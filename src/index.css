@@ -18,7 +18,7 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
-html,body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:15px; min-height:100dvh; overscroll-behavior:none; }
+html,body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:15px; min-height:100dvh; overscroll-behavior:none; scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
 #root { min-height:100dvh; }
 .app-shell { max-width:430px; margin:0 auto; min-height:100dvh; background:var(--bg); }
 
