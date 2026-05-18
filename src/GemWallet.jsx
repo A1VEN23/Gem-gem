@@ -895,7 +895,7 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
 /* ─── Screen: Send — confirm ─────────────────────────────────── */
 const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, onConfirm }) => {
   const asset = assets.find((a) => a.id === assetId);
-  const { sendTransaction, addMockTransaction, testMode } = useWallet();
+  const { sendTransaction, addMockTransaction, testMode, settings: sendSettings } = useWallet();
   const shortRecipient = recipient && recipient.length > 16 ? recipient.slice(0, 7) + "…" + recipient.slice(-7) : (recipient || "");
 
   const [status, setStatus] = useState("idle");
@@ -969,7 +969,7 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 20px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: `1px solid ${DS.border}` }}>
           <span style={{ color: DS.muted, fontSize: 15 }}>Кошелек</span>
-          <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>Кошелек № 1</span>
+          <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>{sendSettings?.walletName || 'Кошелек № 1'}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: `1px solid ${DS.border}` }}>
           <span style={{ color: DS.muted, fontSize: 15 }}>Получатель</span>
@@ -1484,7 +1484,7 @@ function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, on
 
 /* ─── Screen: Swap confirm ───────────────────────────────────── */
 function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
-  const { fireNotif } = useWallet();
+  const { fireNotif, settings: swapSettings } = useWallet();
   const payAsset = swapPayAssets.find((a) => a.id === payId);
   const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
   const receiveAmount = (parseFloat(payAmount.replace(",", ".")) * 0.03384).toFixed(5).replace(".", ",");
@@ -1529,7 +1529,7 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
       </div>
       <div style={{ background: "#181820", borderRadius: 14, margin: "0 16px 10px", overflow: "hidden" }}>
         {[
-          { label: "Кошелек", value: "Кошелек № 1", arrow: false },
+          { label: "Кошелек", value: swapSettings?.walletName || 'Кошелек № 1', arrow: false },
           { label: "Сеть", value: payAsset.symbol, icon: <div style={{ width: 20, height: 20, display: "inline-block", marginLeft: 6 }}><TokenIcon tokenId={payAsset.tokenId} size={20} badgeSize={8} /></div>, arrow: false },
         ].map((row, i) => (
           <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1622,8 +1622,10 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
     id: tx.id,
     type: tx.type,
     amount: `${tx.type === 'Отправлено' ? '-' : '+'}${tx.amount} ${asset.symbol}`,
-    sub: `От ${tx.from}`,
+    sub: tx.type === 'Отправлено' ? (tx.to ? `На: ${tx.to.slice(0,8)}…` : 'Ваш кошелек') : `От: ${tx.from || 'Ваш кошелек'}`,
     positive: tx.type !== 'Отправлено',
+    status: tx.status,
+    pendingUntil: tx.pendingUntil,
     tokenId: asset.tokenId
   }));
 
@@ -1727,25 +1729,58 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
           <div style={{ padding: "0 16px 8px" }}>
             <span style={{ color: "#888", fontSize: 13 }}>Сегодня</span>
           </div>
-          <div style={{ background: "#181820", borderRadius: 16, margin: "0 12px", overflow: "hidden" }}>
-            {transactions.map((tx, i) => (
-              <div key={tx.id} style={{ display: "flex", alignItems: "center", padding: "14px 16px",
-                borderBottom: i < transactions.length - 1 ? "1px solid #2A2A2C" : "none" }}>
-                <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "#252530",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <div style={{ width: 28, height: 28 }}>
-                    <TokenIcon tokenId={tx.tokenId} size={28} badgeSize={12} />
+          <div style={{ background: DS.card, borderRadius: 20, margin: "0 12px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
+            {transactions.map((tx, i) => {
+              const isPending = tx.status === 'В процессе' && tx.pendingUntil;
+              const isCancelled = tx.status === 'Отменена';
+              const amtColor = isPending ? '#FF9F0A' : isCancelled ? DS.muted : tx.positive ? DS.green : DS.danger;
+              const badgeBg = isPending ? '#FF9F0A' : isCancelled ? '#636366' : tx.positive ? DS.green : DS.danger;
+              return (
+              <div key={tx.id} style={{ display: "flex", alignItems: "center", padding: "16px",
+                borderBottom: i < transactions.length - 1 ? `1px solid ${DS.border}` : "none",
+                background: isPending ? "rgba(255,159,10,0.04)" : "none" }}>
+                <div style={{ position: "relative", width: 48, height: 48, flexShrink: 0 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: DS.input,
+                    display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 32, height: 32 }}>
+                      <TokenIcon tokenId={tx.tokenId} size={32} badgeSize={12} />
+                    </div>
+                  </div>
+                  <div style={{ position: "absolute", bottom: -2, right: -2, width: 20, height: 20, borderRadius: "50%",
+                    background: badgeBg, border: `2px solid ${DS.card}`,
+                    display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {isPending ? (
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 11, height: 11 }}>
+                        <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5" />
+                        <path d="M12 7v5l3 3" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    ) : isCancelled ? (
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 11, height: 11 }}>
+                        <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 12, height: 12 }}>
+                        {tx.positive
+                          ? <path d="M12 17V7M7 12l5 5 5-5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          : <path d="M12 7v10M7 12l5-5 5 5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        }
+                      </svg>
+                    )}
                   </div>
                 </div>
-                <div style={{ flex: 1, marginLeft: 12 }}>
-                  <div style={{ color: "white", fontWeight: 600, fontSize: 15 }}>{tx.type}</div>
+                <div style={{ flex: 1, marginLeft: 14 }}>
+                  <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>{tx.type}</div>
+                  <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{tx.sub}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ color: tx.positive ? "#34C759" : "#FF453A", fontWeight: 600, fontSize: 14 }}>{tx.amount}</div>
-                  <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>{tx.sub}</div>
+                  <div style={{ color: amtColor, fontWeight: 700, fontSize: 15 }}>{tx.amount}</div>
+                  <div style={{ color: isCancelled ? DS.danger : isPending ? '#FF9F0A' : DS.muted, fontSize: 12, marginTop: 2 }}>
+                    {isCancelled ? 'Отменена' : isPending ? 'В процессе' : 'Успешно'}
+                  </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -1897,16 +1932,12 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
 
 /* ─── Screen: Wallet Settings ────────────────────────────────── */
 function WalletSettingsScreen({ onBack, wallet }) {
-  const [name, setName] = useState(wallet?.name || 'Кошелек № 1');
+  const { getMnemonic, deleteWallet, updateSetting, settings: walletCtxSettings } = useWallet();
+  const [name, setName] = useState(walletCtxSettings?.walletName || wallet?.name || 'Кошелек № 1');
   const [nameSaved, setNameSaved] = useState(false);
-  const { getMnemonic, deleteWallet } = useWallet();
 
   const handleSaveName = () => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('gem_wallet') || '{}');
-      stored.walletName = name;
-      localStorage.setItem('gem_wallet', JSON.stringify(stored));
-    } catch {}
+    updateSetting('walletName', name.trim() || 'Кошелек № 1');
     setNameSaved(true);
     setTimeout(() => setNameSaved(false), 2000);
   };
@@ -1933,17 +1964,17 @@ function WalletSettingsScreen({ onBack, wallet }) {
       
       <div style={{ padding: '16px' }}>
         <div style={{ background: DS.card, borderRadius: 20, padding: '16px', marginBottom: 16, border: `1px solid ${DS.border}` }}>
-          <div style={{ color: DS.muted, fontSize: 13, marginBottom: 8 }}>Имя кошелька</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input value={name} onChange={e => { setName(e.target.value); setNameSaved(false); }}
-              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: 16, fontWeight: 500 }} />
-            <button onClick={handleSaveName}
-              style={{ padding: '6px 14px', borderRadius: 10, background: nameSaved ? DS.green : DS.blue,
-                color: 'white', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                transition: 'background 0.2s', flexShrink: 0 }}>
-              {nameSaved ? '✓' : 'Сохранить'}
-            </button>
-          </div>
+          <div style={{ color: DS.muted, fontSize: 13, marginBottom: 10 }}>Имя кошелька</div>
+          <input value={name} onChange={e => { setName(e.target.value); setNameSaved(false); }}
+            style={{ width: '100%', background: DS.input, border: `1px solid ${DS.border}`, borderRadius: 12,
+              outline: 'none', color: 'white', fontSize: 16, fontWeight: 500, padding: '11px 14px',
+              boxSizing: 'border-box', marginBottom: 10 }} />
+          <button onClick={handleSaveName}
+            style={{ width: '100%', padding: '12px', borderRadius: 12, background: nameSaved ? DS.green : DS.blue,
+              color: 'white', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              transition: 'background 0.2s' }}>
+            {nameSaved ? '✓ Сохранено' : 'Сохранить'}
+          </button>
         </div>
 
         <div style={{ background: DS.card, borderRadius: 20, overflow: 'hidden', border: `1px solid ${DS.border}`, marginBottom: 16 }}>
@@ -2407,8 +2438,9 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
           <div style={{ background: DS.card, borderRadius: 20, overflow: "hidden", border: `1px solid ${DS.border}` }}>
             {allTx.map((tx, i) => {
                 const isPending = tx.status === 'В процессе' && tx.pendingUntil;
-                const amtColor = isPending ? '#FF9F0A' : tx.positive ? DS.green : DS.danger;
-                const badgeBg = isPending ? '#FF9F0A' : tx.positive ? DS.green : DS.danger;
+                const isCancelled = tx.status === 'Отменена';
+                const amtColor = isPending ? '#FF9F0A' : isCancelled ? DS.muted : tx.positive ? DS.green : DS.danger;
+                const badgeBg = isPending ? '#FF9F0A' : isCancelled ? '#636366' : tx.positive ? DS.green : DS.danger;
                 return (
                 <div key={tx.id} onClick={() => setSelectedTx(tx)}
                   style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
@@ -2429,6 +2461,10 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
                         <svg viewBox="0 0 24 24" fill="none" style={{ width: 11, height: 11 }}>
                           <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5" />
                           <path d="M12 7v5l3 3" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                        </svg>
+                      ) : isCancelled ? (
+                        <svg viewBox="0 0 24 24" fill="none" style={{ width: 11, height: 11 }}>
+                          <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="3" strokeLinecap="round" />
                         </svg>
                       ) : (
                         <svg viewBox="0 0 24 24" fill="none" style={{ width: 12, height: 12 }}>
@@ -2701,7 +2737,7 @@ function WalletConnectScreen({ onBack }) {
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <TopBar title="WalletConnect" onBack={onBack}
         rightEl={
-          <div onClick={() => window.open('https://gemwallet.com/docs/guides/how-to-use-walletconnect', '_blank')}
+          <div onClick={() => openInApp('https://gemwallet.com/docs/guides/how-to-use-walletconnect')}
             style={{ cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
               <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
@@ -2796,7 +2832,7 @@ function SupportScreen({ onBack }) {
 
       <div style={{ background: "#181820", borderRadius: 20, margin: "0 16px", overflow: "hidden", border: "1px solid #252528" }}>
         {channels.map((ch, i) => (
-          <div key={ch.id} onClick={() => { const tg = window.Telegram?.WebApp; const url = ch.url; if (url.startsWith('https://t.me/') && tg?.openTelegramLink) { tg.openTelegramLink(url); } else if (tg?.openLink) { tg.openLink(url); } else { window.open(url, '_blank'); } }}
+          <div key={ch.id} onClick={() => { const url = ch.url; const tg = window.Telegram?.WebApp; if (url.startsWith('https://t.me/') && tg?.openTelegramLink) { tg.openTelegramLink(url); } else { openInApp(url); } }}
             style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
               borderBottom: i < channels.length - 1 ? "1px solid #252528" : "none",
               transition: "background 0.15s", active: "background: rgba(255,255,255,0.04)" }}>
@@ -2922,7 +2958,7 @@ function AboutScreen({ onBack }) {
 
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 0", overflow: "hidden" }}>
         {legalLinks.map((item, i) => (
-          <div key={item.label} onClick={() => { const tg = window.Telegram?.WebApp; if (tg?.openLink) tg.openLink(item.url, { try_instant_view: false }); else window.open(item.url, '_blank'); }}
+          <div key={item.label} onClick={() => openInApp(item.url)}
             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px",
               borderBottom: i < legalLinks.length - 1 ? "1px solid #2A2A2C" : "none", cursor: "pointer" }}>
             <span style={{ color: "white", fontSize: 16 }}>{item.label}</span>
@@ -2934,7 +2970,7 @@ function AboutScreen({ onBack }) {
       <div style={{ color: "#888", fontSize: 13, padding: "16px 32px 8px", fontWeight: 600 }}>Сообщество</div>
       <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px", overflow: "hidden" }}>
         {socialLinks.map((item, i) => (
-          <div key={item.label} onClick={() => { const tg = window.Telegram?.WebApp; const url = item.url; if (url.startsWith('https://t.me/') && tg?.openTelegramLink) { tg.openTelegramLink(url); } else if (tg?.openLink) { tg.openLink(url, { try_instant_view: false }); } else { window.open(url, '_blank'); } }}
+          <div key={item.label} onClick={() => { const url = item.url; const tg = window.Telegram?.WebApp; if (url.startsWith('https://t.me/') && tg?.openTelegramLink) { tg.openTelegramLink(url); } else { openInApp(url); } }}
             style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
               borderBottom: i < socialLinks.length - 1 ? "1px solid #2A2A2C" : "none" }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 }}>
@@ -3073,7 +3109,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
       {
         label: "Поддержка",
         icon: <IconBox bg="#30D158"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" /><path d="M9 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="17" r="1" fill="white" /></svg></IconBox>,
-        onPress: () => { const tg = window.Telegram?.WebApp; if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/GemWalletSupport'); else window.open('https://t.me/GemWalletSupport', '_blank'); },
+        onPress: () => { const tg = window.Telegram?.WebApp; if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/GemWalletSupport'); else openInApp('https://t.me/GemWalletSupport'); },
       },
       {
         label: "Награды",
@@ -3736,7 +3772,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
               <path d="M12 2l3 5h5l-4 4 1.5 5.5L12 14l-5.5 2.5L8 11 4 7h5L12 2z" fill="white" />
             </svg>
           </div>
-          <span style={{ color: "white", fontWeight: 600, fontSize: 17 }}>Кошелек № 1</span>
+          <span style={{ color: "white", fontWeight: 600, fontSize: 17 }}>{settings?.walletName || 'Кошелек № 1'}</span>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
             <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
@@ -4297,6 +4333,54 @@ const BottomNav = memo(({ activeTab, setActiveTab }) => {
   );
 });
 
+/* ─── In-App Browser ─────────────────────────────────────────── */
+let __openInAppBrowser = null;
+function openInApp(url) {
+  if (__openInAppBrowser) {
+    __openInAppBrowser(url);
+  } else {
+    const tg = window.Telegram?.WebApp;
+    if (tg?.openLink) tg.openLink(url, { try_instant_view: false });
+    else window.open(url, '_blank');
+  }
+}
+
+const InAppBrowserModal = ({ url, onClose }) => {
+  const [loading, setLoading] = useState(true);
+  const displayUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column',
+      background: DS.bg, fontFamily: "'Inter','Roboto',sans-serif" }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', background: DS.card,
+        borderBottom: `1px solid ${DS.border}`, gap: 8, flexShrink: 0 }}>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+            <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </button>
+        <div style={{ flex: 1, background: DS.input, borderRadius: 10, padding: '7px 12px', overflow: 'hidden' }}>
+          <div style={{ color: DS.muted, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayUrl}</div>
+        </div>
+        <button onClick={() => { const tg = window.Telegram?.WebApp; if (tg?.openLink) tg.openLink(url, { try_instant_view: false }); else window.open(url, '_blank'); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke={DS.blue} strokeWidth="2" strokeLinecap="round" />
+            <path d="M15 3h6v6M10 14L21 3" stroke={DS.blue} strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      {loading && (
+        <div style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', background: DS.bg }}>
+          <div style={{ color: DS.muted, fontSize: 15 }}>Загрузка…</div>
+        </div>
+      )}
+      <iframe src={url} onLoad={() => setLoading(false)}
+        style={{ flex: 1, border: 'none', background: 'white' }} allow="fullscreen" title="browser" />
+    </div>
+  );
+};
+
 /* ─── Root component ─────────────────────────────────────────── */
 function WalletHomeUI() {
   const [screen, setScreen] = useState({ name: "home" });
@@ -4304,7 +4388,13 @@ function WalletHomeUI() {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [swapPayId, setSwapPayId] = useState(null);
   const [swapReceiveId, setSwapReceiveId] = useState(null);
+  const [inAppUrl, setInAppUrl] = useState(null);
   const isAdmin = useIsAdmin();
+
+  useEffect(() => {
+    __openInAppBrowser = (url) => setInAppUrl(url);
+    return () => { __openInAppBrowser = null; };
+  }, []);
 
   const go = useCallback((s) => setScreen(s || { name: "home" }), []);
 
@@ -4314,6 +4404,7 @@ function WalletHomeUI() {
   return (
     <div style={{ background: "#0D0D0F", minHeight: "100vh", display: "flex", justifyContent: "center", fontFamily: "'Inter','Roboto',sans-serif" }}>
       <AnimStyles />
+      {inAppUrl && <InAppBrowserModal url={inAppUrl} onClose={() => setInAppUrl(null)} />}
       <div style={{ width: "100%", maxWidth: 420, minHeight: "100vh", background: "#0D0D0F", display: "flex", flexDirection: "column", position: "relative" }}>
 
         {showComingSoon && (
