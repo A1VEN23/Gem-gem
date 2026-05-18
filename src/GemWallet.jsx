@@ -1,5 +1,6 @@
 /* ─── Gem Wallet — Updated ──────────────────────────────────── */
 import { useState, useEffect, useRef, memo, useMemo, useCallback } from "react";
+import gemIcon from './assets/gem-icon.png';
 import { useWallet } from './context/WalletContext.jsx';
 import { getEvmFeeEstimate } from './lib/crypto/txSender.js';
 import { TokenIcon } from './components/TokenIcon.jsx';
@@ -4830,7 +4831,8 @@ function OnboardingScreen() {
   const [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [termsChecked, setTermsChecked] = useState([false, false, false]);
-  const [verifyPhrase, setVerifyPhrase] = useState('');
+  const [verifySlots, setVerifySlots] = useState([]);
+  const [verifyPool, setVerifyPool] = useState([]);
   const [localLoading, setLocalLoading] = useState(false);
 
   const handleStartCreate = () => {
@@ -4845,17 +4847,61 @@ function OnboardingScreen() {
     }
   };
 
+  const DECOY_WORDS = ['apple','stone','river','cloud','thunder','silver','dragon','forest','castle','bridge','garden','mirror','candle','shadow','winter','summer'];
+
   const prepareVerify = () => {
-    setVerifyPhrase('');
+    const words = mnemonic.split(' ');
+    const totalWords = words.length;
+    const hiddenCount = Math.min(4, Math.ceil(totalWords / 3));
+    const hiddenSet = new Set();
+    while (hiddenSet.size < hiddenCount) {
+      hiddenSet.add(Math.floor(Math.random() * totalWords));
+    }
+    const slots = words.map((word, i) => ({
+      correctWord: word,
+      hidden: hiddenSet.has(i),
+      placedId: null,
+    }));
+    const correctPoolItems = [...hiddenSet].map((idx, i) => ({
+      id: i, word: words[idx], placed: false,
+    }));
+    const usedDecoys = DECOY_WORDS.filter(d => !words.includes(d)).slice(0, hiddenCount);
+    const decoyItems = usedDecoys.map((word, i) => ({
+      id: hiddenCount + i, word, placed: false,
+    }));
+    const pool = [...correctPoolItems, ...decoyItems].sort(() => Math.random() - 0.5);
+    setVerifySlots(slots);
+    setVerifyPool(pool);
     setError('');
     setStep('verify');
   };
 
+  const handlePoolTap = (item) => {
+    if (item.placed) {
+      const slotIdx = verifySlots.findIndex(s => s.hidden && s.placedId === item.id);
+      if (slotIdx === -1) return;
+      setVerifySlots(prev => prev.map((s, i) => i === slotIdx ? { ...s, placedId: null } : s));
+      setVerifyPool(prev => prev.map(p => p.id === item.id ? { ...p, placed: false } : p));
+    } else {
+      const slotIdx = verifySlots.findIndex(s => s.hidden && s.placedId === null);
+      if (slotIdx === -1) return;
+      setVerifySlots(prev => prev.map((s, i) => i === slotIdx ? { ...s, placedId: item.id } : s));
+      setVerifyPool(prev => prev.map(p => p.id === item.id ? { ...p, placed: true } : p));
+    }
+  };
+
   const handleVerify = () => {
-    const entered = verifyPhrase.trim().toLowerCase().replace(/\s+/g, ' ');
-    const expected = mnemonic.trim().toLowerCase();
-    if (entered !== expected) {
-      setError('Фраза не совпадает. Проверьте и попробуйте снова.');
+    const allFilled = verifySlots.every(s => !s.hidden || s.placedId !== null);
+    if (!allFilled) { setError('Заполните все пустые позиции'); return; }
+    const isCorrect = verifySlots.every(s => {
+      if (!s.hidden) return true;
+      const poolItem = verifyPool.find(p => p.id === s.placedId);
+      return poolItem && poolItem.word.toLowerCase() === s.correctWord.toLowerCase();
+    });
+    if (!isCorrect) {
+      setError('Неверные слова. Проверьте фразу и попробуйте снова.');
+      setVerifySlots(prev => prev.map(s => s.hidden ? { ...s, placedId: null } : s));
+      setVerifyPool(prev => prev.map(p => ({ ...p, placed: false })));
       return;
     }
     setStep('create-password');
@@ -4896,23 +4942,11 @@ function OnboardingScreen() {
     <ORoot>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", padding: "40px 0" }}>
-        <div style={{ width: 110, height: 110, borderRadius: 28,
-          background: "linear-gradient(145deg,#4F8FFF,#1A55E3)",
-          boxShadow: "0 8px 40px rgba(59,125,255,0.35)",
-          display: "flex", alignItems: "center", justifyContent: "center",
+        <div style={{ width: 120, height: 120, borderRadius: 28,
+          overflow: "hidden",
+          boxShadow: "0 8px 40px rgba(59,125,255,0.45)",
           animation: "scaleIn 0.4s cubic-bezier(.22,.68,0,1.2) both" }}>
-          <svg viewBox="0 0 64 64" fill="none" style={{ width: 68, height: 68 }}>
-            <polygon points="32,10 50,24 44,54 20,54 14,24" fill="white" fillOpacity="0.15" />
-            <polygon points="32,10 50,24 44,54 20,54 14,24" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
-            <polygon points="32,10 14,24 20,54" fill="white" fillOpacity="0.55" />
-            <polygon points="32,10 50,24 44,54" fill="white" fillOpacity="0.35" />
-            <polygon points="14,24 20,54 44,54 50,24" fill="white" fillOpacity="0.88" />
-            <line x1="14" y1="24" x2="50" y2="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.6" />
-            <line x1="20" y1="54" x2="14" y2="24" stroke="white" strokeWidth="1" strokeOpacity="0.5" />
-            <line x1="44" y1="54" x2="50" y2="24" stroke="white" strokeWidth="1" strokeOpacity="0.5" />
-            <line x1="32" y1="10" x2="20" y2="54" stroke="white" strokeWidth="0.8" strokeOpacity="0.3" />
-            <line x1="32" y1="10" x2="44" y2="54" stroke="white" strokeWidth="0.8" strokeOpacity="0.3" />
-          </svg>
+          <img src={gemIcon} alt="Gem Wallet" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         </div>
       </div>
       <div style={{ animation: "fadeSlideUp 0.32s 0.10s cubic-bezier(.22,.68,0,1.2) both", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -5063,27 +5097,65 @@ function OnboardingScreen() {
   if (step === 'verify') return (
     <ORoot>
       <OBackBtn onClick={() => setStep('backup')} />
-      <div style={{ color: DS.text, fontWeight: 700, fontSize: 24, marginBottom: 8, marginTop: 16 }}>Проверка фразы</div>
-      <div style={{ color: DS.muted, fontSize: 15, marginBottom: 20, lineHeight: 1.5 }}>
-        Введите или вставьте все 12 слов вашей seed-фразы через пробел, чтобы подтвердить сохранение
+      <div style={{ color: DS.text, fontWeight: 700, fontSize: 22, marginBottom: 6, marginTop: 16 }}>Подтвердить</div>
+      <div style={{ color: DS.muted, fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
+        Нажмите на слова в правильном порядке, чтобы заполнить пустые места
       </div>
-      <textarea
-        placeholder="слово1 слово2 слово3 … слово12"
-        value={verifyPhrase}
-        onChange={e => { setVerifyPhrase(e.target.value); setError(''); }}
-        rows={5}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        style={{ width: "100%", background: DS.card, border: `1px solid ${DS.border}`,
-          borderRadius: 14, padding: "14px 16px", color: DS.text, fontSize: 15,
-          outline: "none", resize: "none", fontFamily: DS.font, lineHeight: 1.6,
-          boxSizing: "border-box", marginBottom: 10 }}
-      />
-      <div style={{ flex: 1 }} />
+      {/* 2-column word grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+        {verifySlots.map((slot, i) => {
+          const leftCol = i < Math.ceil(verifySlots.length / 2);
+          const colIdx = leftCol ? i : i - Math.ceil(verifySlots.length / 2);
+          const displayIdx = leftCol ? i : colIdx + Math.ceil(verifySlots.length / 2);
+          let displayWord = null;
+          if (!slot.hidden) {
+            displayWord = slot.correctWord;
+          } else if (slot.placedId !== null) {
+            const poolItem = verifyPool.find(p => p.id === slot.placedId);
+            displayWord = poolItem ? poolItem.word : null;
+          }
+          const isEmpty = slot.hidden && slot.placedId === null;
+          return (
+            <div key={i} onClick={() => {
+              if (slot.hidden && slot.placedId !== null) {
+                const poolItem = verifyPool.find(p => p.id === slot.placedId);
+                if (poolItem) handlePoolTap(poolItem);
+              }
+            }}
+              style={{
+                background: isEmpty ? "transparent" : DS.card,
+                border: `1px solid ${isEmpty ? DS.border : slot.hidden ? DS.blue : DS.border}`,
+                borderRadius: 10, padding: "10px 12px",
+                display: "flex", alignItems: "center", gap: 8,
+                cursor: slot.hidden && slot.placedId !== null ? "pointer" : "default",
+                minHeight: 42,
+              }}>
+              <span style={{ color: DS.muted, fontSize: 12, minWidth: 18, fontWeight: 600 }}>{i + 1}.</span>
+              {displayWord ? (
+                <span style={{ color: slot.hidden ? DS.blue : DS.text, fontSize: 14, fontWeight: slot.hidden ? 600 : 500 }}>{displayWord}</span>
+              ) : (
+                <span style={{ color: DS.border, fontSize: 13 }}></span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* Word pool */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, justifyContent: "center" }}>
+        {verifyPool.map(item => (
+          <div key={item.id} onClick={() => handlePoolTap(item)}
+            style={{
+              background: item.placed ? DS.blue : DS.card,
+              border: `1px solid ${item.placed ? DS.blue : DS.border}`,
+              borderRadius: 20, padding: "8px 16px", cursor: "pointer",
+              transition: "all 0.15s",
+            }}>
+            <span style={{ color: DS.text, fontSize: 14, fontWeight: item.placed ? 600 : 400 }}>{item.word}</span>
+          </div>
+        ))}
+      </div>
       <OErr msg={error} />
-      <OBtn onClick={handleVerify}>Подтвердить и начать</OBtn>
+      <OBtn onClick={handleVerify}>Продолжить</OBtn>
     </ORoot>
   );
 
