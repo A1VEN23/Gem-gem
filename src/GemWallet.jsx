@@ -1634,30 +1634,22 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
     {
       label: "Отправить",
       onClick: onSend,
-      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="white"/></svg>,
+      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M22 2L11 13" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     },
     {
       label: "Получить",
       onClick: onReceive,
-      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-        <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h3v3h-3v-3zm3 3h3v3h-3v-3zm-3 3h3v-3h-3v3zm6-3v6h-3v-6h3z" fill="white" />
-      </svg>,
+      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="5" width="3" height="3" fill="white"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="16" y="5" width="3" height="3" fill="white"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="16" width="3" height="3" fill="white"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3v1h-3z" fill="white"/></svg>,
     },
     {
       label: "Купить",
       onClick: onBuy,
-      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-        <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2" />
-        <path d="M12 7v10M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h5a1.5 1.5 0 0 1 0 3H9" stroke="white" strokeWidth="2" strokeLinecap="round" />
-      </svg>,
+      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><text x="12" y="17" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold" fontFamily="Arial">$</text></svg>,
     },
     {
       label: "Обмен",
       onClick: onSwap,
-      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-        <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>,
+      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M20 12A8 8 0 0 0 5.07 7.5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/><path d="M4 12a8 8 0 0 0 14.93 4.5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/><path d="M5 4v4h4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 20v-4h-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     },
   ];
 
@@ -1690,7 +1682,7 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
         {actionButtons.map((btn) => (
           <div key={btn.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer" }}
             onClick={btn.onClick}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(145deg, #4F8FFF, #1A55E3)", display: "flex", alignItems: "center", justifyContent: "center" }}
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#3B7DFF", boxShadow: "0 4px 20px #3B7DFF66", display: "flex", alignItems: "center", justifyContent: "center" }}
               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.93)")}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
               onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>
@@ -3795,29 +3787,21 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-around", padding: "0 24px 24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-around", padding: "0 20px 24px" }}>
         {(() => {
           const T = getLang(settings);
           return [
-            { label: T.send, onClick: onSend, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="white"/></svg> },
-            { label: T.receive, onClick: onReceive, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-              <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h3v3h-3v-3zm3 3h3v3h-3v-3zm-3 3h3v-3h-3v3zm6-3v6h-3v-6h3z" fill="white" />
-            </svg> },
-            { label: T.buy, onClick: onBuy, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-              <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2" />
-              <path d="M12 7v10M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h5a1.5 1.5 0 0 1 0 3H9" stroke="white" strokeWidth="2" strokeLinecap="round" />
-            </svg> },
-            { label: T.swap, onClick: onSwap, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-              <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg> },
+            { label: T.send, onClick: onSend, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M22 2L11 13" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+            { label: T.receive, onClick: onReceive, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="5" width="3" height="3" fill="white"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="16" y="5" width="3" height="3" fill="white"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="16" width="3" height="3" fill="white"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3v1h-3z" fill="white"/></svg> },
+            { label: T.buy, onClick: onBuy, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><text x="12" y="17" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold" fontFamily="Arial">$</text></svg> },
+            { label: T.swap, onClick: onSwap, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M20 12A8 8 0 0 0 5.07 7.5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/><path d="M4 12a8 8 0 0 0 14.93 4.5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/><path d="M5 4v4h4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 20v-4h-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
           ];
         })().map((btn, i) => (
           <div key={btn.label} className="tap-btn" onClick={btn.onClick}
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, animation: `fadeSlideUp 0.3s ${i * 0.06}s ease both` }}>
-            <div style={{ width: 58, height: 58, borderRadius: "50%",
-              background: "linear-gradient(145deg, #4F8FFF, #1A55E3)",
-              boxShadow: "0 4px 18px #3B7DFF55",
+            <div style={{ width: 64, height: 64, borderRadius: "50%",
+              background: "#3B7DFF",
+              boxShadow: "0 4px 20px #3B7DFF66",
               display: "flex", alignItems: "center", justifyContent: "center" }}>
               {btn.icon}
             </div>
@@ -4307,16 +4291,22 @@ const BottomNav = memo(({ activeTab, setActiveTab }) => {
   ];
 
   return (
-    <div style={{ background: "rgba(10, 10, 10, 0.85)", backdropFilter: "blur(20px)", borderTop: `1px solid ${DS.border}`, display: "flex", padding: "8px 0 28px" }}>
+    <div style={{ background: "rgba(10, 10, 10, 0.92)", backdropFilter: "blur(20px)", borderTop: `1px solid ${DS.border}`, display: "flex", padding: "8px 0 28px" }}>
       {tabs.map((tab) => {
         const active = activeTab === tab.id;
         return (
           <div key={tab.id} onClick={() => setActiveTab(tab.id)}
-            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, cursor: "pointer", transition: "all 0.2s" }}>
-            <div className="nav-icon" style={{ padding: "4px 0" }}>
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", transition: "all 0.2s" }}>
+            <div className="nav-icon" style={{
+              width: 48, height: 32, borderRadius: 16,
+              background: active ? "rgba(59,125,255,0.18)" : "transparent",
+              border: active ? `1.5px solid rgba(59,125,255,0.45)` : "1.5px solid transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.2s",
+            }}>
               <tab.Icon active={active} />
             </div>
-            <span style={{ color: active ? DS.blue : DS.muted, fontSize: 11, fontWeight: 500 }}>{tab.label}</span>
+            <span style={{ color: active ? DS.blue : DS.muted, fontSize: 11, fontWeight: active ? 600 : 500 }}>{tab.label}</span>
           </div>
         );
       })}
