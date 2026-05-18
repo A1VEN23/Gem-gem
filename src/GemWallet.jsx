@@ -743,6 +743,10 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
 
   const [selected, setSelected] = useState("normal");
   const [customVal, setCustomVal] = useState("");
+  const handleSelectCustom = () => {
+    setSelected("custom");
+    if (!customVal) setCustomVal(String(feeData.normal.native));
+  };
   const isCustom = selected === "custom";
   const canContinue = !isCustom || (customVal.trim() !== "" && parseFloat(customVal) > 0);
 
@@ -811,7 +815,7 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
           })}
 
           {/* Custom option */}
-          <div onClick={() => setSelected("custom")}
+          <div onClick={handleSelectCustom}
             style={{ display: "flex", alignItems: "flex-start", padding: "16px", cursor: "pointer",
               borderTop: `1px solid ${DS.border}`,
               background: isCustom ? "rgba(0,122,255,0.07)" : "none",
@@ -826,18 +830,26 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
               </div>
               {isCustom ? (
                 <>
-                  <input
-                    type="number"
-                    value={customVal}
-                    onChange={e => setCustomVal(e.target.value)}
-                    onClick={e => e.stopPropagation()}
-                    placeholder={`Введите ${unitLabel}`}
-                    min="1"
-                    style={{ marginTop: 10, background: DS.input, border: `1px solid ${DS.border}`,
-                      borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 15,
-                      width: "100%", outline: "none", fontFamily: DS.font,
-                      boxSizing: "border-box", WebkitAppearance: "none" }}
-                  />
+                  <div style={{ marginTop: 10, position: "relative", display: "flex", alignItems: "center" }}>
+                    <input
+                      type="number"
+                      value={customVal}
+                      onChange={e => setCustomVal(e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      placeholder={String(feeData.normal.native)}
+                      min="1"
+                      style={{ background: DS.input, border: `1px solid ${DS.border}`,
+                        borderRadius: 10, padding: "10px 90px 10px 14px", color: "white", fontSize: 15,
+                        width: "100%", outline: "none", fontFamily: DS.font,
+                        boxSizing: "border-box", WebkitAppearance: "none" }}
+                    />
+                    <span style={{ position: "absolute", right: 12, color: DS.muted, fontSize: 12, pointerEvents: "none", whiteSpace: "nowrap" }}>{unitLabel}</span>
+                  </div>
+                  {customVal && parseFloat(customVal) > 0 && (
+                    <div style={{ color: DS.muted, fontSize: 12, marginTop: 5 }}>
+                      ≈ {formatFee(parseFloat(customVal))} {unitLabel}
+                    </div>
+                  )}
                   {customVal && parseFloat(customVal) > 0 && parseFloat(customVal) <= feeData.slow.native / 10 && (
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 8, padding: "10px 12px", background: "rgba(255,159,10,0.10)", borderRadius: 10, border: "1px solid rgba(255,159,10,0.25)" }}>
                       <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 1 }}>
@@ -2738,7 +2750,7 @@ function SupportScreen({ onBack }) {
       id: "tg",
       label: "Telegram поддержка",
       sub: "Официальный канал поддержки",
-      url: "https://t.me/gemwallet",
+      url: "https://t.me/GemWalletSupport",
       bg: "#0098EA",
       icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 22, height: 22 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg>,
     },
@@ -2785,7 +2797,7 @@ function SupportScreen({ onBack }) {
 
       <div style={{ background: "#181820", borderRadius: 20, margin: "0 16px", overflow: "hidden", border: "1px solid #252528" }}>
         {channels.map((ch, i) => (
-          <div key={ch.id} onClick={() => window.open(ch.url, '_blank')}
+          <div key={ch.id} onClick={() => { const tg = window.Telegram?.WebApp; const url = ch.url; if (url.startsWith('https://t.me/') && tg?.openTelegramLink) { tg.openTelegramLink(url); } else if (tg?.openLink) { tg.openLink(url); } else { window.open(url, '_blank'); } }}
             style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
               borderBottom: i < channels.length - 1 ? "1px solid #252528" : "none",
               transition: "background 0.15s", active: "background: rgba(255,255,255,0.04)" }}>
@@ -2893,13 +2905,15 @@ function AboutScreen({ onBack }) {
   const socialLinks = [
     { label: "X (Twitter)", sub: "@GemWalletApp", url: "https://x.com/GemWalletApp", bg: "#111",
       icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg> },
-    { label: "Telegram", sub: "t.me/gemwallet", url: "https://t.me/gemwallet", bg: "#0098EA",
+    { label: "Telegram", sub: "t.me/gemwallet", url: "https://t.me/gemwallet_official", bg: "#0098EA",
       icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg> },
     { label: "YouTube", sub: "youtube.com/@gemwallet", url: "https://www.youtube.com/@gemwallet", bg: "#FF0000",
       icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M23 7s-.3-1.9-1.2-2.7c-1.1-1.2-2.4-1.2-3-1.3C16.2 3 12 3 12 3s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5.1 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.3.3 4.3s.3 1.9 1.2 2.7c1.1 1.2 2.6 1.1 3.3 1.2C7.5 21.7 12 21.7 12 21.7s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.7 1.2-2.7s.3-2.1.3-4.3v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg> },
     { label: "GitHub", sub: "github.com/gemwalletcom", url: "https://github.com/gemwalletcom", bg: "#161B22",
       icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85.004 1.71.115 2.51.337 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.01 10.01 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg> },
     { label: "Discord", sub: "Сообщество Gem Wallet", url: "https://discord.gg/aWXpSmwHH4", bg: "#5865F2",
+    { label: "Reddit", sub: "r/gemwallet", url: "https://www.reddit.com/r/gemwallet", bg: "#FF4500",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><circle cx="12" cy="8" r="2.5"/><path d="M4 13c0-1.1.9-2 2-2 .5 0 1 .2 1.4.5C8.5 10.6 10.2 10 12 10s3.5.6 4.6 1.5c.4-.3.9-.5 1.4-.5 1.1 0 2 .9 2 2s-.9 2-2 2c-.3 0-.6-.1-.9-.2C16.4 15.5 14.3 16 12 16s-4.4-.5-5.1-1.2c-.3.1-.6.2-.9.2-1.1 0-2-.9-2-2z" stroke="white" strokeWidth=".5"/><circle cx="10" cy="13" r="1"/><circle cx="14" cy="13" r="1"/><path d="M10 15c.5.5 1 .8 2 .8s1.5-.3 2-.8" stroke="white" strokeWidth="1.2" fill="none" strokeLinecap="round"/></svg> },
       icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg> },
   ];
 
@@ -2909,7 +2923,7 @@ function AboutScreen({ onBack }) {
 
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 0", overflow: "hidden" }}>
         {legalLinks.map((item, i) => (
-          <div key={item.label} onClick={() => window.open(item.url, '_blank')}
+          <div key={item.label} onClick={() => { const tg = window.Telegram?.WebApp; if (tg?.openLink) tg.openLink(item.url, { try_instant_view: false }); else window.open(item.url, '_blank'); }}
             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px",
               borderBottom: i < legalLinks.length - 1 ? "1px solid #2A2A2C" : "none", cursor: "pointer" }}>
             <span style={{ color: "white", fontSize: 16 }}>{item.label}</span>
@@ -2921,7 +2935,7 @@ function AboutScreen({ onBack }) {
       <div style={{ color: "#888", fontSize: 13, padding: "16px 32px 8px", fontWeight: 600 }}>Сообщество</div>
       <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px", overflow: "hidden" }}>
         {socialLinks.map((item, i) => (
-          <div key={item.label} onClick={() => window.open(item.url, '_blank')}
+          <div key={item.label} onClick={() => { const tg = window.Telegram?.WebApp; const url = item.url; if (url.startsWith('https://t.me/') && tg?.openTelegramLink) { tg.openTelegramLink(url); } else if (tg?.openLink) { tg.openLink(url, { try_instant_view: false }); } else { window.open(url, '_blank'); } }}
             style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
               borderBottom: i < socialLinks.length - 1 ? "1px solid #2A2A2C" : "none" }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 }}>
@@ -3060,7 +3074,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
       {
         label: "Поддержка",
         icon: <IconBox bg="#30D158"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" /><path d="M9 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="17" r="1" fill="white" /></svg></IconBox>,
-        onPress: () => setSubScreen("support"),
+        onPress: () => { const tg = window.Telegram?.WebApp; if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/GemWalletSupport'); else window.open('https://t.me/GemWalletSupport', '_blank'); },
       },
       {
         label: "Награды",
@@ -3384,10 +3398,9 @@ function SecurityScreen({ onBack, onLock }) {
 
 /* ─── Screen: Notifications ──────────────────────────────────── */
 function NotificationsScreen({ onBack }) {
-  const { settings, updateSetting, requestNotifPermission } = useWallet();
+  const { settings, updateSetting } = useWallet();
   const notifEnabled = settings?.notifEnabled ?? false;
   const [subScreen, setSubScreen] = useState(null);
-  const [permDenied, setPermDenied] = useState(false);
 
   const Toggle = ({ value, onChange }) => (
     <div onClick={() => onChange(!value)}
@@ -3398,15 +3411,9 @@ function NotificationsScreen({ onBack }) {
     </div>
   );
 
-  const handleNotifToggle = async (val) => {
-    if (val) {
-      const granted = await requestNotifPermission();
-      if (!granted) { setPermDenied(true); return; }
-      setPermDenied(false);
-    }
+  const handleNotifToggle = (val) => {
     updateSetting('notifEnabled', val);
   };
-
   if (subScreen === "price-alerts") return <PriceAlertsScreen onBack={() => setSubScreen(null)} />;
 
   return (
@@ -3426,11 +3433,9 @@ function NotificationsScreen({ onBack }) {
           <span style={{ color: "white", fontSize: 16 }}>Уведомления</span>
           <Toggle value={notifEnabled} onChange={handleNotifToggle} />
         </div>
-        {permDenied && (
-          <div style={{ padding: "0 16px 14px", color: "#FF9500", fontSize: 13 }}>
-            Разрешите уведомления в настройках браузера и повторите попытку.
-          </div>
-        )}
+        <div style={{ padding: "0 16px 14px", color: "#888", fontSize: 13 }}>
+          Уведомления приходят напрямую в чат бота.
+        </div>
       </div>
 
       <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px", overflow: "hidden" }}>
