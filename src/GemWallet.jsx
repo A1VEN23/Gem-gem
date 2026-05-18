@@ -1947,7 +1947,6 @@ function WalletSettingsScreen({ onBack, wallet }) {
     </div>
   );
 }
-}
 
 /* ─── Screen: Wallet Add Options ─────────────────────────────── */
 function WalletAddScreen({ onBack, onCreate, onImport, onShowMenu }) {
@@ -5476,7 +5475,6 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
       onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false, isTooLow: false });
     }
   }
-  }
 
   const CheckIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" style={{ width: 12, height: 12 }}>
@@ -6725,7 +6723,6 @@ function WalletSettingsScreen({ onBack, wallet }) {
       </div>
     </div>
   );
-}
 }
 
 /* ─── Screen: Wallet Add Options ─────────────────────────────── */
