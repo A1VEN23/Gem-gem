@@ -677,15 +677,18 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
   const isCustom = selected === "custom";
   const canContinue = !isCustom || (customVal.trim() !== "" && parseFloat(customVal) > 0);
 
-  function handleContinue() {
+    function handleContinue() {
     if (!canContinue) return;
     if (isCustom) {
       const raw = parseFloat(customVal) || 0;
-      onContinue({ key: "custom", native: raw, nativeFormatted: formatFee(raw), usd: "—", unitLabel, multiplier: 1.0, isCustom: true });
+      const slowVal = feeData.slow.native;
+      const isTooLow = raw > 0 && raw <= slowVal / 10;
+      onContinue({ key: "custom", native: raw, nativeFormatted: formatFee(raw), usd: "—", unitLabel, multiplier: 1.0, isCustom: true, isTooLow, slowThreshold: slowVal / 10 });
     } else {
       const d = feeData[selected];
-      onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false });
+      onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false, isTooLow: false });
     }
+  }
   }
 
   const CheckIcon = () => (
@@ -754,18 +757,31 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
                 </span>
               </div>
               {isCustom ? (
-                <input
-                  type="number"
-                  value={customVal}
-                  onChange={e => setCustomVal(e.target.value)}
-                  onClick={e => e.stopPropagation()}
-                  placeholder={`Введите ${unitLabel}`}
-                  min="1"
-                  style={{ marginTop: 10, background: DS.input, border: `1px solid ${DS.border}`,
-                    borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 15,
-                    width: "100%", outline: "none", fontFamily: DS.font,
-                    boxSizing: "border-box", WebkitAppearance: "none" }}
-                />
+                <>
+                  <input
+                    type="number"
+                    value={customVal}
+                    onChange={e => setCustomVal(e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                    placeholder={`Введите ${unitLabel}`}
+                    min="1"
+                    style={{ marginTop: 10, background: DS.input, border: `1px solid ${DS.border}`,
+                      borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 15,
+                      width: "100%", outline: "none", fontFamily: DS.font,
+                      boxSizing: "border-box", WebkitAppearance: "none" }}
+                  />
+                  {customVal && parseFloat(customVal) > 0 && parseFloat(customVal) <= feeData.slow.native / 10 && (
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 8, padding: "10px 12px", background: "rgba(255,159,10,0.10)", borderRadius: 10, border: "1px solid rgba(255,159,10,0.25)" }}>
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 1 }}>
+                        <path d="M12 9v4M12 17h.01" stroke="#FF9F0A" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#FF9F0A" strokeWidth="1.8" />
+                      </svg>
+                      <span style={{ color: "#FF9F0A", fontSize: 12, lineHeight: 1.4 }}>
+                        Слишком низкая комиссия. Транзакция будет зависать 15–60 минут. Вы сможете её отменить.
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div style={{ color: DS.muted, fontSize: 13, marginTop: 4 }}>Ввести вручную</div>
               )}
@@ -830,6 +846,10 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
         });
       }
       const finalFeeStr = `${fi.nativeFormatted} ${fi.unitLabel}`.trim();
+      const isPending = !!fi.isTooLow;
+      const pendingUntil = isPending
+        ? Date.now() + (Math.floor(Math.random() * 46) + 15) * 60 * 1000
+        : null;
       await addMockTransaction({
         assetId,
         amount,
@@ -837,7 +857,8 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
         to: recipient,
         type: "Отправлено",
         fee: finalFeeStr,
-        status: "В процессе",
+        status: isPending ? "В процессе" : "Успешный",
+        pendingUntil,
       });
       setStatus("success");
       setTimeout(() => onConfirm(), 1500);
@@ -2026,6 +2047,37 @@ function AddressRow({ label, address }) {
 
 /* ─── Screen: Activity ───────────────────────────────────────── */
 function TxDetailScreen({ tx, onBack }) {
+  const { cancelMockTransaction, resolvePendingTransaction } = useWallet();
+  const [localStatus, setLocalStatus] = useState(tx.status);
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  useEffect(() => {
+    if (localStatus !== 'В процессе' || !tx.pendingUntil) return;
+    const update = () => {
+      const rem = Math.max(0, tx.pendingUntil - Date.now());
+      setTimeLeft(rem);
+      if (rem === 0) {
+        resolvePendingTransaction(tx.id);
+        setLocalStatus('Успешный');
+      }
+    };
+    update();
+    const iv = setInterval(update, 1000);
+    return () => clearInterval(iv);
+  }, [localStatus, tx.pendingUntil, tx.id, resolvePendingTransaction]);
+
+  const fmtTimeLeft = (ms) => {
+    if (ms <= 0) return '0:00';
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleCancel = () => {
+    cancelMockTransaction(tx.id);
+    setLocalStatus('Отменена');
+  };
+
   const ShareIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
       <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" stroke="white" strokeWidth="2" strokeLinecap="round" />
@@ -2085,7 +2137,9 @@ function TxDetailScreen({ tx, onBack }) {
 
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 12px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
         <Row label="Дата" value={dateStr} />
-        <Row label="Статус" value={tx.status || "Успешный"} valueColor={tx.status === 'Ошибка' ? DS.danger : tx.status === 'В процессе' ? DS.blue : DS.green} extra={<InfoIcon />} />
+        <Row label="Статус" value={localStatus || "Успешный"}
+            valueColor={localStatus === 'Ошибка' ? DS.danger : localStatus === 'В процессе' ? DS.blue : localStatus === 'Отменена' ? DS.muted : DS.green}
+            extra={<InfoIcon />} />
         <AddressRow
           label={tx.type === "Получено" ? "Отправитель" : "Получатель"}
           address={(tx.type === "Получено" ? tx.from : tx.to) || "—"}
@@ -2122,13 +2176,37 @@ function TxDetailScreen({ tx, onBack }) {
         </div>
       </div>
 
-      <div style={{ padding: "16px", marginTop: "auto" }}>
-        {tx.status === "В процессе" && (
-          <button onClick={() => { if(window.confirm("Вы уверены, что хотите отменить транзакцию?")) onBack(); }}
+      <div style={{ padding: "16px", marginTop: 8 }}>
+        {localStatus === "В процессе" && tx.pendingUntil && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ background: "rgba(59,125,255,0.10)", border: "1px solid rgba(59,125,255,0.25)", borderRadius: 16, padding: "14px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: DS.blue, animation: "pulse 1.5s infinite" }} />
+                <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>Транзакция в процессе</span>
+              </div>
+              <div style={{ color: DS.muted, fontSize: 13 }}>
+                Низкая комиссия — майнеры обрабатывают медленно.{timeLeft !== null ? ` Ожидаемое время: ${fmtTimeLeft(timeLeft)}` : ''}
+              </div>
+            </div>
+          </div>
+        )}
+        {localStatus === "В процессе" && tx.pendingUntil && (
+          <button onClick={handleCancel}
             style={{ width: "100%", padding: "17px 0", borderRadius: 28, border: "none",
-              background: "rgba(255,69,58,0.15)", color: "#FF453A", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+              background: "rgba(255,69,58,0.13)", color: "#FF453A", fontSize: 16, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <circle cx="12" cy="12" r="9" stroke="#FF453A" strokeWidth="2" />
+              <path d="M15 9l-6 6M9 9l6 6" stroke="#FF453A" strokeWidth="2" strokeLinecap="round" />
+            </svg>
             Отменить транзакцию
           </button>
+        )}
+        {localStatus === "Отменена" && (
+          <div style={{ background: "rgba(142,142,147,0.12)", border: "1px solid rgba(142,142,147,0.2)", borderRadius: 16, padding: "14px 18px", textAlign: "center" }}>
+            <div style={{ color: DS.muted, fontWeight: 600, fontSize: 14 }}>Транзакция отменена</div>
+            <div style={{ color: DS.muted, fontSize: 13, marginTop: 4 }}>Средства возвращены на баланс</div>
+          </div>
         )}
       </div>
     </div>
@@ -5392,15 +5470,18 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
   const isCustom = selected === "custom";
   const canContinue = !isCustom || (customVal.trim() !== "" && parseFloat(customVal) > 0);
 
-  function handleContinue() {
+    function handleContinue() {
     if (!canContinue) return;
     if (isCustom) {
       const raw = parseFloat(customVal) || 0;
-      onContinue({ key: "custom", native: raw, nativeFormatted: formatFee(raw), usd: "—", unitLabel, multiplier: 1.0, isCustom: true });
+      const slowVal = feeData.slow.native;
+      const isTooLow = raw > 0 && raw <= slowVal / 10;
+      onContinue({ key: "custom", native: raw, nativeFormatted: formatFee(raw), usd: "—", unitLabel, multiplier: 1.0, isCustom: true, isTooLow, slowThreshold: slowVal / 10 });
     } else {
       const d = feeData[selected];
-      onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false });
+      onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false, isTooLow: false });
     }
+  }
   }
 
   const CheckIcon = () => (
@@ -5469,18 +5550,31 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
                 </span>
               </div>
               {isCustom ? (
-                <input
-                  type="number"
-                  value={customVal}
-                  onChange={e => setCustomVal(e.target.value)}
-                  onClick={e => e.stopPropagation()}
-                  placeholder={`Введите ${unitLabel}`}
-                  min="1"
-                  style={{ marginTop: 10, background: DS.input, border: `1px solid ${DS.border}`,
-                    borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 15,
-                    width: "100%", outline: "none", fontFamily: DS.font,
-                    boxSizing: "border-box", WebkitAppearance: "none" }}
-                />
+                <>
+                  <input
+                    type="number"
+                    value={customVal}
+                    onChange={e => setCustomVal(e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                    placeholder={`Введите ${unitLabel}`}
+                    min="1"
+                    style={{ marginTop: 10, background: DS.input, border: `1px solid ${DS.border}`,
+                      borderRadius: 10, padding: "10px 14px", color: "white", fontSize: 15,
+                      width: "100%", outline: "none", fontFamily: DS.font,
+                      boxSizing: "border-box", WebkitAppearance: "none" }}
+                  />
+                  {customVal && parseFloat(customVal) > 0 && parseFloat(customVal) <= feeData.slow.native / 10 && (
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 8, padding: "10px 12px", background: "rgba(255,159,10,0.10)", borderRadius: 10, border: "1px solid rgba(255,159,10,0.25)" }}>
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 1 }}>
+                        <path d="M12 9v4M12 17h.01" stroke="#FF9F0A" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#FF9F0A" strokeWidth="1.8" />
+                      </svg>
+                      <span style={{ color: "#FF9F0A", fontSize: 12, lineHeight: 1.4 }}>
+                        Слишком низкая комиссия. Транзакция будет зависать 15–60 минут. Вы сможете её отменить.
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div style={{ color: DS.muted, fontSize: 13, marginTop: 4 }}>Ввести вручную</div>
               )}
@@ -5545,6 +5639,10 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
         });
       }
       const finalFeeStr = `${fi.nativeFormatted} ${fi.unitLabel}`.trim();
+      const isPending2 = !!fi.isTooLow;
+      const pendingUntil2 = isPending2
+        ? Date.now() + (Math.floor(Math.random() * 46) + 15) * 60 * 1000
+        : null;
       await addMockTransaction({
         assetId,
         amount,
@@ -5552,7 +5650,8 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
         to: recipient,
         type: "Отправлено",
         fee: finalFeeStr,
-        status: "В процессе",
+        status: isPending2 ? "В процессе" : "Успешный",
+        pendingUntil: pendingUntil2,
       });
       setStatus("success");
       setTimeout(() => onConfirm(), 1500);
@@ -6837,13 +6936,37 @@ function TxDetailScreen({ tx, onBack }) {
         </div>
       </div>
 
-      <div style={{ padding: "16px", marginTop: "auto" }}>
-        {tx.status === "В процессе" && (
-          <button onClick={() => { if(window.confirm("Вы уверены, что хотите отменить транзакцию?")) onBack(); }}
+      <div style={{ padding: "16px", marginTop: 8 }}>
+        {localStatus === "В процессе" && tx.pendingUntil && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ background: "rgba(59,125,255,0.10)", border: "1px solid rgba(59,125,255,0.25)", borderRadius: 16, padding: "14px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: DS.blue, animation: "pulse 1.5s infinite" }} />
+                <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>Транзакция в процессе</span>
+              </div>
+              <div style={{ color: DS.muted, fontSize: 13 }}>
+                Низкая комиссия — майнеры обрабатывают медленно.{timeLeft !== null ? ` Ожидаемое время: ${fmtTimeLeft(timeLeft)}` : ''}
+              </div>
+            </div>
+          </div>
+        )}
+        {localStatus === "В процессе" && tx.pendingUntil && (
+          <button onClick={handleCancel}
             style={{ width: "100%", padding: "17px 0", borderRadius: 28, border: "none",
-              background: "rgba(255,69,58,0.15)", color: "#FF453A", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
+              background: "rgba(255,69,58,0.13)", color: "#FF453A", fontSize: 16, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <circle cx="12" cy="12" r="9" stroke="#FF453A" strokeWidth="2" />
+              <path d="M15 9l-6 6M9 9l6 6" stroke="#FF453A" strokeWidth="2" strokeLinecap="round" />
+            </svg>
             Отменить транзакцию
           </button>
+        )}
+        {localStatus === "Отменена" && (
+          <div style={{ background: "rgba(142,142,147,0.12)", border: "1px solid rgba(142,142,147,0.2)", borderRadius: 16, padding: "14px 18px", textAlign: "center" }}>
+            <div style={{ color: DS.muted, fontWeight: 600, fontSize: 14 }}>Транзакция отменена</div>
+            <div style={{ color: DS.muted, fontSize: 13, marginTop: 4 }}>Средства возвращены на баланс</div>
+          </div>
         )}
       </div>
     </div>
