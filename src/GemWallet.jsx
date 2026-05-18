@@ -698,7 +698,6 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
       onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false, isTooLow: false });
     }
   }
-  }
 
   const CheckIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" style={{ width: 12, height: 12 }}>
