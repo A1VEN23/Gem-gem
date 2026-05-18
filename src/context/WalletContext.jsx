@@ -223,16 +223,20 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
     // ── Browser notifications ────────────────────────────────────────────────────
     const requestNotifPermission = useCallback(async () => {
-      if (!('Notification' in window)) return false;
-      if (Notification.permission === 'granted') return true;
-      const perm = await Notification.requestPermission();
-      return perm === 'granted';
+      // Telegram Mini App: no browser permission needed — notifications go through the bot
+      return true;
     }, []);
 
-    const fireNotif = useCallback((title, body, icon = '/vite.svg') => {
+    const fireNotif = useCallback((title, body) => {
       if (!settingsRef.current.notifEnabled) return;
-      if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      try { new Notification(title, { body, icon }); } catch {}
+      try {
+        const tg = window.Telegram?.WebApp;
+        if (tg?.showPopup) {
+          tg.showPopup({ title, message: body, buttons: [{ type: 'close' }] });
+        } else if (tg?.showAlert) {
+          tg.showAlert(`${title}\n${body}`);
+        }
+      } catch {}
     }, []);
 
     // Private keys are kept ONLY in memory — never persisted to localStorage
