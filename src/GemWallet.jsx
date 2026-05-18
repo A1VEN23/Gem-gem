@@ -4059,7 +4059,7 @@ function WalletHomeUI() {
         {screen.name === "receive-nft-select" && (
           <div className="anim-page">
           <ReceiveNFTSelectScreen
-            onBack={() => go({ name: "home" })}
+            onBack={() => { setActiveTab("collections"); go({ name: "home" }); }}
             onSelect={(assetId) => go({ name: "receive-qr", assetId, backTo: "receive-nft-select" })}
           />
           </div>
