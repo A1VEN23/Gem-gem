@@ -3055,18 +3055,13 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
     [
       {
         label: "Кошельки", badge: "1",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M20 8H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2z" stroke="white" strokeWidth="1.8" /><path d="M16 14h.01" stroke="white" strokeWidth="2.5" strokeLinecap="round" /><path d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2" stroke="white" strokeWidth="1.8" /></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 64 64" fill="none" style={{ width: 22, height: 22 }}><polygon points="32,8 52,24 46,56 18,56 12,24" fill="white" fillOpacity="0.18" /><polygon points="32,8 52,24 46,56 18,56 12,24" stroke="white" strokeWidth="2" strokeLinejoin="round" /><polygon points="32,8 12,24 18,56" fill="white" fillOpacity="0.55" /><polygon points="32,8 52,24 46,56" fill="white" fillOpacity="0.35" /><polygon points="12,24 18,56 46,56 52,24" fill="white" fillOpacity="0.85" /><line x1="12" y1="24" x2="52" y2="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.5" /></svg></IconBox>,
         onPress: onWalletsClick,
       },
       {
         label: "Безопасность",
-        icon: <IconBox border><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10C8 19.5 5 15.5 5 11V6l7-3z" stroke="white" strokeWidth="1.8" fill="none" /></svg></IconBox>,
+        icon: <IconBox bg="#1C1C1E" border><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10C8 19.5 5 15.5 5 11V6l7-3z" stroke="white" strokeWidth="1.8" fill="white" fillOpacity="0.12" /></svg></IconBox>,
         onPress: () => setSubScreen("security"),
-      },
-      {
-        label: "Заблокировать",
-        icon: <IconBox bg="#FF3B30"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><rect x="5" y="11" width="14" height="10" rx="2" stroke="white" strokeWidth="1.8" /><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
-        onPress: () => lock(),
       },
     ],
     [
@@ -3074,11 +3069,6 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
         label: "Уведомления",
         icon: <IconBox bg="#FF3B30"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
         onPress: () => setSubScreen("notifications"),
-      },
-      {
-        label: "Оповещения о ценах",
-        icon: <IconBox bg="#34C759"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" /><path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h5a1.5 1.5 0 0 1 0 3H9" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
-        onPress: () => setSubScreen("price-alerts"),
       },
       {
         label: "Настройки",
@@ -3095,31 +3085,18 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
     ],
     [
       {
-        label: "Тестовый режим",
-        badge: testMode ? "ВКЛ" : "ВЫКЛ",
-        icon: <IconBox bg={testMode ? "#34C759" : "#555"}><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></IconBox>,
-        onPress: () => setTestMode(!testMode),
-      },
-      ...(testMode ? [{
-        label: "Создать транзакцию",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2" strokeLinecap="round" /></svg></IconBox>,
-        onPress: () => setShowMockTxModal(true),
-      }] : []),
-    ],
-    [
-      {
         label: "Поддержка",
-        icon: <IconBox bg="#30D158"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" /><path d="M9 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="17" r="1" fill="white" /></svg></IconBox>,
+        icon: <IconBox bg="#30D158"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M3 18v-2a9 9 0 0 1 18 0v2" stroke="white" strokeWidth="1.8" strokeLinecap="round" /><rect x="1" y="16" width="4" height="6" rx="2" fill="white" /><rect x="19" y="16" width="4" height="6" rx="2" fill="white" /></svg></IconBox>,
         onPress: () => { const tg = window.Telegram?.WebApp; if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/GemWalletSupport'); else openInApp('https://t.me/GemWalletSupport'); },
       },
       {
         label: "Награды",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M20 8H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2z" stroke="white" strokeWidth="1.8" /><path d="M16 14h.01" stroke="white" strokeWidth="2.5" strokeLinecap="round" /><path d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2" stroke="white" strokeWidth="1.8" /></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 64 64" fill="none" style={{ width: 22, height: 22 }}><polygon points="32,8 52,24 46,56 18,56 12,24" fill="white" fillOpacity="0.18" /><polygon points="32,8 52,24 46,56 18,56 12,24" stroke="white" strokeWidth="2" strokeLinejoin="round" /><polygon points="32,8 12,24 18,56" fill="white" fillOpacity="0.55" /><polygon points="32,8 52,24 46,56" fill="white" fillOpacity="0.35" /><polygon points="12,24 18,56 46,56 52,24" fill="white" fillOpacity="0.85" /><line x1="12" y1="24" x2="52" y2="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.5" /></svg></IconBox>,
         onPress: () => setSubScreen("rewards"),
       },
       {
         label: "О нас",
-        icon: <IconBox border><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" /><path d="M12 8v1M12 11v5" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
+        icon: <IconBox bg="#555"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" /><path d="M12 8v1M12 11v5" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
         onPress: () => setSubScreen("about"),
       },
     ],
@@ -4852,22 +4829,17 @@ function OnboardingScreen() {
   const prepareVerify = () => {
     const words = mnemonic.split(' ');
     const totalWords = words.length;
-    const hiddenCount = Math.min(4, Math.ceil(totalWords / 3));
-    const hiddenSet = new Set();
-    while (hiddenSet.size < hiddenCount) {
-      hiddenSet.add(Math.floor(Math.random() * totalWords));
-    }
-    const slots = words.map((word, i) => ({
+    const slots = words.map((word) => ({
       correctWord: word,
-      hidden: hiddenSet.has(i),
+      hidden: true,
       placedId: null,
     }));
-    const correctPoolItems = [...hiddenSet].map((idx, i) => ({
-      id: i, word: words[idx], placed: false,
+    const correctPoolItems = words.map((word, i) => ({
+      id: i, word, placed: false,
     }));
-    const usedDecoys = DECOY_WORDS.filter(d => !words.includes(d)).slice(0, hiddenCount);
+    const usedDecoys = DECOY_WORDS.filter(d => !words.includes(d)).slice(0, 4);
     const decoyItems = usedDecoys.map((word, i) => ({
-      id: hiddenCount + i, word, placed: false,
+      id: totalWords + i, word, placed: false,
     }));
     const pool = [...correctPoolItems, ...decoyItems].sort(() => Math.random() - 0.5);
     setVerifySlots(slots);
