@@ -3051,31 +3051,31 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
     [
       {
         label: "Кошельки", badge: "1",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><polygon points="12,2 4,8 20,8" fill="white" fillOpacity="0.95"/><polygon points="4,8 7,22 12,14" fill="white" fillOpacity="0.7"/><polygon points="20,8 17,22 12,14" fill="white" fillOpacity="0.55"/><polygon points="7,22 17,22 12,14" fill="white" fillOpacity="0.85"/><polygon points="12,2 4,8 7,22 17,22 20,8" fill="none" stroke="white" strokeWidth="1.2" strokeLinejoin="round" strokeOpacity="0.4"/><line x1="4" y1="8" x2="20" y2="8" stroke="white" strokeWidth="1" strokeOpacity="0.35"/></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><path d="M12 2L3 9L12 22L21 9L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 9H21" stroke="white" strokeWidth="2" strokeLinecap="round"/><path d="M12 2L12 22" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/></svg></IconBox>,
         onPress: onWalletsClick,
       },
       {
         label: "Безопасность",
-        icon: <IconBox bg="#2A2A2E"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 3L5 6.5v4.5c0 4.2 3.1 8.1 7 9.5 3.9-1.4 7-5.3 7-9.5V6.5L12 3z" fill="white" fillOpacity="0.85"/><path d="M9 12l2 2 4-4" stroke="#2A2A2E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></IconBox>,
+        icon: <IconBox bg="#1C1C1E" border><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 3L5 6.5v4.5c0 4.2 3.1 8.1 7 9.5 3.9-1.4 7-5.3 7-9.5V6.5L12 3z" stroke="white" strokeWidth="1.8" strokeLinejoin="round" fill="white" fillOpacity="0.1"/><path d="M9 12l2 2 4-4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></IconBox>,
         onPress: () => setSubScreen("security"),
       },
     ],
     [
       {
         label: "Уведомления",
-        icon: <IconBox bg="#FF3B30"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
+        icon: <IconBox bg="#FF3B30"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" fill="white" fillOpacity="0.9"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="white" strokeWidth="1.8" strokeLinecap="round"/></svg></IconBox>,
         onPress: () => setSubScreen("notifications"),
       },
       {
         label: "Настройки",
-        icon: <IconBox bg="#FF9500"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><circle cx="12" cy="12" r="3" stroke="white" strokeWidth="1.8" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="white" strokeWidth="1.8" fill="none" /></svg></IconBox>,
+        icon: <IconBox bg="#FF9500"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M3 7h18M3 12h18M3 17h18" stroke="white" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="2.5" fill="white"/><circle cx="15" cy="12" r="2.5" fill="white"/><circle cx="9" cy="17" r="2.5" fill="white"/></svg></IconBox>,
         onPress: () => setSubScreen("app-settings"),
       },
     ],
     [
       {
         label: "WalletConnect",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M4.5 12.5C7.5 9.5 16.5 9.5 19.5 12.5M7 15c2-2 8-2 10 0M10 17.5c.67-.67 3.33-.67 4 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" /></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M4.5 12.5C7.5 9.5 16.5 9.5 19.5 12.5M7 15c2-2 8-2 10 0M10 17.5c.67-.67 3.33-.67 4 0" stroke="white" strokeWidth="1.8" strokeLinecap="round"/></svg></IconBox>,
         onPress: () => setSubScreen("walletconnect"),
       },
     ],
@@ -3100,7 +3100,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
       },
       {
         label: "Награды",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><polygon points="12,2 4,8 20,8" fill="white" fillOpacity="0.95"/><polygon points="4,8 7,22 12,14" fill="white" fillOpacity="0.7"/><polygon points="20,8 17,22 12,14" fill="white" fillOpacity="0.55"/><polygon points="7,22 17,22 12,14" fill="white" fillOpacity="0.85"/><polygon points="12,2 4,8 7,22 17,22 20,8" fill="none" stroke="white" strokeWidth="1.2" strokeLinejoin="round" strokeOpacity="0.4"/><line x1="4" y1="8" x2="20" y2="8" stroke="white" strokeWidth="1" strokeOpacity="0.35"/></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><path d="M12 2L3 9L12 22L21 9L12 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 9H21" stroke="white" strokeWidth="2" strokeLinecap="round"/><path d="M12 2L12 22" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/></svg></IconBox>,
         onPress: () => setSubScreen("rewards"),
       },
       {
