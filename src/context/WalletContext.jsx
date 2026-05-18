@@ -153,6 +153,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     passEnabled: true,
     notifEnabled: false,
     priceAlertsEnabled: false,
+    walletName: 'Кошелек № 1',
   };
 
   /**
