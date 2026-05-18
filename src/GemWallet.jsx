@@ -2560,10 +2560,13 @@ function WalletConnectScreen({ onBack }) {
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <TopBar title="WalletConnect" onBack={onBack}
         rightEl={
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-            <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
-            <path d="M12 8v1M12 11v5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
+          <div onClick={() => window.open('https://gemwallet.com/docs/guides/how-to-use-walletconnect', '_blank')}
+            style={{ cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
+              <path d="M12 8v1M12 11v5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </div>
         }
       />
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 0", overflow: "hidden" }}>
@@ -2600,51 +2603,80 @@ function WalletConnectScreen({ onBack }) {
 }
 
 function SupportScreen({ onBack }) {
-  const [tab, setTab] = useState("support");
+  const channels = [
+    {
+      id: "tg",
+      label: "Telegram поддержка",
+      sub: "Официальный канал поддержки",
+      url: "https://t.me/gemwallet",
+      bg: "#0098EA",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 22, height: 22 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg>,
+    },
+    {
+      id: "x",
+      label: "X (Twitter) поддержка",
+      sub: "@GemWalletApp",
+      url: "https://x.com/GemWalletApp",
+      bg: "#111",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 22, height: 22 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg>,
+    },
+    {
+      id: "help",
+      label: "Центр помощи",
+      sub: "Гайды и FAQ на gemwallet.com",
+      url: "https://gemwallet.com/docs",
+      bg: "#3B7DFF",
+      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 17h.01" stroke="white" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+    },
+  ];
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, background: "#0D0D12" }}>
       <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 12 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
             <path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <div style={{ flex: 1, display: "flex", gap: 8, justifyContent: "center" }}>
-          {[{ id: "support", label: "Поддержка" }, { id: "help", label: "Центр помощи" }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ padding: "8px 18px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600,
-                background: tab === t.id ? "#3B7DFF" : "#2A2A2C", color: "white" }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <span style={{ flex: 1, color: "white", fontWeight: 700, fontSize: 18, textAlign: "center" }}>Поддержка</span>
         <div style={{ width: 30 }} />
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "0 16px" }}>
-        <div style={{ background: "#181820", borderRadius: 16, padding: "16px", flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#252530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🚀</div>
-              <span style={{ color: "white", fontSize: 14, fontWeight: 500 }}>Avatar</span>
-            </div>
-            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#888", fontSize: 18 }}>✕</button>
-          </div>
-          <div style={{ flex: 1, color: "#ccc", fontSize: 15, lineHeight: 1.6 }}>
-            How can we help?<br />
-            For quick answers, tap on the Help Center tab to learn more about Gem Wallet.<br />
-            If you're facing a specific issue, please provide details like your wallet address…
-          </div>
-          <div style={{ background: "#252530", borderRadius: 14, padding: "16px", marginTop: 12 }}>
-            <div style={{ color: "white", fontWeight: 600, fontSize: 15, marginBottom: 4 }}>We are away at the moment</div>
-            <div style={{ color: "#888", fontSize: 14, marginBottom: 12 }}>We will be back as soon as possible</div>
-            <div style={{ color: "#3B7DFF", fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
-              Start Conversation <span>›</span>
-            </div>
-          </div>
-          <div style={{ textAlign: "center", marginTop: 12, color: "#555", fontSize: 12 }}>● Powered by Chatwoot</div>
+
+      <div style={{ padding: "8px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ width: 68, height: 68, borderRadius: "50%", background: "linear-gradient(145deg,#4F8FFF,#1A55E3)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 36, height: 36 }}>
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div style={{ color: "white", fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Нужна помощь?</div>
+        <div style={{ color: "#888", fontSize: 14, textAlign: "center", maxWidth: 260, lineHeight: 1.5 }}>
+          Выберите удобный способ связи с командой поддержки Gem Wallet
         </div>
       </div>
-      <div style={{ height: 16 }} />
+
+      <div style={{ background: "#181820", borderRadius: 20, margin: "0 16px", overflow: "hidden", border: "1px solid #252528" }}>
+        {channels.map((ch, i) => (
+          <div key={ch.id} onClick={() => window.open(ch.url, '_blank')}
+            style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
+              borderBottom: i < channels.length - 1 ? "1px solid #252528" : "none",
+              transition: "background 0.15s", active: "background: rgba(255,255,255,0.04)" }}>
+            <div style={{ width: 46, height: 46, borderRadius: 14, background: ch.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {ch.icon}
+            </div>
+            <div style={{ flex: 1, marginLeft: 14 }}>
+              <div style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{ch.label}</div>
+              <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>{ch.sub}</div>
+            </div>
+            <ChevronRight />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ margin: "16px 16px 0", padding: "14px 16px", background: "rgba(59,125,255,0.08)", borderRadius: 14, border: "1px solid rgba(59,125,255,0.18)" }}>
+        <div style={{ color: "#3B7DFF", fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Официальный Telegram</div>
+        <div style={{ color: "#888", fontSize: 13, lineHeight: 1.5 }}>
+          Для быстрой помощи напишите нам в Telegram. Мы отвечаем в течение нескольких часов.
+        </div>
+      </div>
     </div>
   );
 }
@@ -2721,39 +2753,59 @@ function RewardsScreen({ onBack }) {
 }
 
 function AboutScreen({ onBack }) {
+  const legalLinks = [
+    { label: "Условия предоставления услуг", url: "https://gemwallet.com/terms" },
+    { label: "Политика конфиденциальности", url: "https://gemwallet.com/privacy" },
+    { label: "Посетить сайт", url: "https://gemwallet.com" },
+    { label: "Центр помощи", url: "https://gemwallet.com/docs" },
+  ];
+
   const socialLinks = [
-    { label: "X (бывший Twitter)", bg: "#111", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg> },
-    { label: "Телеграм", bg: "#0098EA", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg> },
-    { label: "YouTube", bg: "#FF0000", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M23 7s-.3-1.9-1.2-2.7c-1.1-1.2-2.4-1.2-3-1.3C16.2 3 12 3 12 3s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5.1 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.3.3 4.3s.3 1.9 1.2 2.7c1.1 1.2 2.6 1.1 3.3 1.2C7.5 21.7 12 21.7 12 21.7s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.7 1.2-2.7s.3-2.1.3-4.3v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg> },
-    { label: "GitHub", bg: "#111", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85.004 1.71.115 2.51.337 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.01 10.01 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg> },
-    { label: "Discord", bg: "#5865F2", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg> },
+    { label: "X (Twitter)", sub: "@GemWalletApp", url: "https://x.com/GemWalletApp", bg: "#111",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg> },
+    { label: "Telegram", sub: "t.me/gemwallet", url: "https://t.me/gemwallet", bg: "#0098EA",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg> },
+    { label: "YouTube", sub: "youtube.com/@gemwallet", url: "https://www.youtube.com/@gemwallet", bg: "#FF0000",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M23 7s-.3-1.9-1.2-2.7c-1.1-1.2-2.4-1.2-3-1.3C16.2 3 12 3 12 3s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5.1 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.3.3 4.3s.3 1.9 1.2 2.7c1.1 1.2 2.6 1.1 3.3 1.2C7.5 21.7 12 21.7 12 21.7s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.7 1.2-2.7s.3-2.1.3-4.3v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg> },
+    { label: "GitHub", sub: "github.com/gemwalletcom", url: "https://github.com/gemwalletcom", bg: "#161B22",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85.004 1.71.115 2.51.337 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.01 10.01 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg> },
+    { label: "Discord", sub: "Сообщество Gem Wallet", url: "https://discord.gg/aWXpSmwHH4", bg: "#5865F2",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg> },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, paddingBottom: 20 }}>
       <TopBar title="О нас" onBack={onBack} />
+
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 0", overflow: "hidden" }}>
-        {["Условия предоставления услуг", "Политика конфиденциальности", "Посетить сайт"].map((label, i, arr) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px",
-            borderBottom: i < arr.length - 1 ? "1px solid #2A2A2C" : "none", cursor: "pointer" }}>
-            <span style={{ color: "white", fontSize: 16 }}>{label}</span>
+        {legalLinks.map((item, i) => (
+          <div key={item.label} onClick={() => window.open(item.url, '_blank')}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px",
+              borderBottom: i < legalLinks.length - 1 ? "1px solid #2A2A2C" : "none", cursor: "pointer" }}>
+            <span style={{ color: "white", fontSize: 16 }}>{item.label}</span>
             <ChevronRight />
           </div>
         ))}
       </div>
-      <div style={{ color: "#888", fontSize: 13, padding: "16px 32px 8px" }}>Сообщество</div>
+
+      <div style={{ color: "#888", fontSize: 13, padding: "16px 32px 8px", fontWeight: 600 }}>Сообщество</div>
       <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px", overflow: "hidden" }}>
         {socialLinks.map((item, i) => (
-          <div key={item.label} style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
-            borderBottom: i < socialLinks.length - 1 ? "1px solid #2A2A2C" : "none" }}>
+          <div key={item.label} onClick={() => window.open(item.url, '_blank')}
+            style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
+              borderBottom: i < socialLinks.length - 1 ? "1px solid #2A2A2C" : "none" }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 }}>
               {item.icon}
             </div>
-            <span style={{ flex: 1, color: "white", fontSize: 16 }}>{item.label}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "white", fontSize: 16 }}>{item.label}</div>
+              <div style={{ color: "#888", fontSize: 12, marginTop: 1 }}>{item.sub}</div>
+            </div>
             <ChevronRight />
           </div>
         ))}
       </div>
+
       <div style={{ background: "#181820", borderRadius: 16, margin: "12px 16px 0", display: "flex", justifyContent: "space-between", padding: "16px" }}>
         <span style={{ color: "white", fontSize: 16 }}>Версия</span>
         <span style={{ color: "#888", fontSize: 16 }}>2.59</span>
@@ -7327,10 +7379,13 @@ function WalletConnectScreen({ onBack }) {
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <TopBar title="WalletConnect" onBack={onBack}
         rightEl={
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-            <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
-            <path d="M12 8v1M12 11v5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
+          <div onClick={() => window.open('https://gemwallet.com/docs/guides/how-to-use-walletconnect', '_blank')}
+            style={{ cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
+              <path d="M12 8v1M12 11v5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </div>
         }
       />
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 0", overflow: "hidden" }}>
@@ -7367,51 +7422,80 @@ function WalletConnectScreen({ onBack }) {
 }
 
 function SupportScreen({ onBack }) {
-  const [tab, setTab] = useState("support");
+  const channels = [
+    {
+      id: "tg",
+      label: "Telegram поддержка",
+      sub: "Официальный канал поддержки",
+      url: "https://t.me/gemwallet",
+      bg: "#0098EA",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 22, height: 22 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg>,
+    },
+    {
+      id: "x",
+      label: "X (Twitter) поддержка",
+      sub: "@GemWalletApp",
+      url: "https://x.com/GemWalletApp",
+      bg: "#111",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 22, height: 22 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg>,
+    },
+    {
+      id: "help",
+      label: "Центр помощи",
+      sub: "Гайды и FAQ на gemwallet.com",
+      url: "https://gemwallet.com/docs",
+      bg: "#3B7DFF",
+      icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 17h.01" stroke="white" strokeWidth="1.8" strokeLinecap="round"/></svg>,
+    },
+  ];
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, background: "#0D0D12" }}>
       <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 12 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
             <path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <div style={{ flex: 1, display: "flex", gap: 8, justifyContent: "center" }}>
-          {[{ id: "support", label: "Поддержка" }, { id: "help", label: "Центр помощи" }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ padding: "8px 18px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600,
-                background: tab === t.id ? "#3B7DFF" : "#2A2A2C", color: "white" }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <span style={{ flex: 1, color: "white", fontWeight: 700, fontSize: 18, textAlign: "center" }}>Поддержка</span>
         <div style={{ width: 30 }} />
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "0 16px" }}>
-        <div style={{ background: "#181820", borderRadius: 16, padding: "16px", flex: 1, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#252530", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🚀</div>
-              <span style={{ color: "white", fontSize: 14, fontWeight: 500 }}>Avatar</span>
-            </div>
-            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#888", fontSize: 18 }}>✕</button>
-          </div>
-          <div style={{ flex: 1, color: "#ccc", fontSize: 15, lineHeight: 1.6 }}>
-            How can we help?<br />
-            For quick answers, tap on the Help Center tab to learn more about Gem Wallet.<br />
-            If you're facing a specific issue, please provide details like your wallet address…
-          </div>
-          <div style={{ background: "#252530", borderRadius: 14, padding: "16px", marginTop: 12 }}>
-            <div style={{ color: "white", fontWeight: 600, fontSize: 15, marginBottom: 4 }}>We are away at the moment</div>
-            <div style={{ color: "#888", fontSize: 14, marginBottom: 12 }}>We will be back as soon as possible</div>
-            <div style={{ color: "#3B7DFF", fontSize: 15, fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
-              Start Conversation <span>›</span>
-            </div>
-          </div>
-          <div style={{ textAlign: "center", marginTop: 12, color: "#555", fontSize: 12 }}>● Powered by Chatwoot</div>
+
+      <div style={{ padding: "8px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ width: 68, height: 68, borderRadius: "50%", background: "linear-gradient(145deg,#4F8FFF,#1A55E3)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 36, height: 36 }}>
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div style={{ color: "white", fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Нужна помощь?</div>
+        <div style={{ color: "#888", fontSize: 14, textAlign: "center", maxWidth: 260, lineHeight: 1.5 }}>
+          Выберите удобный способ связи с командой поддержки Gem Wallet
         </div>
       </div>
-      <div style={{ height: 16 }} />
+
+      <div style={{ background: "#181820", borderRadius: 20, margin: "0 16px", overflow: "hidden", border: "1px solid #252528" }}>
+        {channels.map((ch, i) => (
+          <div key={ch.id} onClick={() => window.open(ch.url, '_blank')}
+            style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
+              borderBottom: i < channels.length - 1 ? "1px solid #252528" : "none",
+              transition: "background 0.15s", active: "background: rgba(255,255,255,0.04)" }}>
+            <div style={{ width: 46, height: 46, borderRadius: 14, background: ch.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {ch.icon}
+            </div>
+            <div style={{ flex: 1, marginLeft: 14 }}>
+              <div style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{ch.label}</div>
+              <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>{ch.sub}</div>
+            </div>
+            <ChevronRight />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ margin: "16px 16px 0", padding: "14px 16px", background: "rgba(59,125,255,0.08)", borderRadius: 14, border: "1px solid rgba(59,125,255,0.18)" }}>
+        <div style={{ color: "#3B7DFF", fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Официальный Telegram</div>
+        <div style={{ color: "#888", fontSize: 13, lineHeight: 1.5 }}>
+          Для быстрой помощи напишите нам в Telegram. Мы отвечаем в течение нескольких часов.
+        </div>
+      </div>
     </div>
   );
 }
@@ -7488,39 +7572,59 @@ function RewardsScreen({ onBack }) {
 }
 
 function AboutScreen({ onBack }) {
+  const legalLinks = [
+    { label: "Условия предоставления услуг", url: "https://gemwallet.com/terms" },
+    { label: "Политика конфиденциальности", url: "https://gemwallet.com/privacy" },
+    { label: "Посетить сайт", url: "https://gemwallet.com" },
+    { label: "Центр помощи", url: "https://gemwallet.com/docs" },
+  ];
+
   const socialLinks = [
-    { label: "X (бывший Twitter)", bg: "#111", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg> },
-    { label: "Телеграм", bg: "#0098EA", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg> },
-    { label: "YouTube", bg: "#FF0000", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M23 7s-.3-1.9-1.2-2.7c-1.1-1.2-2.4-1.2-3-1.3C16.2 3 12 3 12 3s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5.1 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.3.3 4.3s.3 1.9 1.2 2.7c1.1 1.2 2.6 1.1 3.3 1.2C7.5 21.7 12 21.7 12 21.7s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.7 1.2-2.7s.3-2.1.3-4.3v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg> },
-    { label: "GitHub", bg: "#111", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85.004 1.71.115 2.51.337 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.01 10.01 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg> },
-    { label: "Discord", bg: "#5865F2", icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg> },
+    { label: "X (Twitter)", sub: "@GemWalletApp", url: "https://x.com/GemWalletApp", bg: "#111",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63L18.244 2.25z"/></svg> },
+    { label: "Telegram", sub: "t.me/gemwallet", url: "https://t.me/gemwallet", bg: "#0098EA",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8l-1.68 7.92c-.12.56-.46.7-.94.44l-2.6-1.92-1.25 1.21c-.14.14-.26.26-.52.26l.18-2.62 4.74-4.28c.2-.18-.04-.28-.32-.1L7.46 14.9l-2.56-.8c-.56-.18-.58-.56.12-.82l10-3.86c.46-.18.86.1.62.58z"/></svg> },
+    { label: "YouTube", sub: "youtube.com/@gemwallet", url: "https://www.youtube.com/@gemwallet", bg: "#FF0000",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M23 7s-.3-1.9-1.2-2.7c-1.1-1.2-2.4-1.2-3-1.3C16.2 3 12 3 12 3s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5.1 1 7 1 7S.7 9.1.7 11.3v2c0 2.1.3 4.3.3 4.3s.3 1.9 1.2 2.7c1.1 1.2 2.6 1.1 3.3 1.2C7.5 21.7 12 21.7 12 21.7s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.7 1.2-2.7s.3-2.1.3-4.3v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg> },
+    { label: "GitHub", sub: "github.com/gemwalletcom", url: "https://github.com/gemwalletcom", bg: "#161B22",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85.004 1.71.115 2.51.337 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.01 10.01 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg> },
+    { label: "Discord", sub: "Сообщество Gem Wallet", url: "https://discord.gg/aWXpSmwHH4", bg: "#5865F2",
+      icon: <svg viewBox="0 0 24 24" fill="white" style={{ width: 18, height: 18 }}><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg> },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, paddingBottom: 20 }}>
       <TopBar title="О нас" onBack={onBack} />
+
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 0", overflow: "hidden" }}>
-        {["Условия предоставления услуг", "Политика конфиденциальности", "Посетить сайт"].map((label, i, arr) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px",
-            borderBottom: i < arr.length - 1 ? "1px solid #2A2A2C" : "none", cursor: "pointer" }}>
-            <span style={{ color: "white", fontSize: 16 }}>{label}</span>
+        {legalLinks.map((item, i) => (
+          <div key={item.label} onClick={() => window.open(item.url, '_blank')}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px",
+              borderBottom: i < legalLinks.length - 1 ? "1px solid #2A2A2C" : "none", cursor: "pointer" }}>
+            <span style={{ color: "white", fontSize: 16 }}>{item.label}</span>
             <ChevronRight />
           </div>
         ))}
       </div>
-      <div style={{ color: "#888", fontSize: 13, padding: "16px 32px 8px" }}>Сообщество</div>
+
+      <div style={{ color: "#888", fontSize: 13, padding: "16px 32px 8px", fontWeight: 600 }}>Сообщество</div>
       <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px", overflow: "hidden" }}>
         {socialLinks.map((item, i) => (
-          <div key={item.label} style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
-            borderBottom: i < socialLinks.length - 1 ? "1px solid #2A2A2C" : "none" }}>
+          <div key={item.label} onClick={() => window.open(item.url, '_blank')}
+            style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
+              borderBottom: i < socialLinks.length - 1 ? "1px solid #2A2A2C" : "none" }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14, flexShrink: 0 }}>
               {item.icon}
             </div>
-            <span style={{ flex: 1, color: "white", fontSize: 16 }}>{item.label}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "white", fontSize: 16 }}>{item.label}</div>
+              <div style={{ color: "#888", fontSize: 12, marginTop: 1 }}>{item.sub}</div>
+            </div>
             <ChevronRight />
           </div>
         ))}
       </div>
+
       <div style={{ background: "#181820", borderRadius: 16, margin: "12px 16px 0", display: "flex", justifyContent: "space-between", padding: "16px" }}>
         <span style={{ color: "white", fontSize: 16 }}>Версия</span>
         <span style={{ color: "#888", fontSize: 16 }}>2.59</span>
