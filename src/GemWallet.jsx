@@ -4914,34 +4914,32 @@ function OnboardingScreen() {
   if (step === 'welcome') return (
     <ORoot>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", textAlign: "center", padding: "40px 0" }}>
-        <div style={{ width: 96, height: 96, borderRadius: "50%",
-          background: "linear-gradient(135deg,#5B9EFF,#1A50D4)",
-          boxShadow: "0 0 56px #3B7DFF55",
-          display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 32,
+        justifyContent: "center", padding: "40px 0" }}>
+        <div style={{ width: 110, height: 110, borderRadius: 28,
+          background: "linear-gradient(145deg,#4F8FFF,#1A55E3)",
+          boxShadow: "0 8px 40px rgba(59,125,255,0.35)",
+          display: "flex", alignItems: "center", justifyContent: "center",
           animation: "scaleIn 0.4s cubic-bezier(.22,.68,0,1.2) both" }}>
-          <svg viewBox="0 0 32 32" fill="none" style={{ width: 54, height: 54 }}>
-            <path d="M16 4 L28 10 L28 18 C28 24 22 28.5 16 30 C10 28.5 4 24 4 18 L4 10 Z"
-              fill="white" fillOpacity="0.18" stroke="white" strokeWidth="1.4" />
-            <path d="M16 8.5 L24 13 L24 19 C24 23 20 26 16 27.5 C12 26 8 23 8 19 L8 13 Z"
-              fill="white" fillOpacity="0.88" />
+          <svg viewBox="0 0 64 64" fill="none" style={{ width: 68, height: 68 }}>
+            <polygon points="32,10 50,24 44,54 20,54 14,24" fill="white" fillOpacity="0.15" />
+            <polygon points="32,10 50,24 44,54 20,54 14,24" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
+            <polygon points="32,10 14,24 20,54" fill="white" fillOpacity="0.55" />
+            <polygon points="32,10 50,24 44,54" fill="white" fillOpacity="0.35" />
+            <polygon points="14,24 20,54 44,54 50,24" fill="white" fillOpacity="0.88" />
+            <line x1="14" y1="24" x2="50" y2="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.6" />
+            <line x1="20" y1="54" x2="14" y2="24" stroke="white" strokeWidth="1" strokeOpacity="0.5" />
+            <line x1="44" y1="54" x2="50" y2="24" stroke="white" strokeWidth="1" strokeOpacity="0.5" />
+            <line x1="32" y1="10" x2="20" y2="54" stroke="white" strokeWidth="0.8" strokeOpacity="0.3" />
+            <line x1="32" y1="10" x2="44" y2="54" stroke="white" strokeWidth="0.8" strokeOpacity="0.3" />
           </svg>
         </div>
-        <div style={{ color: DS.text, fontWeight: 700, fontSize: 32, marginBottom: 12,
-          animation: "fadeSlideUp 0.32s 0.05s cubic-bezier(.22,.68,0,1.2) both" }}>
-          Gem Wallet
-        </div>
-        <div style={{ color: DS.muted, fontSize: 16, lineHeight: 1.6, marginBottom: 48,
-          animation: "fadeSlideUp 0.32s 0.10s cubic-bezier(.22,.68,0,1.2) both" }}>
-          Безопасный мультисетевой<br />криптокошелёк
-        </div>
       </div>
-      <div style={{ animation: "fadeSlideUp 0.32s 0.15s cubic-bezier(.22,.68,0,1.2) both", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ animation: "fadeSlideUp 0.32s 0.10s cubic-bezier(.22,.68,0,1.2) both", display: "flex", flexDirection: "column", gap: 12 }}>
         <OBtn onClick={handleStartCreate} disabled={localLoading}>
-          {localLoading ? "Создание..." : "Создать новый кошелёк"}
+          {localLoading ? "Создание..." : "Создать новый кошелек"}
         </OBtn>
-        <OBtn secondary onClick={() => { setStep('import'); setError(''); setPassword(''); setPassword2(''); setImportPhrase(''); }}>
-          Импортировать кошелёк
+        <OBtn onClick={() => { setStep('import'); setError(''); setPassword(''); setPassword2(''); setImportPhrase(''); }}>
+          Импорт существующего кошелька
         </OBtn>
       </div>
     </ORoot>
