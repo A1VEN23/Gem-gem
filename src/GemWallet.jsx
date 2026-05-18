@@ -2825,7 +2825,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
         </span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 16px", overflowY: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 16px 90px", overflowY: "auto" }}>
         {settingsGroups.map((group, gi) => (
           <div key={gi} style={{ background: "#181820", borderRadius: 16, overflow: "hidden" }}>
             {group.map((item, ii) => (
