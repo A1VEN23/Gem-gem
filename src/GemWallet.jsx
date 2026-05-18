@@ -23,15 +23,15 @@ const DS = {
 
 const assets = [
   { id: "eth",      name: "Ethereum",  symbol: "ETH",  price: "2 191,35 $", change: "+0,49 %", positive: true,  tokenId: "ETH",      usdPrice: 2191.35 },
-  { id: "ltc",      name: "Litecoin",  symbol: "LTC",  price: "55,99 $",    change: "-0,26 %", positive: false, tokenId: "LTC",      usdPrice: 55.99 },
+  { id: "sol",      name: "Solana",    symbol: "SOL",  price: "86,64 $",    change: "-0,13 %", positive: false, tokenId: "SOL",      usdPrice: 86.64 },
   { id: "ton",      name: "TON",       symbol: "TON",  price: "1,96 $",     change: "+1,98 %", positive: true,  tokenId: "TON",      usdPrice: 1.96 },
+  { id: "bnb",      name: "BNB Chain", symbol: "BNB",  price: "655,17 $",   change: "-0,17 %", positive: false, tokenId: "BNB",      usdPrice: 655.17 },
+  { id: "ltc",      name: "Litecoin",  symbol: "LTC",  price: "55,99 $",    change: "-0,26 %", positive: false, tokenId: "LTC",      usdPrice: 55.99 },
   { id: "arb",      name: "Arbitrum",  symbol: "ARB",  price: "0,1192 $",   change: "-0,86 %", positive: false, tokenId: "ARB",      usdPrice: 0.1192 },
   { id: "usdt-eth", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,01 %", positive: false, tokenId: "USDT_ETH", usdPrice: 1.00 },
-  { id: "bnb",      name: "BNB Chain", symbol: "BNB",  price: "655,17 $",   change: "-0,17 %", positive: false, tokenId: "BNB",      usdPrice: 655.17 },
-  { id: "sol",      name: "Solana",    symbol: "SOL",  price: "86,64 $",    change: "-0,13 %", positive: false, tokenId: "SOL",      usdPrice: 86.64 },
-  { id: "usdt-bnb", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,02 %", positive: false, tokenId: "USDT_BNB", usdPrice: 1.00 },
   { id: "usdt-sol", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,01 %", positive: false, tokenId: "USDT_SOL", usdPrice: 1.00 },
   { id: "usdt-ton", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,01 %", positive: false, tokenId: "USDT_TON", usdPrice: 1.00 },
+  { id: "usdt-bnb", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,02 %", positive: false, tokenId: "USDT_BNB", usdPrice: 1.00 },
   { id: "usdt-arb", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,01 %", positive: false, tokenId: "USDT_ARB", usdPrice: 1.00 },
 ];
 const sendableAssets = assets;
@@ -3085,6 +3085,19 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
     ],
     [
       {
+        label: "Тестовый режим",
+        badge: testMode ? "ВКЛ" : "ВЫКЛ",
+        icon: <IconBox bg={testMode ? "#34C759" : "#555"}><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></IconBox>,
+        onPress: () => setTestMode(!testMode),
+      },
+      ...(testMode ? [{
+        label: "Создать транзакцию",
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2" strokeLinecap="round" /></svg></IconBox>,
+        onPress: () => setShowMockTxModal(true),
+      }] : []),
+    ],
+    [
+      {
         label: "Поддержка",
         icon: <IconBox bg="#30D158"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M3 18v-2a9 9 0 0 1 18 0v2" stroke="white" strokeWidth="1.8" strokeLinecap="round" /><rect x="1" y="16" width="4" height="6" rx="2" fill="white" /><rect x="19" y="16" width="4" height="6" rx="2" fill="white" /></svg></IconBox>,
         onPress: () => { const tg = window.Telegram?.WebApp; if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/GemWalletSupport'); else openInApp('https://t.me/GemWalletSupport'); },
@@ -4671,16 +4684,9 @@ function UnlockScreen() {
 
         {/* Logo */}
         <div style={{ marginBottom: 32, animation: "scaleIn 0.4s cubic-bezier(.22,.68,0,1.2) both" }}>
-          <div style={{ width: 88, height: 88, borderRadius: "50%",
-            background: "linear-gradient(135deg,#5B9EFF,#1A50D4)",
-            boxShadow: "0 0 48px #3B7DFF55",
-            display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg viewBox="0 0 32 32" fill="none" style={{ width: 48, height: 48 }}>
-              <path d="M16 4 L28 10 L28 18 C28 24 22 28.5 16 30 C10 28.5 4 24 4 18 L4 10 Z"
-                fill="white" fillOpacity="0.18" stroke="white" strokeWidth="1.4" />
-              <path d="M16 8.5 L24 13 L24 19 C24 23 20 26 16 27.5 C12 26 8 23 8 19 L8 13 Z"
-                fill="white" fillOpacity="0.88" />
-            </svg>
+          <div style={{ width: 88, height: 88, borderRadius: 22, overflow: "hidden",
+            boxShadow: "0 0 48px #3B7DFF66" }}>
+            <img src={gemIcon} alt="Gem Wallet" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
         </div>
 
