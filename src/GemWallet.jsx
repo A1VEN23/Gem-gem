@@ -1876,7 +1876,7 @@ function TxDetailScreen({ tx, onBack }) {
   const dateStr = tx.timestamp ? new Date(tx.timestamp).toLocaleString("ru-RU", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : "Недавно";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, background: DS.bg }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, background: DS.bg, overflowY: "auto", paddingBottom: 90 }}>
       <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 12 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}>
@@ -1897,8 +1897,8 @@ function TxDetailScreen({ tx, onBack }) {
             <TokenIcon tokenId={tx.tokenId} size={54} badgeSize={20} />
           )}
         </div>
-        <div style={{ color: "white", fontSize: 36, fontWeight: 700, marginTop: 20, letterSpacing: -1 }}>{tx.amount}</div>
-        <div style={{ color: DS.muted, fontSize: 15, marginTop: 6, fontWeight: 500 }}>~ {parseFloat(tx.amount.replace(/[^\d.,]/g, "")) * (assets.find(a => a.id === tx.assetId)?.price || 1)} $</div>
+        <div style={{ color: "white", fontSize: 32, fontWeight: 700, marginTop: 20, letterSpacing: -1, textAlign: "center", padding: "0 16px", wordBreak: "break-all" }}>{tx.amount}</div>
+        <div style={{ color: DS.muted, fontSize: 15, marginTop: 6, fontWeight: 500 }}>~ {tx.usdValue || "0,00"} $</div>
       </div>
 
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 12px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
@@ -1954,8 +1954,20 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
   const { mockTransactions } = useWallet();
   const [selectedTx, setSelectedTx] = useState(null);
 
+  const APPROX_PRICES_ACT = { ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  const getActPrice = (id) => id?.startsWith('usdt') ? 1 : (APPROX_PRICES_ACT[id] || 0);
+
+  const fmtAmt = (raw) => {
+    const n = parseFloat(raw);
+    if (isNaN(n)) return raw;
+    if (Number.isInteger(n)) return n.toString().replace(".", ",");
+    return parseFloat(n.toFixed(8)).toString().replace(".", ",");
+  };
+
   const allTx = (mockTransactions || []).map(tx => {
     const asset = assets.find(a => a.id === tx.assetId);
+    const shortTo = tx.to ? (tx.to.slice(0,4)+"..."+tx.to.slice(-4)) : "—";
+    const shortFrom = tx.from ? (tx.from.slice(0,4)+"..."+tx.from.slice(-4)) : "—";
     return {
       id: tx.id,
       hash: tx.hash,
@@ -1963,12 +1975,16 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
       fee: tx.fee,
       timestamp: tx.timestamp,
       tokenId: asset ? asset.tokenId : 'TON',
-      amount: `${tx.type === 'Отправлено' ? '-' : '+'}${parseFloat(tx.amount).toString().replace(".", ",")} ${asset ? asset.symbol : ''}`,
-      sub: tx.type === 'Отправлено' ? `Кому ${tx.to ? (tx.to.slice(0,6)+"..."+tx.to.slice(-4)) : "..."}` : `От ${tx.from ? (tx.from.slice(0,6)+"..."+tx.from.slice(-4)) : "..."}`,
+      amount: `${tx.type === 'Отправлено' ? '-' : '+'}${fmtAmt(tx.amount)} ${asset ? asset.symbol : ''}`,
+      rawAmount: parseFloat(tx.amount),
+      sub: tx.type === 'Отправлено' ? `Кому ${shortTo}` : `От ${shortFrom}`,
       positive: tx.type !== 'Отправлено',
       isMock: true,
       assetId: tx.assetId,
-      status: tx.status || 'Успешный'
+      status: tx.status || 'Успешный',
+      from: tx.from || null,
+      to: tx.to || null,
+      usdValue: (parseFloat(tx.amount) * getActPrice(tx.assetId)).toFixed(2).replace(".", ","),
     };
   });
 
