@@ -1338,6 +1338,7 @@ function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, on
 
 /* ─── Screen: Swap confirm ───────────────────────────────────── */
 function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
+  const { fireNotif } = useWallet();
   const payAsset = swapPayAssets.find((a) => a.id === payId);
   const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
   const receiveAmount = (parseFloat(payAmount.replace(",", ".")) * 0.03384).toFixed(5).replace(".", ",");
@@ -1345,6 +1346,10 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
 
   function handleConfirm() {
     setDone(true);
+    fireNotif(
+      `Обмен выполнен`,
+      `${payAmount} ${payAsset?.symbol} → ${receiveAmount} ${receiveAsset?.symbol}`
+    );
     setTimeout(onConfirm, 1200);
   }
 
@@ -2924,9 +2929,11 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
 
 /* ─── Screen: Security ───────────────────────────────────────── */
 function SecurityScreen({ onBack, onLock }) {
-  const { getMnemonic, deleteWallet, lock, clearAllData } = useWallet();
-  const [passEnabled, setPassEnabled] = useState(true);
-  const [hideBalance, setHideBalance] = useState(false);
+  const { getMnemonic, deleteWallet, lock, clearAllData, settings, updateSetting } = useWallet();
+  const passEnabled = settings?.passEnabled ?? true;
+  const hideBalance = settings?.hideBalance ?? false;
+  const setPassEnabled = (v) => updateSetting('passEnabled', v);
+  const setHideBalance = (v) => updateSetting('hideBalance', v);
   const [showSeed, setShowSeed] = useState(false);
   const [seedPassword, setSeedPassword] = useState('');
   const [mnemonic, setMnemonic] = useState('');
@@ -3042,8 +3049,10 @@ function SecurityScreen({ onBack, onLock }) {
 
 /* ─── Screen: Notifications ──────────────────────────────────── */
 function NotificationsScreen({ onBack }) {
-  const [notifEnabled, setNotifEnabled] = useState(true);
+  const { settings, updateSetting, requestNotifPermission } = useWallet();
+  const notifEnabled = settings?.notifEnabled ?? false;
   const [subScreen, setSubScreen] = useState(null);
+  const [permDenied, setPermDenied] = useState(false);
 
   const Toggle = ({ value, onChange }) => (
     <div onClick={() => onChange(!value)}
@@ -3053,6 +3062,15 @@ function NotificationsScreen({ onBack }) {
         borderRadius: "50%", background: "white", transition: "left 0.2s" }} />
     </div>
   );
+
+  const handleNotifToggle = async (val) => {
+    if (val) {
+      const granted = await requestNotifPermission();
+      if (!granted) { setPermDenied(true); return; }
+      setPermDenied(false);
+    }
+    updateSetting('notifEnabled', val);
+  };
 
   if (subScreen === "price-alerts") return <PriceAlertsScreen onBack={() => setSubScreen(null)} />;
 
@@ -3071,13 +3089,18 @@ function NotificationsScreen({ onBack }) {
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px" }}>
           <span style={{ color: "white", fontSize: 16 }}>Уведомления</span>
-          <Toggle value={notifEnabled} onChange={setNotifEnabled} />
+          <Toggle value={notifEnabled} onChange={handleNotifToggle} />
         </div>
+        {permDenied && (
+          <div style={{ padding: "0 16px 14px", color: "#FF9500", fontSize: 13 }}>
+            Разрешите уведомления в настройках браузера и повторите попытку.
+          </div>
+        )}
       </div>
 
       <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px", overflow: "hidden" }}>
         <div onClick={() => setSubScreen("price-alerts")}
-          style={{ display: "flex", alignItems: "center", padding: "15px 16px", cursor: "pointer" }}>
+          style={{ display: "flex", alignItems: "center", padding: "15px 16px", cursor: "pointer", opacity: notifEnabled ? 1 : 0.4 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: "#1DB954",
             display: "flex", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
             <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
@@ -3097,7 +3120,15 @@ function NotificationsScreen({ onBack }) {
 
 /* ─── Screen: Price Alerts ───────────────────────────────────── */
 function PriceAlertsScreen({ onBack }) {
-  const [enabled, setEnabled] = useState(true);
+  const { settings, updateSetting, requestNotifPermission, fireNotif } = useWallet();
+  const enabled = settings?.priceAlertsEnabled ?? false;
+  const setEnabled = async (v) => {
+    if (v) {
+      const granted = await requestNotifPermission();
+      if (!granted) return;
+    }
+    updateSetting('priceAlertsEnabled', v);
+  };
   const [addingAsset, setAddingAsset] = useState(false);
   const [watchlist, setWatchlist] = useState([]);
   const [toast, setToast] = useState(null);
@@ -3307,7 +3338,7 @@ function fmtBal(num, sym) {
 
 /* ─── Screen: Home ───────────────────────────────────────────── */
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
-  const { balances, addresses, refreshBalance, testMode } = useWallet();
+  const { balances, addresses, refreshBalance, testMode, settings, updateSetting } = useWallet();
 
   // Build real balances mapped to asset ids
   const getRealBalance = (assetId) => {
@@ -3379,11 +3410,23 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
         </button>
       </div>
 
-      <div style={{ textAlign: "center", padding: "12px 20px 20px", animation: "fadeSlideUp 0.3s ease both" }}>
+      <div
+        onClick={() => updateSetting('hideBalance', !settings?.hideBalance)}
+        style={{ textAlign: "center", padding: "12px 20px 20px", animation: "fadeSlideUp 0.3s ease both", cursor: "pointer", userSelect: "none" }}
+      >
         <div style={{ color: "white", fontSize: 40, fontWeight: 700, letterSpacing: -1 }}>
-          {totalUsd < 0.01 ? "0,00 $" : `${totalUsd.toFixed(2).replace(".", ",")} $`}
+          {settings?.hideBalance
+            ? "••••• $"
+            : totalUsd < 0.01 ? "0,00 $" : `${totalUsd.toFixed(2).replace(".", ",")} $`}
         </div>
-        <div style={{ color: "#888", fontSize: 15, marginTop: 4 }}>Баланс портфеля</div>
+        <div style={{ color: "#888", fontSize: 15, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          Баланс портфеля
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, opacity: 0.5 }}>
+            {settings?.hideBalance
+              ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="#888" strokeWidth="1.8" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="#888" strokeWidth="1.8" strokeLinecap="round"/><path d="M1 1l22 22" stroke="#888" strokeWidth="1.8" strokeLinecap="round"/></>
+              : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="#888" strokeWidth="1.8"/><circle cx="12" cy="12" r="3" stroke="#888" strokeWidth="1.8"/></>}
+          </svg>
+        </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-around", padding: "0 24px 24px" }}>
@@ -4565,7 +4608,12 @@ function OnboardingScreen() {
 
 /* ─── Root component — state router ─────────────────────────── */
 export default function GemWalletApp() {
-  const { hasWallet, isUnlocked } = useWallet();
+  const { hasWallet, isUnlocked, settings, bypassUnlock } = useWallet();
+  useEffect(() => {
+    if (hasWallet && !isUnlocked && settings && settings.passEnabled === false) {
+      bypassUnlock();
+    }
+  }, [hasWallet, isUnlocked, settings, bypassUnlock]);
   if (!hasWallet) return <OnboardingScreen />;
   if (!isUnlocked) return <UnlockScreen />;
   return <WalletHomeUI />;
