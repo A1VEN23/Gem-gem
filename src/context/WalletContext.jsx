@@ -147,6 +147,13 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   const WalletContext = createContext(null);
 
   const STORAGE_KEY = 'gem_wallet_v1';
+  const SETTINGS_KEY = 'gem_settings_v1';
+  const DEFAULT_SETTINGS = {
+    hideBalance: false,
+    passEnabled: true,
+    notifEnabled: false,
+    priceAlertsEnabled: false,
+  };
 
   /**
    * deriveWallet returns addresses keyed as ETH/BNB/ARB/SOL/TON/LTC.
@@ -190,6 +197,43 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       testMode: false,
       mockTransactions: [],
     });
+
+    // ── Settings (persisted) ─────────────────────────────────────────────────────
+    const [settings, setSettings] = useState(() => {
+      try {
+        const s = localStorage.getItem(SETTINGS_KEY);
+        return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : { ...DEFAULT_SETTINGS };
+      } catch { return { ...DEFAULT_SETTINGS }; }
+    });
+    const settingsRef = useRef(settings);
+    useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+    const updateSetting = useCallback((key, value) => {
+      setSettings(prev => {
+        const next = { ...prev, [key]: value };
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+        return next;
+      });
+    }, []);
+
+    // ── Bypass unlock (no password mode) ────────────────────────────────────────
+    const bypassUnlock = useCallback(() => {
+      setState(s => ({ ...s, isUnlocked: true }));
+    }, []);
+
+    // ── Browser notifications ────────────────────────────────────────────────────
+    const requestNotifPermission = useCallback(async () => {
+      if (!('Notification' in window)) return false;
+      if (Notification.permission === 'granted') return true;
+      const perm = await Notification.requestPermission();
+      return perm === 'granted';
+    }, []);
+
+    const fireNotif = useCallback((title, body, icon = '/vite.svg') => {
+      if (!settingsRef.current.notifEnabled) return;
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      try { new Notification(title, { body, icon }); } catch {}
+    }, []);
 
     // Private keys are kept ONLY in memory — never persisted to localStorage
     const privateKeysRef = useRef({});
@@ -242,6 +286,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee }) => {
       const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const finalFee = customFee || (Math.random() * 0.001).toFixed(6);
+      // Fire browser notification
+      const sym = (assetId || '').split('-')[0].toUpperCase();
+      const amtStr = parseFloat(amount) % 1 === 0 ? String(parseFloat(amount)) : parseFloat(amount).toFixed(4).replace(/\.?0+$/, '');
+      if (type === 'Получено') {
+        fireNotif(`+${amtStr} ${sym} получено`, `Вы получили ${amtStr} ${sym}. Транзакция подтверждена.`);
+      } else {
+        fireNotif(`${amtStr} ${sym} отправлено`, `Перевод ${amtStr} ${sym} успешно выполнен.`);
+      }
       
       const newTx = {
         id: `mock-${Date.now()}`,
@@ -575,6 +627,11 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         addMockTransaction,
         clearAllData,
         generateNewMnemonic,
+        settings,
+        updateSetting,
+        bypassUnlock,
+        requestNotifPermission,
+        fireNotif,
       }}>
         {children}
       </WalletContext.Provider>
