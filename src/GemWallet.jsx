@@ -1639,14 +1639,13 @@ function CollectionsScreen({ onReceive }) {
   );
 }
 
-function ReceiveNFTSelectScreen({ onBack }) {
+function ReceiveNFTSelectScreen({ onBack, onSelect }) {
   const [search, setSearch] = useState("");
   const networks = [
-    { name: "Ethereum", tokenId: "ETH" },
-    { name: "BNB Chain", tokenId: "BNB" },
-    { name: "Solana", tokenId: "SOL" },
-    { name: "Polygon", tokenId: "POLYGON" },
-    { name: "TON", tokenId: "TON" },
+    { name: "Ethereum", tokenId: "ETH",      assetId: "eth" },
+    { name: "BNB Chain", tokenId: "BNB",     assetId: "bnb" },
+    { name: "Solana",    tokenId: "SOL",     assetId: "sol" },
+    { name: "TON",       tokenId: "TON",     assetId: "ton" },
   ];
 
   const filtered = networks.filter(n => n.name.toLowerCase().includes(search.toLowerCase()));
@@ -1668,7 +1667,8 @@ function ReceiveNFTSelectScreen({ onBack }) {
 
       <div style={{ background: "#1C1C1E", borderRadius: 20, margin: "0 16px", overflow: "hidden" }}>
         {filtered.map((net, i) => (
-          <div key={net.name} 
+          <div key={net.name}
+            onClick={() => onSelect && onSelect(net.assetId)}
             style={{ 
               display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
               borderBottom: i < filtered.length - 1 ? `1px solid ${DS.border}` : "none"
@@ -1678,7 +1678,7 @@ function ReceiveNFTSelectScreen({ onBack }) {
             </div>
             <span style={{ flex: 1, color: "white", fontSize: 16, marginLeft: 16, fontWeight: 500 }}>{net.name}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <button onClick={(e) => { e.stopPropagation(); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+              <button onClick={(e) => { e.stopPropagation(); onSelect && onSelect(net.assetId); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
                 <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
                   <rect x="8" y="4" width="12" height="14" rx="2" stroke="white" strokeWidth="1.8" />
                   <path d="M4 8v10a2 2 0 0 0 2 2h10" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
@@ -4044,6 +4044,7 @@ function WalletHomeUI() {
           <div className="anim-page">
           <ReceiveNFTSelectScreen
             onBack={() => go({ name: "home" })}
+            onSelect={(assetId) => go({ name: "receive-qr", assetId })}
           />
           </div>
         )}
