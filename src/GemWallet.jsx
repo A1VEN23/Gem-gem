@@ -62,6 +62,66 @@ const CURRENCIES = [
   { code: 'KZT', symbol: '₸',  name: 'Казахстанский тенге', flag: '🇰🇿', rate: 445.0 },
 ];
 
+  const LANGUAGES = [
+    { code: 'ru', name: 'Русский',    flag: '🇷🇺' },
+    { code: 'en', name: 'English',    flag: '🇬🇧' },
+    { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+    { code: 'de', name: 'Deutsch',    flag: '🇩🇪' },
+    { code: 'fr', name: 'Français',   flag: '🇫🇷' },
+    { code: 'es', name: 'Español',    flag: '🇪🇸' },
+    { code: 'zh', name: '中文',        flag: '🇨🇳' },
+    { code: 'tr', name: 'Türkçe',     flag: '🇹🇷' },
+    { code: 'pl', name: 'Polski',     flag: '🇵🇱' },
+  ];
+
+  const TRANSLATIONS = {
+    ru: { send: 'Отправить', receive: 'Получить', buy: 'Купить', swap: 'Обмен',
+          wallet: 'Кошелек', collections: 'Коллекции', activity: 'Активность', settings: 'Настройки',
+          portfolio: 'Баланс портфеля', currency: 'Валюта', language: 'Язык' },
+    en: { send: 'Send', receive: 'Receive', buy: 'Buy', swap: 'Swap',
+          wallet: 'Wallet', collections: 'Collections', activity: 'Activity', settings: 'Settings',
+          portfolio: 'Portfolio Balance', currency: 'Currency', language: 'Language' },
+    uk: { send: 'Надіслати', receive: 'Отримати', buy: 'Купити', swap: 'Обмін',
+          wallet: 'Гаманець', collections: 'Колекції', activity: 'Активність', settings: 'Налаштування',
+          portfolio: 'Баланс портфеля', currency: 'Валюта', language: 'Мова' },
+    de: { send: 'Senden', receive: 'Empfangen', buy: 'Kaufen', swap: 'Tauschen',
+          wallet: 'Wallet', collections: 'Sammlungen', activity: 'Aktivität', settings: 'Einstellungen',
+          portfolio: 'Portfolio-Saldo', currency: 'Währung', language: 'Sprache' },
+    fr: { send: 'Envoyer', receive: 'Recevoir', buy: 'Acheter', swap: 'Échanger',
+          wallet: 'Portefeuille', collections: 'Collections', activity: 'Activité', settings: 'Paramètres',
+          portfolio: 'Solde du portefeuille', currency: 'Devise', language: 'Langue' },
+    es: { send: 'Enviar', receive: 'Recibir', buy: 'Comprar', swap: 'Cambiar',
+          wallet: 'Billetera', collections: 'Colecciones', activity: 'Actividad', settings: 'Ajustes',
+          portfolio: 'Saldo de cartera', currency: 'Moneda', language: 'Idioma' },
+    zh: { send: '发送', receive: '接收', buy: '购买', swap: '兑换',
+          wallet: '钱包', collections: '收藏', activity: '活动', settings: '设置',
+          portfolio: '投资组合余额', currency: '货币', language: '语言' },
+    tr: { send: 'Gönder', receive: 'Al', buy: 'Satın Al', swap: 'Takas',
+          wallet: 'Cüzdan', collections: 'Koleksiyonlar', activity: 'Aktivite', settings: 'Ayarlar',
+          portfolio: 'Portföy Bakiyesi', currency: 'Para Birimi', language: 'Dil' },
+    pl: { send: 'Wyślij', receive: 'Odbierz', buy: 'Kup', swap: 'Wymień',
+          wallet: 'Portfel', collections: 'Kolekcje', activity: 'Aktywność', settings: 'Ustawienia',
+          portfolio: 'Saldo portfela', currency: 'Waluta', language: 'Język' },
+  };
+
+  function fmtCurrency(usdAmount, currencyCode) {
+    const cur = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
+    const val = usdAmount * cur.rate;
+    let formatted;
+    if (val >= 1000000) formatted = (val / 1000000).toFixed(2).replace('.', ',') + ' M';
+    else if (val >= 10000) formatted = Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    else if (val >= 100)   formatted = val.toFixed(2).replace('.', ',');
+    else if (val >= 1)     formatted = val.toFixed(2).replace('.', ',');
+    else                   formatted = val.toFixed(4).replace('.', ',');
+    return `${formatted} ${cur.symbol}`;
+  }
+
+  function getLang(settings) {
+    const code = settings?.languageCode || 'ru';
+    return TRANSLATIONS[code] || TRANSLATIONS.ru;
+  }
+  
+
 const ANIM_STYLE = `
   @keyframes fadeSlideUp {
     from { opacity: 0; transform: translate3d(0, 10px, 0); }
