@@ -144,6 +144,10 @@ const ANIM_STYLE = `
     0%, 100% { transform: scale3d(1, 1, 1); }
     50%       { transform: scale3d(1.06, 1.06, 1); }
   }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
   .anim-page    { 
     animation: slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) both; 
     will-change: transform, opacity; 
@@ -3047,12 +3051,12 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
     [
       {
         label: "Кошельки", badge: "1",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 64 64" fill="none" style={{ width: 22, height: 22 }}><polygon points="32,8 52,24 46,56 18,56 12,24" fill="white" fillOpacity="0.18" /><polygon points="32,8 52,24 46,56 18,56 12,24" stroke="white" strokeWidth="2" strokeLinejoin="round" /><polygon points="32,8 12,24 18,56" fill="white" fillOpacity="0.55" /><polygon points="32,8 52,24 46,56" fill="white" fillOpacity="0.35" /><polygon points="12,24 18,56 46,56 52,24" fill="white" fillOpacity="0.85" /><line x1="12" y1="24" x2="52" y2="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.5" /></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><polygon points="12,2 4,8 20,8" fill="white" fillOpacity="0.95"/><polygon points="4,8 7,22 12,14" fill="white" fillOpacity="0.7"/><polygon points="20,8 17,22 12,14" fill="white" fillOpacity="0.55"/><polygon points="7,22 17,22 12,14" fill="white" fillOpacity="0.85"/><polygon points="12,2 4,8 7,22 17,22 20,8" fill="none" stroke="white" strokeWidth="1.2" strokeLinejoin="round" strokeOpacity="0.4"/><line x1="4" y1="8" x2="20" y2="8" stroke="white" strokeWidth="1" strokeOpacity="0.35"/></svg></IconBox>,
         onPress: onWalletsClick,
       },
       {
         label: "Безопасность",
-        icon: <IconBox bg="#1C1C1E" border><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10C8 19.5 5 15.5 5 11V6l7-3z" stroke="white" strokeWidth="1.8" fill="white" fillOpacity="0.12" /></svg></IconBox>,
+        icon: <IconBox bg="#2A2A2E"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 3L5 6.5v4.5c0 4.2 3.1 8.1 7 9.5 3.9-1.4 7-5.3 7-9.5V6.5L12 3z" fill="white" fillOpacity="0.85"/><path d="M9 12l2 2 4-4" stroke="#2A2A2E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></IconBox>,
         onPress: () => setSubScreen("security"),
       },
     ],
@@ -3096,7 +3100,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
       },
       {
         label: "Награды",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 64 64" fill="none" style={{ width: 22, height: 22 }}><polygon points="32,8 52,24 46,56 18,56 12,24" fill="white" fillOpacity="0.18" /><polygon points="32,8 52,24 46,56 18,56 12,24" stroke="white" strokeWidth="2" strokeLinejoin="round" /><polygon points="32,8 12,24 18,56" fill="white" fillOpacity="0.55" /><polygon points="32,8 52,24 46,56" fill="white" fillOpacity="0.35" /><polygon points="12,24 18,56 46,56 52,24" fill="white" fillOpacity="0.85" /><line x1="12" y1="24" x2="52" y2="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.5" /></svg></IconBox>,
+        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}><polygon points="12,2 4,8 20,8" fill="white" fillOpacity="0.95"/><polygon points="4,8 7,22 12,14" fill="white" fillOpacity="0.7"/><polygon points="20,8 17,22 12,14" fill="white" fillOpacity="0.55"/><polygon points="7,22 17,22 12,14" fill="white" fillOpacity="0.85"/><polygon points="12,2 4,8 7,22 17,22 20,8" fill="none" stroke="white" strokeWidth="1.2" strokeLinejoin="round" strokeOpacity="0.4"/><line x1="4" y1="8" x2="20" y2="8" stroke="white" strokeWidth="1" strokeOpacity="0.35"/></svg></IconBox>,
         onPress: () => setSubScreen("rewards"),
       },
       {
@@ -3697,6 +3701,7 @@ function fmtBal(num, sym) {
 /* ─── Screen: Home ───────────────────────────────────────────── */
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
   const { balances, addresses, refreshBalance, testMode, settings, updateSetting } = useWallet();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Build real balances mapped to asset ids
   const getRealBalance = (assetId) => {
@@ -3760,8 +3765,13 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
             <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </div>
-        <button onClick={() => refreshBalance()} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
+        <button onClick={async () => {
+          if (isRefreshing) return;
+          setIsRefreshing(true);
+          try { await refreshBalance(); } catch(e) {}
+          setIsRefreshing(false);
+        }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22, animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
             <path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" stroke="white" strokeWidth="2" strokeLinecap="round" />
             <path d="M18 4v4h-4M6 20v-4H2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
