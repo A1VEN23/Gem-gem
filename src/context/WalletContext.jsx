@@ -283,15 +283,15 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       }));
     }, []);
 
-    const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee }) => {
+    const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee, status: txStatus, pendingUntil }) => {
       const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const finalFee = customFee || (Math.random() * 0.001).toFixed(6);
-      // Fire browser notification
+      // Fire browser notification only for completed sends
       const sym = (assetId || '').split('-')[0].toUpperCase();
       const amtStr = parseFloat(amount) % 1 === 0 ? String(parseFloat(amount)) : parseFloat(amount).toFixed(4).replace(/\.?0+$/, '');
       if (type === 'Получено') {
         fireNotif(`+${amtStr} ${sym} получено`, `Вы получили ${amtStr} ${sym}. Транзакция подтверждена.`);
-      } else {
+      } else if (txStatus !== 'В процессе') {
         fireNotif(`${amtStr} ${sym} отправлено`, `Перевод ${amtStr} ${sym} успешно выполнен.`);
       }
       
@@ -305,7 +305,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         type,
         fee: finalFee,
         timestamp: new Date().toISOString(),
-        status: 'Успешный',
+        status: txStatus || 'Успешный',
+        pendingUntil: pendingUntil || null,
       };
       
       setState(s => {
@@ -344,6 +345,41 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           mockBalances: newMockBalances,
           balances: newMergedBalances
         };
+      });
+    }, []);
+
+    const cancelMockTransaction = useCallback((txId) => {
+      setState(s => {
+        const tx = s.mockTransactions.find(t => t.id === txId);
+        if (!tx) return s;
+        const updatedTxs = s.mockTransactions.map(t =>
+          t.id === txId ? { ...t, status: 'Отменена', pendingUntil: null } : t
+        );
+        localStorage.setItem('gem_mock_txs', JSON.stringify(updatedTxs));
+        // Refund the amount back to balance
+        const sym = tx.assetId.split('-')[0].toUpperCase();
+        const currentMock = parseFloat(s.mockBalances[tx.assetId] || s.mockBalances[sym] || '0');
+        const numAmount = parseFloat(tx.amount.toString().replace(',', '.'));
+        const newMockVal = (currentMock + numAmount).toString();
+        const newMockBalances = { ...s.mockBalances, [tx.assetId]: newMockVal, [sym]: newMockVal };
+        localStorage.setItem('gem_mock_balances', JSON.stringify(newMockBalances));
+        const newMergedBalances = { ...s.realBalances };
+        Object.keys(newMockBalances).forEach(k => {
+          const real = parseFloat(newMergedBalances[k] || '0');
+          const mock = parseFloat(newMockBalances[k] || '0');
+          newMergedBalances[k] = (real + mock).toString();
+        });
+        return { ...s, mockTransactions: updatedTxs, mockBalances: newMockBalances, balances: newMergedBalances };
+      });
+    }, []);
+
+    const resolvePendingTransaction = useCallback((txId) => {
+      setState(s => {
+        const updatedTxs = s.mockTransactions.map(t =>
+          t.id === txId ? { ...t, status: 'Успешный', pendingUntil: null } : t
+        );
+        localStorage.setItem('gem_mock_txs', JSON.stringify(updatedTxs));
+        return { ...s, mockTransactions: updatedTxs };
       });
     }, []);
 
@@ -625,6 +661,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         sendTransaction,
         setTestMode,
         addMockTransaction,
+        cancelMockTransaction,
+        resolvePendingTransaction,
         clearAllData,
         generateNewMnemonic,
         settings,
