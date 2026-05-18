@@ -2205,7 +2205,7 @@ function TxDetailScreen({ tx, onBack }) {
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 12px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
         <Row label="Дата" value={dateStr} />
         <Row label="Статус" value={localStatus || "Успешный"}
-            valueColor={localStatus === 'Ошибка' ? DS.danger : localStatus === 'В процессе' ? DS.blue : localStatus === 'Отменена' ? DS.muted : DS.green}
+            valueColor={localStatus === 'Ошибка' ? DS.danger : localStatus === 'В процессе' ? '#FF9F0A' : localStatus === 'Отменена' ? DS.muted : DS.green}
             extra={<InfoIcon />} />
         <AddressRow
           label={tx.type === "Получено" ? "Отправитель" : "Получатель"}
@@ -2244,42 +2244,81 @@ function TxDetailScreen({ tx, onBack }) {
       </div>
 
       <div style={{ padding: "16px", marginTop: 8 }}>
-        {localStatus === "В процессе" && tx.pendingUntil && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ background: "rgba(59,125,255,0.10)", border: "1px solid rgba(59,125,255,0.25)", borderRadius: 16, padding: "14px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: DS.blue, animation: "pulse 1.5s infinite" }} />
-                <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>Транзакция в процессе</span>
-              </div>
-              <div style={{ color: DS.muted, fontSize: 13 }}>
-                Низкая комиссия — майнеры обрабатывают медленно.{timeLeft !== null ? ` Ожидаемое время: ${fmtTimeLeft(timeLeft)}` : ''}
+          {localStatus === "В процессе" && tx.pendingUntil && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ background: "rgba(255,159,10,0.10)", border: "1px solid rgba(255,159,10,0.30)", borderRadius: 18, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#FF9F0A", animation: "pulse 1.2s infinite" }} />
+                    <span style={{ color: "white", fontWeight: 700, fontSize: 15 }}>В процессе</span>
+                  </div>
+                  {timeLeft !== null && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(255,159,10,0.18)", borderRadius: 10, padding: "4px 10px" }}>
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 13, height: 13 }}>
+                        <circle cx="12" cy="12" r="9" stroke="#FF9F0A" strokeWidth="2" />
+                        <path d="M12 7v5l3 3" stroke="#FF9F0A" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      <span style={{ color: "#FF9F0A", fontWeight: 700, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{fmtTimeLeft(timeLeft)}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ color: "#CC8800", fontSize: 13, lineHeight: 1.5 }}>
+                  Транзакция ожидает подтверждения. Низкая комиссия — майнеры обрабатывают медленно.
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        {localStatus === "В процессе" && tx.pendingUntil && (
-          <button onClick={handleCancel}
-            style={{ width: "100%", padding: "17px 0", borderRadius: 28, border: "none",
-              background: "rgba(255,69,58,0.13)", color: "#FF453A", fontSize: 16, fontWeight: 700, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-              <circle cx="12" cy="12" r="9" stroke="#FF453A" strokeWidth="2" />
-              <path d="M15 9l-6 6M9 9l6 6" stroke="#FF453A" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Отменить транзакцию
-          </button>
-        )}
-        {localStatus === "Отменена" && (
-          <div style={{ background: "rgba(142,142,147,0.12)", border: "1px solid rgba(142,142,147,0.2)", borderRadius: 16, padding: "14px 18px", textAlign: "center" }}>
-            <div style={{ color: DS.muted, fontWeight: 600, fontSize: 14 }}>Транзакция отменена</div>
-            <div style={{ color: DS.muted, fontSize: 13, marginTop: 4 }}>Средства возвращены на баланс</div>
-          </div>
-        )}
-      </div>
+          )}
+          {localStatus === "В процессе" && tx.pendingUntil && (
+            <button onClick={handleCancel}
+              style={{ width: "100%", padding: "16px 0", borderRadius: 14, border: "1px solid rgba(255,69,58,0.35)",
+                background: "rgba(255,69,58,0.10)", color: "#FF453A", fontSize: 16, fontWeight: 700, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                fontFamily: DS.font, transition: "all 0.2s" }}>
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+                <circle cx="12" cy="12" r="9" stroke="#FF453A" strokeWidth="2" />
+                <path d="M15 9l-6 6M9 9l6 6" stroke="#FF453A" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              Отменить транзакцию
+            </button>
+          )}
+          {localStatus === "Отменена" && (
+            <div style={{ background: "rgba(142,142,147,0.12)", border: "1px solid rgba(142,142,147,0.2)", borderRadius: 16, padding: "14px 18px", textAlign: "center" }}>
+              <div style={{ color: DS.muted, fontWeight: 600, fontSize: 14 }}>Транзакция отменена</div>
+              <div style={{ color: DS.muted, fontSize: 13, marginTop: 4 }}>Средства возвращены на баланс</div>
+            </div>
+          )}
+        </div>
     </div>
   );
 }
 
+
+  /* ─── Pending timer badge for activity list ─────────────────── */
+  function PendingActivityTimer({ pendingUntil }) {
+    const [timeLeft, setTimeLeft] = useState(() => Math.max(0, pendingUntil - Date.now()));
+    useEffect(() => {
+      if (!pendingUntil) return;
+      const iv = setInterval(() => {
+        const rem = Math.max(0, pendingUntil - Date.now());
+        setTimeLeft(rem);
+        if (rem === 0) clearInterval(iv);
+      }, 1000);
+      return () => clearInterval(iv);
+    }, [pendingUntil]);
+    const m = Math.floor(timeLeft / 60000);
+    const s = Math.floor((timeLeft % 60000) / 1000);
+    const str = `${m}:${s.toString().padStart(2, '0')}`;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+        <svg viewBox="0 0 24 24" fill="none" style={{ width: 11, height: 11 }}>
+          <circle cx="12" cy="12" r="9" stroke="#FF9F0A" strokeWidth="2.2" />
+          <path d="M12 7v5l3 3" stroke="#FF9F0A" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+        <span style={{ color: "#FF9F0A", fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{str}</span>
+      </div>
+    );
+  }
+  
 const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
   const { mockTransactions } = useWallet();
   const [selectedTx, setSelectedTx] = useState(null);
@@ -2315,6 +2354,7 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
       from: tx.from || null,
       to: tx.to || null,
       usdValue: (parseFloat(tx.amount) * getActPrice(tx.assetId)).toFixed(2).replace(".", ","),
+      pendingUntil: tx.pendingUntil || null,
     };
   });
 
@@ -2353,41 +2393,64 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
           </div>
 
           <div style={{ background: DS.card, borderRadius: 20, overflow: "hidden", border: `1px solid ${DS.border}` }}>
-            {allTx.map((tx, i) => (
-              <div key={tx.id} onClick={() => setSelectedTx(tx)}
-                style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
-                  borderBottom: i < allTx.length - 1 ? `1px solid ${DS.border}` : "none" }}>
-                <div style={{ position: "relative", width: 48, height: 48, flexShrink: 0 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: DS.input,
-                    display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 32, height: 32 }}>
-                      <TokenIcon tokenId={tx.tokenId} size={32} badgeSize={12} />
+            {allTx.map((tx, i) => {
+                const isPending = tx.status === 'В процессе' && tx.pendingUntil;
+                const amtColor = isPending ? '#FF9F0A' : tx.positive ? DS.green : DS.danger;
+                const badgeBg = isPending ? '#FF9F0A' : tx.positive ? DS.green : DS.danger;
+                return (
+                <div key={tx.id} onClick={() => setSelectedTx(tx)}
+                  style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
+                    borderBottom: i < allTx.length - 1 ? `1px solid ${DS.border}` : "none",
+                    background: isPending ? "rgba(255,159,10,0.04)" : "none" }}>
+                  <div style={{ position: "relative", width: 48, height: 48, flexShrink: 0 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: DS.input,
+                      display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: 32, height: 32 }}>
+                        <TokenIcon tokenId={tx.tokenId} size={32} badgeSize={12} />
+                      </div>
+                    </div>
+                    <div style={{ position: "absolute", bottom: -2, right: -2, width: 20, height: 20, borderRadius: "50%",
+                      background: badgeBg,
+                      border: `2px solid ${DS.card}`,
+                      display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {isPending ? (
+                        <svg viewBox="0 0 24 24" fill="none" style={{ width: 11, height: 11 }}>
+                          <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5" />
+                          <path d="M12 7v5l3 3" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" style={{ width: 12, height: 12 }}>
+                          {tx.positive
+                            ? <path d="M12 17V7M7 12l5 5 5-5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                            : <path d="M12 7v10M7 12l5-5 5 5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          }
+                        </svg>
+                      )}
                     </div>
                   </div>
-                  <div style={{ position: "absolute", bottom: -2, right: -2, width: 20, height: 20, borderRadius: "50%",
-                    background: tx.positive ? DS.green : DS.danger,
-                    border: `2px solid ${DS.card}`,
-                    display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 12, height: 12 }}>
-                      {tx.positive
-                        ? <path d="M12 17V7M7 12l5 5 5-5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                        : <path d="M12 7v10M7 12l5-5 5 5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                      }
-                    </svg>
+                  <div style={{ flex: 1, marginLeft: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>{tx.type}</div>
+                      {tx.status === 'Ошибка' && <span style={{ background: "rgba(255,69,58,0.15)", color: DS.danger, fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>Ошибка</span>}
+                    </div>
+                    <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{tx.sub}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: amtColor, fontWeight: 700, fontSize: 15 }}>{tx.amount}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 2 }}>
+                      {isPending ? (
+                        <>
+                          <span style={{ color: "#FF9F0A", fontSize: 12, fontWeight: 600 }}>В процессе</span>
+                          <PendingActivityTimer pendingUntil={tx.pendingUntil} />
+                        </>
+                      ) : (
+                        <span style={{ color: DS.muted, fontSize: 12 }}>{tx.status === 'Отменена' ? 'Отменена' : tx.status === 'Ошибка' ? 'Ошибка' : 'Успешно'}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div style={{ flex: 1, marginLeft: 14 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>{tx.type}</div>
-                    {tx.status === 'Ошибка' && <span style={{ background: "rgba(255,69,58,0.15)", color: DS.danger, fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>Ошибка</span>}
-                  </div>
-                  <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{tx.sub}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ color: tx.positive ? DS.green : DS.danger, fontWeight: 700, fontSize: 15 }}>{tx.amount}</div>
-                  <div style={{ color: DS.muted, fontSize: 12, marginTop: 2 }}>Успешно</div>
-                </div>
-              </div>
+                );
+              })}
             ))}
           </div>
         </div>
