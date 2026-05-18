@@ -2463,7 +2463,6 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
                 </div>
                 );
               })}
-            ))}
           </div>
         </div>
       )}
