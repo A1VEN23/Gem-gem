@@ -4035,7 +4035,7 @@ function WalletHomeUI() {
           <div className="anim-page">
           <ReceiveQRScreen
             assetId={screen.assetId}
-            onBack={() => go({ name: "receive-select" })}
+            onBack={() => go({ name: screen.backTo || "receive-select" })}
           />
           </div>
         )}
@@ -4044,7 +4044,7 @@ function WalletHomeUI() {
           <div className="anim-page">
           <ReceiveNFTSelectScreen
             onBack={() => go({ name: "home" })}
-            onSelect={(assetId) => go({ name: "receive-qr", assetId })}
+            onSelect={(assetId) => go({ name: "receive-qr", assetId, backTo: "receive-nft-select" })}
           />
           </div>
         )}
