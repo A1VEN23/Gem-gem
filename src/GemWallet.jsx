@@ -52,7 +52,16 @@ const tabs = [
 
 /* ─── Currency & Language system ────────────────────────────── */
 const CURRENCIES = [
-  { code: 'USD', symbol: '
+  { code: 'USD', symbol: '$',  name: 'US Dollar',           flag: '🇺🇸', rate: 1.0    },
+  { code: 'EUR', symbol: '€',  name: 'Euro',                flag: '🇪🇺', rate: 0.92   },
+  { code: 'RUB', symbol: '₽',  name: 'Российский рубль',   flag: '🇷🇺', rate: 90.5   },
+  { code: 'BYN', symbol: 'Br', name: 'Белорусский рубль',  flag: '🇧🇾', rate: 3.25   },
+  { code: 'GBP', symbol: '£',  name: 'British Pound',      flag: '🇬🇧', rate: 0.79   },
+  { code: 'UAH', symbol: '₴',  name: 'Українська гривня', flag: '🇺🇦', rate: 41.5   },
+  { code: 'CNY', symbol: '¥',  name: '人民币',              flag: '🇨🇳', rate: 7.24   },
+  { code: 'KZT', symbol: '₸',  name: 'Казахстанский тенге', flag: '🇰🇿', rate: 445.0 },
+];
+
 const ANIM_STYLE = `
   @keyframes fadeSlideUp {
     from { opacity: 0; transform: translate3d(0, 10px, 0); }
@@ -4896,72 +4905,6 @@ function getLang(settings) {
   const code = settings?.languageCode || 'ru';
   return TRANSLATIONS[code] || TRANSLATIONS.ru;
 }
-
-/* ─── Global animations injected once ───────────────────────── */
-const ANIM_STYLE = `
-  @keyframes fadeSlideUp {
-    from { opacity: 0; transform: translate3d(0, 10px, 0); }
-    to   { opacity: 1; transform: translate3d(0, 0, 0); }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale3d(0.95, 0.95, 1); }
-    to   { opacity: 1; transform: scale3d(1, 1, 1); }
-  }
-  @keyframes slideInRight {
-    from { opacity: 0; transform: translate3d(20px, 0, 0); }
-    to   { opacity: 1; transform: translate3d(0, 0, 0); }
-  }
-  @keyframes pulse {
-    0%, 100% { transform: scale3d(1, 1, 1); }
-    50%       { transform: scale3d(1.06, 1.06, 1); }
-  }
-  .anim-page    { 
-    animation: slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) both; 
-    will-change: transform, opacity; 
-    backface-visibility: hidden;
-    transform: translate3d(0,0,0);
-  }
-  .anim-list > * { 
-    animation: fadeSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) both; 
-    will-change: transform, opacity; 
-    backface-visibility: hidden;
-    transform: translate3d(0,0,0);
-  }
-  .anim-list > *:nth-child(1)  { animation-delay: 0.00s; }
-  .anim-list > *:nth-child(2)  { animation-delay: 0.02s; }
-  .anim-list > *:nth-child(3)  { animation-delay: 0.04s; }
-  .anim-list > *:nth-child(4)  { animation-delay: 0.06s; }
-  .anim-list > *:nth-child(5)  { animation-delay: 0.08s; }
-  .anim-list > *:nth-child(6)  { animation-delay: 0.10s; }
-  .anim-list > *:nth-child(7)  { animation-delay: 0.12s; }
-  .anim-list > *:nth-child(8)  { animation-delay: 0.14s; }
-  .anim-list > *:nth-child(9)  { animation-delay: 0.16s; }
-  .anim-list > *:nth-child(10) { animation-delay: 0.18s; }
-  .anim-list > *:nth-child(11) { animation-delay: 0.20s; }
-  .tap-btn {
-    transition: transform 0.1s ease, box-shadow 0.1s;
-    cursor: pointer;
-  }
-  .tap-btn:active { transform: scale3d(0.95, 0.95, 1) !important; }
-  .tap-row {
-    transition: background 0.1s;
-    cursor: pointer;
-  }
-  .tap-row:active { background: rgba(255,255,255,0.06) !important; }
-  .nav-icon {
-    transition: transform 0.15s ease;
-  }
-  .nav-icon:active { transform: scale3d(0.85, 0.85, 1); }
-  
-  * { -webkit-tap-highlight-color: transparent; outline: none; -webkit-overflow-scrolling: touch; }
-  html, body { scroll-behavior: smooth; }
-  .smooth-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
-  body { margin: 0; padding: 0; background: #000; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
-`;
 
 const AnimStyles = memo(() => {
   return <style>{ANIM_STYLE}</style>;
