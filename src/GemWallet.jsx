@@ -4829,55 +4829,36 @@ function OnboardingScreen() {
   const [password2, setPassword2] = useState('');
   const [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [verifyIndices, setVerifyIndices] = useState([]);
-  const [verifyInputs, setVerifyInputs] = useState({});
+  const [termsChecked, setTermsChecked] = useState([false, false, false]);
+  const [verifyPhrase, setVerifyPhrase] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
 
-  const handleStartCreate = async () => {
+  const handleStartCreate = () => {
     setError('');
-    setLocalLoading(true);
+    setTermsChecked([false, false, false]);
     try {
-      const m = generateNewMnemonic(); 
+      const m = generateNewMnemonic();
       setMnemonic(m);
-      setStep('backup');
+      setStep('terms');
     } catch (e) {
       setError(e.message);
-    } finally {
-      setLocalLoading(false);
     }
   };
 
   const prepareVerify = () => {
-    const words = mnemonic.split(' ');
-    const indices = [];
-    while (indices.length < 3) {
-      const r = Math.floor(Math.random() * 12);
-      if (!indices.includes(r)) indices.push(r);
-    }
-    setVerifyIndices(indices.sort((a, b) => a - b));
-    setVerifyInputs({});
+    setVerifyPhrase('');
+    setError('');
     setStep('verify');
   };
 
-  const handleVerifySuccess = () => {
-    setStep('create-password');
-  };
-
   const handleVerify = () => {
-    const words = mnemonic.split(' ');
-    let isCorrect = true;
-    for (const idx of verifyIndices) {
-      if ((verifyInputs[idx] || '').trim().toLowerCase() !== words[idx].toLowerCase()) {
-        isCorrect = false;
-        break;
-      }
-    }
-
-    if (!isCorrect) {
-      setError('Неверные слова. Проверьте фразу.');
+    const entered = verifyPhrase.trim().toLowerCase().replace(/\s+/g, ' ');
+    const expected = mnemonic.trim().toLowerCase();
+    if (entered !== expected) {
+      setError('Фраза не совпадает. Проверьте и попробуйте снова.');
       return;
     }
-    handleVerifySuccess();
+    setStep('create-password');
   };
 
   const handleFinishCreate = async () => {
@@ -4960,6 +4941,86 @@ function OnboardingScreen() {
     </ORoot>
   );
 
+  if (step === 'terms') {
+    const TERMS = [
+      "Я понимаю, что ответственность за безопасность и резервное копирование моих кошельков несу исключительно я, а не Gem.",
+      "Я понимаю, что Gem не является банком или биржей, и использование его в незаконных целях строго запрещено.",
+      "Я понимаю, что если я потеряю доступ к своим кошелькам, Gem не несет ответственности и не сможет оказать никакой помощи.",
+    ];
+    const allAccepted = termsChecked.every(Boolean);
+    return (
+      <ORoot>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16, marginBottom: 8 }}>
+          <button onClick={() => setStep('welcome')} style={{ background: DS.card, border: `1px solid ${DS.border}`, borderRadius: "50%", width: 36, height: 36, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}><path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" /></svg>
+          </button>
+          <span style={{ color: DS.text, fontWeight: 700, fontSize: 17 }}>Принять условия</span>
+          <div style={{ width: 36 }} />
+        </div>
+        <div style={{ color: DS.muted, fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 1.6 }}>
+          Прежде чем продолжить, пожалуйста,<br />прочтите и примите следующие условия.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+          {TERMS.map((text, i) => (
+            <div key={i} onClick={() => { const c = [...termsChecked]; c[i] = !c[i]; setTermsChecked(c); }}
+              style={{ display: "flex", alignItems: "flex-start", gap: 14, background: DS.card, borderRadius: 16,
+                padding: "16px", border: `1px solid ${termsChecked[i] ? DS.blue : DS.border}`, cursor: "pointer",
+                transition: "border-color 0.2s" }}>
+              <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${termsChecked[i] ? DS.blue : "#555"}`,
+                background: termsChecked[i] ? DS.blue : "transparent", flexShrink: 0, marginTop: 1,
+                display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+                {termsChecked[i] && <svg viewBox="0 0 24 24" fill="none" style={{ width: 13, height: 13 }}>
+                  <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>}
+              </div>
+              <span style={{ color: DS.text, fontSize: 14, lineHeight: 1.6 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 32 }}>
+          <OBtn onClick={() => setStep('new-wallet-info')} disabled={!allAccepted}>Согласиться и продолжить</OBtn>
+        </div>
+      </ORoot>
+    );
+  }
+
+  if (step === 'new-wallet-info') {
+    const INFO = [
+      { icon: "🔒", title: "Храните в безопасном месте", sub: "Секретная фраза – это единственный способ получить доступ к своему кошельку." },
+      { icon: "⚠️", title: "Не делитесь этим ни с кем", sub: "Любой, кто узнает вашу секретную фразу, может получить полный контроль над вашим кошельком." },
+      { icon: "💎", title: "Мы не можем помочь вам восстановить его.", sub: "Если вы потеряете секретную фразу, вы потеряете доступ к своему кошельку." },
+    ];
+    return (
+      <ORoot>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16, marginBottom: 8 }}>
+          <button onClick={() => setStep('terms')} style={{ background: DS.card, border: `1px solid ${DS.border}`, borderRadius: "50%", width: 36, height: 36, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}><path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <span style={{ color: DS.text, fontWeight: 700, fontSize: 17 }}>Новый кошелек</span>
+          <div style={{ width: 36 }} />
+        </div>
+        <div style={{ color: DS.muted, fontSize: 14, textAlign: "center", marginBottom: 24, lineHeight: 1.6 }}>
+          Вы получите Секретную фразу — это единственный способ получить доступ к вашему кошельку.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+          {INFO.map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 14, background: DS.card,
+              borderRadius: 16, padding: "16px", border: `1px solid ${DS.border}` }}>
+              <span style={{ fontSize: 22, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+              <div>
+                <div style={{ color: DS.text, fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{item.title}</div>
+                <div style={{ color: DS.muted, fontSize: 13, lineHeight: 1.6 }}>{item.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 32 }}>
+          <OBtn onClick={() => setStep('backup')}>Продолжить</OBtn>
+        </div>
+      </ORoot>
+    );
+  }
+
   if (step === 'backup') return (
     <ORoot>
       <div style={{ paddingTop: 24 }}>
@@ -5003,19 +5064,23 @@ function OnboardingScreen() {
     <ORoot>
       <OBackBtn onClick={() => setStep('backup')} />
       <div style={{ color: DS.text, fontWeight: 700, fontSize: 24, marginBottom: 8, marginTop: 16 }}>Проверка фразы</div>
-      <div style={{ color: DS.muted, fontSize: 15, marginBottom: 32, lineHeight: 1.5 }}>
-        Введите указанные слова, чтобы подтвердить сохранение фразы
+      <div style={{ color: DS.muted, fontSize: 15, marginBottom: 20, lineHeight: 1.5 }}>
+        Введите или вставьте все 12 слов вашей seed-фразы через пробел, чтобы подтвердить сохранение
       </div>
-      {verifyIndices.map(idx => (
-        <div key={idx} style={{ marginBottom: 16 }}>
-          <div style={{ color: DS.muted, fontSize: 12, marginBottom: 8, textTransform: "uppercase", fontWeight: 700 }}>Слово №{idx + 1}</div>
-          <OInputRow 
-            placeholder="Введите слово" 
-            value={verifyInputs[idx] || ''} 
-            onChange={val => setVerifyInputs({...verifyInputs, [idx]: val})} 
-          />
-        </div>
-      ))}
+      <textarea
+        placeholder="слово1 слово2 слово3 … слово12"
+        value={verifyPhrase}
+        onChange={e => { setVerifyPhrase(e.target.value); setError(''); }}
+        rows={5}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        style={{ width: "100%", background: DS.card, border: `1px solid ${DS.border}`,
+          borderRadius: 14, padding: "14px 16px", color: DS.text, fontSize: 15,
+          outline: "none", resize: "none", fontFamily: DS.font, lineHeight: 1.6,
+          boxSizing: "border-box", marginBottom: 10 }}
+      />
       <div style={{ flex: 1 }} />
       <OErr msg={error} />
       <OBtn onClick={handleVerify}>Подтвердить и начать</OBtn>
