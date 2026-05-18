@@ -2251,73 +2251,81 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
   );
 });
 
-/* ─── Screen: App Settings (Валюта / Язык / Сети) ───────────── */
+/* ─── Screen: App Settings (Валюта / Язык) ──────────────────── */
+const STORAGE_CURRENCY = 'gem_currency';
+const STORAGE_LANGUAGE = 'gem_language';
+
+function loadCurrency() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_CURRENCY)) || { code: 'USD', flag: '🇺🇸' }; } catch { return { code: 'USD', flag: '🇺🇸' }; }
+}
+function loadLanguage() {
+  try { return localStorage.getItem(STORAGE_LANGUAGE) || 'Русский'; } catch { return 'Русский'; }
+}
+
 function AppSettingsScreen({ onBack }) {
   const [subScreen, setSubScreen] = useState(null);
-  const [currency, setCurrency] = useState({ code: "USD", flag: "🇺🇸" });
-  const [language, setLanguage] = useState("Русский");
+  const [currency, setCurrency] = useState(loadCurrency);
+  const [language, setLanguage] = useState(loadLanguage);
 
-  if (subScreen === "currency") return <CurrencyScreen onBack={() => setSubScreen(null)} selected={currency} onSelect={(c) => { setCurrency(c); setSubScreen(null); }} />;
-  if (subScreen === "language") return <LanguageScreen onBack={() => setSubScreen(null)} selected={language} onSelect={(l) => { setLanguage(l); setSubScreen(null); }} />;
-  if (subScreen === "networks") return <NetworksScreen onBack={() => setSubScreen(null)} />;
+  const handleSelectCurrency = (c) => {
+    setCurrency(c);
+    localStorage.setItem(STORAGE_CURRENCY, JSON.stringify(c));
+    setSubScreen(null);
+  };
+  const handleSelectLanguage = (l) => {
+    setLanguage(l);
+    localStorage.setItem(STORAGE_LANGUAGE, l);
+    setSubScreen(null);
+  };
+
+  if (subScreen === 'currency') return <CurrencyScreen onBack={() => setSubScreen(null)} selected={currency} onSelect={handleSelectCurrency} />;
+  if (subScreen === 'language') return <LanguageScreen onBack={() => setSubScreen(null)} selected={language} onSelect={handleSelectLanguage} />;
+
+  const items = [
+    {
+      label: 'Валюта',
+      value: `${currency.flag} ${currency.code}`,
+      icon: <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FF9500', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg viewBox='0 0 24 24' fill='none' style={{ width: 20, height: 20 }}>
+          <circle cx='12' cy='12' r='9' stroke='white' strokeWidth='1.8' />
+          <path d='M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h5a1.5 1.5 0 0 1 0 3H9' stroke='white' strokeWidth='1.8' strokeLinecap='round' />
+        </svg>
+      </div>,
+      onPress: () => setSubScreen('currency'),
+    },
+    {
+      label: 'Язык',
+      value: language,
+      icon: <div style={{ width: 36, height: 36, borderRadius: 10, background: '#30B0C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg viewBox='0 0 24 24' fill='none' style={{ width: 20, height: 20 }}>
+          <circle cx='12' cy='12' r='9' stroke='white' strokeWidth='1.8' />
+          <path d='M12 3c0 0-4 4-4 9s4 9 4 9M12 3c0 0 4 4 4 9s-4 9-4 9M3 12h18' stroke='white' strokeWidth='1.5' />
+        </svg>
+      </div>,
+      onPress: () => setSubScreen('language'),
+    },
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 12 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-            <path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', gap: 12 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+          <svg viewBox='0 0 24 24' fill='none' style={{ width: 22, height: 22 }}>
+            <path d='M15 19l-7-7 7-7' stroke='white' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' />
           </svg>
         </button>
-        <span style={{ flex: 1, color: "white", fontWeight: 600, fontSize: 17, textAlign: "center" }}>Настройки</span>
+        <span style={{ flex: 1, color: 'white', fontWeight: 600, fontSize: 17, textAlign: 'center' }}>Настройки</span>
         <div style={{ width: 30 }} />
       </div>
 
-      <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px", overflow: "hidden" }}>
-        {[
-          {
-            label: "Валюта",
-            value: `${currency.flag} ${currency.code}`,
-            icon: <div style={{ width: 36, height: 36, borderRadius: 10, background: "#FF9500", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-                <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
-                <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h5a1.5 1.5 0 0 1 0 3H9" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </div>,
-            onPress: () => setSubScreen("currency"),
-          },
-          {
-            label: "Язык",
-            value: language,
-            icon: <div style={{ width: 36, height: 36, borderRadius: 10, background: "#30B0C7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-                <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" />
-                <path d="M12 3c0 0-4 4-4 9s4 9 4 9M12 3c0 0 4 4 4 9s-4 9-4 9M3 12h18" stroke="white" strokeWidth="1.5" />
-              </svg>
-            </div>,
-            onPress: () => setSubScreen("language"),
-          },
-          {
-            label: "Сети",
-            value: "",
-            icon: <div style={{ width: 36, height: 36, borderRadius: 10, background: "#6E3DD4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-                <rect x="2" y="7" width="5" height="5" rx="1" stroke="white" strokeWidth="1.6" />
-                <rect x="9" y="4" width="5" height="5" rx="1" stroke="white" strokeWidth="1.6" />
-                <rect x="17" y="7" width="5" height="5" rx="1" stroke="white" strokeWidth="1.6" />
-                <rect x="9" y="14" width="5" height="5" rx="1" stroke="white" strokeWidth="1.6" />
-                <path d="M11.5 9v5M11.5 9L4.5 12M11.5 9l7 3" stroke="white" strokeWidth="1.4" />
-              </svg>
-            </div>,
-            onPress: () => setSubScreen("networks"),
-          },
-        ].map((item, i, arr) => (
+      <div style={{ background: '#181820', borderRadius: 16, margin: '8px 16px', overflow: 'hidden' }}>
+        {items.map((item, i) => (
           <div key={item.label} onClick={item.onPress}
-            style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer",
-              borderBottom: i < arr.length - 1 ? "1px solid #2A2A2C" : "none" }}>
+            style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', cursor: 'pointer',
+              borderBottom: i < items.length - 1 ? '1px solid #2A2A2C' : 'none' }}>
             {item.icon}
-            <span style={{ flex: 1, color: "white", fontSize: 16, marginLeft: 14 }}>{item.label}</span>
-            {item.value && <span style={{ color: "#888", fontSize: 15, marginRight: 6 }}>{item.value}</span>}
+            <span style={{ flex: 1, color: 'white', fontSize: 16, marginLeft: 14 }}>{item.label}</span>
+            {item.value && <span style={{ color: '#888', fontSize: 15, marginRight: 6 }}>{item.value}</span>}
             <ChevronRight />
           </div>
         ))}
