@@ -110,7 +110,9 @@ const ANIM_STYLE = `
   }
   .nav-icon:active { transform: scale3d(0.85, 0.85, 1); }
   
-  * { -webkit-tap-highlight-color: transparent; outline: none; }
+  * { -webkit-tap-highlight-color: transparent; outline: none; -webkit-overflow-scrolling: touch; }
+  html, body { scroll-behavior: smooth; }
+  .smooth-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
   body { margin: 0; padding: 0; background: #000; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
 `;
 
@@ -309,7 +311,6 @@ const TopBar = memo(({ title, onBack, rightEl }) => {
 
 /* ─── QR Code ────────────────────────────────────────────────── */
 const QRCode = memo(({ size = 220 }) => {
-  // A more "standard" looking 21x21 QR pattern
   const cells = [
     [1,1,1,1,1,1,1,0,0,1,0,1,0,0,1,1,1,1,1,1,1],
     [1,0,0,0,0,0,1,0,1,1,1,0,1,0,1,0,0,0,0,0,1],
@@ -335,14 +336,35 @@ const QRCode = memo(({ size = 220 }) => {
   ];
   const n = cells.length;
   const cell = size / n;
+  const dr = cell * 0.38;
+  // finder pattern zones: top-left (0-6,0-6), top-right (0-6,14-20), bottom-left (14-20,0-6)
+  const isFinderZone = (row, col) =>
+    (row < 7 && col < 7) || (row < 7 && col > 13) || (row > 13 && col < 7);
+  const fp = cell; // finder pattern corner radius
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <rect width={size} height={size} fill="white" rx="4" />
-      {cells.map((row, r) =>
-        row.map((v, c) =>
-          v ? <rect key={`${r}-${c}`} x={c * cell} y={r * cell} width={cell} height={cell} fill="black" /> : null
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      <rect width={size} height={size} fill="white" rx={fp * 1.5} />
+      {/* data cells — rounded dots */}
+      {cells.map((row, ri) =>
+        row.map((v, ci) =>
+          v && !isFinderZone(ri, ci)
+            ? <rect key={`${ri}-${ci}`} x={ci * cell + 1} y={ri * cell + 1}
+                width={cell - 2} height={cell - 2} fill="#111" rx={dr} />
+            : null
         )
       )}
+      {/* ── Finder: Top-Left ── */}
+      <rect x={0.5} y={0.5} width={7*cell-1} height={7*cell-1} rx={fp*1.2} fill="#111" />
+      <rect x={cell+0.5} y={cell+0.5} width={5*cell-1} height={5*cell-1} rx={fp*0.8} fill="white" />
+      <rect x={2*cell+0.5} y={2*cell+0.5} width={3*cell-1} height={3*cell-1} rx={fp*0.5} fill="#111" />
+      {/* ── Finder: Top-Right ── */}
+      <rect x={14*cell+0.5} y={0.5} width={7*cell-1} height={7*cell-1} rx={fp*1.2} fill="#111" />
+      <rect x={15*cell+0.5} y={cell+0.5} width={5*cell-1} height={5*cell-1} rx={fp*0.8} fill="white" />
+      <rect x={16*cell+0.5} y={2*cell+0.5} width={3*cell-1} height={3*cell-1} rx={fp*0.5} fill="#111" />
+      {/* ── Finder: Bottom-Left ── */}
+      <rect x={0.5} y={14*cell+0.5} width={7*cell-1} height={7*cell-1} rx={fp*1.2} fill="#111" />
+      <rect x={cell+0.5} y={15*cell+0.5} width={5*cell-1} height={5*cell-1} rx={fp*0.8} fill="white" />
+      <rect x={2*cell+0.5} y={16*cell+0.5} width={3*cell-1} height={3*cell-1} rx={fp*0.5} fill="#111" />
     </svg>
   );
 });
@@ -1065,49 +1087,70 @@ function ReceiveQRScreen({ assetId, onBack }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
-      <TopBar title="Получить" onBack={onBack}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative', background: DS.bg }}>
+      <TopBar title='Получить' onBack={onBack}
         rightEl={
-          <button style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-              <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M16 6l-4-4-4 4M12 2v13" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <svg viewBox='0 0 24 24' fill='none' style={{ width: 20, height: 20 }}>
+              <path d='M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7' stroke='white' strokeWidth='1.8' strokeLinecap='round' />
+              <path d='M16 6l-4-4-4 4M12 2v13' stroke='white' strokeWidth='1.8' strokeLinecap='round' strokeLinejoin='round' />
             </svg>
           </button>
         }
       />
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, paddingBottom: 20 }}>
-        <div style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden" }}>
-          <TokenIcon tokenId={asset.tokenId} size={64} badgeSize={24} />
+
+      {/* coin badge */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, paddingBottom: 16 }}>
+        <div style={{ width: 60, height: 60, borderRadius: '50%', overflow: 'hidden' }}>
+          <TokenIcon tokenId={asset.tokenId} size={60} badgeSize={22} />
         </div>
-        <div style={{ color: "white", fontWeight: 700, fontSize: 18, marginTop: 12 }}>{asset.symbol}</div>
+        <div style={{ color: 'white', fontWeight: 700, fontSize: 17, marginTop: 8 }}>{asset.name}</div>
+        <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{asset.symbol} сеть</div>
       </div>
-      <div style={{ margin: "0 24px", background: "white", borderRadius: 24, padding: "24px 24px 20px",
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-        <div style={{ background: "#f0f0f0", padding: 12, borderRadius: 16 }}>
-          <QRCode size={200} value={address} />
+
+      {/* QR card */}
+      <div style={{ margin: '0 20px', background: 'white', borderRadius: 28,
+        padding: '24px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
+        {/* QR code — clean, no extra background */}
+        <div style={{ borderRadius: 18, overflow: 'hidden', lineHeight: 0 }}>
+          <QRCode size={210} />
         </div>
-        <div style={{ color: "#333", fontSize: 13, fontWeight: 600, textAlign: "center", lineHeight: 1.4, wordBreak: "break-all", background: "#f5f5f5", padding: "12px 16px", borderRadius: 12, width: "100%", boxSizing: "border-box" }}>
-          {address}
+
+        {/* address pill */}
+        <div style={{ width: '100%', background: '#F2F2F7', borderRadius: 14,
+          padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ color: '#6B6B6B', fontSize: 11, fontWeight: 500, marginBottom: 4, letterSpacing: 0.3 }}>
+            Адрес кошелька
+          </div>
+          <div style={{ color: '#111', fontSize: 12, fontWeight: 600, wordBreak: 'break-all', lineHeight: 1.5 }}>
+            {address}
+          </div>
         </div>
       </div>
-      <div style={{ padding: "12px 32px", textAlign: "center" }}>
-        <div style={{ color: "#888", fontSize: 13, lineHeight: 1.5 }}>
-          Это ваш адрес — отправляйте только <span style={{ color: "white", fontWeight: 600 }}>{asset.symbol}</span> на{" "}
-          <span style={{ color: "white", fontWeight: 600 }}>{asset.symbol}</span> сеть. Мемо не требуется
+
+      {/* hint */}
+      <div style={{ padding: '14px 28px', textAlign: 'center' }}>
+        <div style={{ color: DS.muted, fontSize: 12, lineHeight: 1.6 }}>
+          Отправляйте только{' '}
+          <span style={{ color: 'white', fontWeight: 600 }}>{asset.symbol}</span>{' '}
+          в сети <span style={{ color: 'white', fontWeight: 600 }}>{asset.symbol}</span>. Мемо не требуется.
         </div>
       </div>
-      <div style={{ padding: "16px", marginTop: "auto" }}>
+
+      {/* copy button */}
+      <div style={{ padding: '8px 20px 20px', marginTop: 'auto' }}>
         <button onClick={handleCopy}
-          style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
-            background: copied ? "#34D760" : "linear-gradient(145deg, #4F8FFF, #1A55E3)", color: "white", fontSize: 16,
-            fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center",
-            justifyContent: "center", gap: 8, transition: "background 0.3s" }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-            <rect x="8" y="2" width="13" height="17" rx="2" stroke="white" strokeWidth="1.7" />
-            <path d="M3 6v13a2 2 0 0 0 2 2h10" stroke="white" strokeWidth="1.7" strokeLinecap="round" />
+          style={{ width: '100%', padding: '16px 0', borderRadius: 16, border: 'none',
+            background: copied ? DS.green : DS.blue, color: 'white', fontSize: 16,
+            fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 8, transition: 'background 0.25s, transform 0.1s',
+            boxShadow: copied ? '0 4px 16px rgba(52,199,89,0.4)' : '0 4px 16px rgba(0,122,255,0.4)' }}>
+          <svg viewBox='0 0 24 24' fill='none' style={{ width: 18, height: 18 }}>
+            <rect x='8' y='2' width='13' height='17' rx='2' stroke='white' strokeWidth='1.7' />
+            <path d='M3 6v13a2 2 0 0 0 2 2h10' stroke='white' strokeWidth='1.7' strokeLinecap='round' />
           </svg>
-          {copied ? "Скопировано!" : "Копировать адрес"}
+          {copied ? 'Скопировано ✓' : 'Копировать адрес'}
         </button>
       </div>
     </div>
@@ -1752,7 +1795,18 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
 /* ─── Screen: Wallet Settings ────────────────────────────────── */
 function WalletSettingsScreen({ onBack, wallet }) {
   const [name, setName] = useState(wallet?.name || 'Кошелек № 1');
+  const [nameSaved, setNameSaved] = useState(false);
   const { getMnemonic, deleteWallet } = useWallet();
+
+  const handleSaveName = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('gem_wallet') || '{}');
+      stored.walletName = name;
+      localStorage.setItem('gem_wallet', JSON.stringify(stored));
+    } catch {}
+    setNameSaved(true);
+    setTimeout(() => setNameSaved(false), 2000);
+  };
 
   const [showSeed, setShowSeed] = useState(false);
   const [seedPassword, setSeedPassword] = useState('');
@@ -1777,8 +1831,16 @@ function WalletSettingsScreen({ onBack, wallet }) {
       <div style={{ padding: '16px' }}>
         <div style={{ background: DS.card, borderRadius: 20, padding: '16px', marginBottom: 16, border: `1px solid ${DS.border}` }}>
           <div style={{ color: DS.muted, fontSize: 13, marginBottom: 8 }}>Имя кошелька</div>
-          <input value={name} onChange={e => setName(e.target.value)}
-            style={{ width: '100%', background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: 16, fontWeight: 500 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input value={name} onChange={e => { setName(e.target.value); setNameSaved(false); }}
+              style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: 16, fontWeight: 500 }} />
+            <button onClick={handleSaveName}
+              style={{ padding: '6px 14px', borderRadius: 10, background: nameSaved ? DS.green : DS.blue,
+                color: 'white', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                transition: 'background 0.2s', flexShrink: 0 }}>
+              {nameSaved ? '✓' : 'Сохранить'}
+            </button>
+          </div>
         </div>
 
         <div style={{ background: DS.card, borderRadius: 20, overflow: 'hidden', border: `1px solid ${DS.border}`, marginBottom: 16 }}>
@@ -4165,8 +4227,8 @@ function WalletHomeUI() {
           <AssetDetailScreen
             assetId={screen.assetId}
             onBack={() => go({ name: "home" })}
-            onSend={() => go({ name: "send-recipient", assetId: screen.assetId })}
-            onReceive={() => go({ name: "receive-qr", assetId: screen.assetId })}
+            onSend={() => go({ name: "send-recipient", assetId: screen.assetId, backTo: "asset-detail" })}
+            onReceive={() => go({ name: "receive-qr", assetId: screen.assetId, backTo: "asset-detail" })}
             onBuy={() => setShowComingSoon(true)}
             onSwap={() => { setSwapPayId(screen.assetId); setSwapReceiveId(null); go({ name: "swap" }); }}
           />
@@ -4186,7 +4248,7 @@ function WalletHomeUI() {
           <div className="anim-page">
           <SendRecipientScreen
             assetId={screen.assetId}
-            onBack={() => go({ name: "send-select" })}
+            onBack={() => go(screen.backTo === "asset-detail" ? { name: "asset-detail", assetId: screen.assetId } : { name: "send-select" })}
             onContinue={(recipient) => go({ name: "send-amount", assetId: screen.assetId, recipient })}
           />
           </div>
@@ -4239,7 +4301,7 @@ function WalletHomeUI() {
           <div className="anim-page">
           <ReceiveQRScreen
             assetId={screen.assetId}
-            onBack={() => go({ name: screen.backTo || "receive-select" })}
+            onBack={() => go(screen.backTo === "asset-detail" ? { name: "asset-detail", assetId: screen.assetId } : { name: screen.backTo || "receive-select" })}
           />
           </div>
         )}
