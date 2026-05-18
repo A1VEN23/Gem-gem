@@ -1842,6 +1842,42 @@ function WalletBackupMenu({ onBack, onOption }) {
   );
 }
 
+/* ─── Address row with copy button ──────────────────────────── */
+function AddressRow({ label, address }) {
+  const [copied, setCopied] = useState(false);
+  const addrShort = shortAddress(address);
+  const handleCopy = async () => {
+    if (!address || address === "—") return;
+    await copyToClipboard(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: `1px solid ${DS.border}` }}>
+      <span style={{ color: "white", fontSize: 15, fontWeight: 500, flexShrink: 0 }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span style={{ color: DS.muted, fontSize: 14, fontWeight: 500, fontFamily: "monospace", letterSpacing: "0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {addrShort}
+        </span>
+        {address && address !== "—" && (
+          <button onClick={handleCopy} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+            {copied ? (
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+                <path d="M5 13l4 4L19 7" stroke={DS.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+                <rect x="9" y="9" width="11" height="11" rx="2" stroke={DS.muted} strokeWidth="1.8" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke={DS.muted} strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Screen: Activity ───────────────────────────────────────── */
 function TxDetailScreen({ tx, onBack }) {
   const ShareIcon = () => (
@@ -1904,7 +1940,10 @@ function TxDetailScreen({ tx, onBack }) {
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 12px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
         <Row label="Дата" value={dateStr} />
         <Row label="Статус" value={tx.status || "Успешный"} valueColor={tx.status === 'Ошибка' ? DS.danger : tx.status === 'В процессе' ? DS.blue : DS.green} extra={<InfoIcon />} />
-        <Row label={tx.type === "Получено" ? "Отправитель" : "Получатель"} value={tx.from || tx.to || "—"} arrow />
+        <AddressRow
+          label={tx.type === "Получено" ? "Отправитель" : "Получатель"}
+          address={(tx.type === "Получено" ? tx.from : tx.to) || "—"}
+        />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px" }}>
           <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Сеть</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1925,7 +1964,7 @@ function TxDetailScreen({ tx, onBack }) {
             <div style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid #555", display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: 12, fontWeight: 700 }}>i</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>{formatFee(tx.fee) || "0,001"} {asset?.symbol || ""}</span>
+            <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>{formatTxFee(tx.fee, tx.assetId) || "0,001 " + (asset?.symbol || "")}</span>
           </div>
         </div>
       </div>
@@ -3221,6 +3260,35 @@ function formatFee(val) {
   if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '').replace(".", ",") + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '').replace(".", ",") + 'K';
   return n.toString().replace(".", ",");
+}
+
+/* Convert a base-currency fee to small units and format with K/M */
+function formatTxFee(rawFee, assetId) {
+  if (!rawFee) return null;
+  const s = String(rawFee).trim();
+  // Already formatted with a unit label (contains letters) → show as-is
+  if (/[a-zA-Z]/.test(s)) return s;
+  const n = parseFloat(s.replace(",", "."));
+  if (isNaN(n) || n === 0) return s;
+  // Map asset to small-unit multiplier and label
+  let mul, unit;
+  const id = (assetId || "").toLowerCase();
+  if (id === "ton" || id === "usdt-ton") { mul = 1e9; unit = "NanoTON"; }
+  else if (id === "sol" || id === "usdt-sol") { mul = 1e9; unit = "Lamports"; }
+  else if (id === "ltc") { mul = 1e8; unit = "sat/vB"; }
+  else { mul = 1e9; unit = "Gwei"; }
+  const small = n * mul;
+  let fmt;
+  if (small >= 1e6) fmt = parseFloat((small / 1e6).toFixed(3)).toString().replace(".", ",") + "M";
+  else if (small >= 1e3) fmt = parseFloat((small / 1e3).toFixed(3)).toString().replace(".", ",") + "K";
+  else fmt = parseFloat(small.toFixed(3)).toString().replace(".", ",");
+  return `${fmt} ${unit}`;
+}
+
+/* Shorten a blockchain address for display */
+function shortAddress(addr) {
+  if (!addr || addr.length <= 16) return addr;
+  return addr.slice(0, 8) + "…" + addr.slice(-6);
 }
 
 function fmtBal(num, sym) {
