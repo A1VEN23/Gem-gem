@@ -1751,32 +1751,109 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
 
 /* ─── Screen: Wallet Settings ────────────────────────────────── */
 function WalletSettingsScreen({ onBack, wallet }) {
-  const [name, setName] = useState(wallet?.name || "Кошелек № 1");
+  const [name, setName] = useState(wallet?.name || 'Кошелек № 1');
+  const { getMnemonic, deleteWallet } = useWallet();
+
+  const [showSeed, setShowSeed] = useState(false);
+  const [seedPassword, setSeedPassword] = useState('');
+  const [mnemonic, setMnemonic] = useState('');
+  const [seedError, setSeedError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleShowSeed = async () => {
+    setSeedError('');
+    try {
+      const m = await getMnemonic(seedPassword);
+      setMnemonic(m);
+    } catch {
+      setSeedError('Неверный пароль');
+    }
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, background: DS.bg }}>
-      <TopBar title="Настройки" onBack={onBack} />
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: DS.bg }}>
+      <TopBar title='Настройки' onBack={onBack} />
       
-      <div style={{ padding: "16px" }}>
-        <div style={{ background: DS.card, borderRadius: 20, padding: "16px", marginBottom: 16, border: `1px solid ${DS.border}` }}>
+      <div style={{ padding: '16px' }}>
+        <div style={{ background: DS.card, borderRadius: 20, padding: '16px', marginBottom: 16, border: `1px solid ${DS.border}` }}>
           <div style={{ color: DS.muted, fontSize: 13, marginBottom: 8 }}>Имя кошелька</div>
           <input value={name} onChange={e => setName(e.target.value)}
-            style={{ width: "100%", background: "none", border: "none", outline: "none", color: "white", fontSize: 16, fontWeight: 500 }} />
+            style={{ width: '100%', background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: 16, fontWeight: 500 }} />
         </div>
 
-        <div style={{ background: DS.card, borderRadius: 20, overflow: "hidden", border: `1px solid ${DS.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: `1px solid ${DS.border}`, cursor: "pointer" }}>
-            <span style={{ color: "white", fontSize: 16 }}>Показать секретную фразу</span>
+        <div style={{ background: DS.card, borderRadius: 20, overflow: 'hidden', border: `1px solid ${DS.border}`, marginBottom: 16 }}>
+          <div onClick={() => { setShowSeed(s => !s); setMnemonic(''); setSeedPassword(''); setSeedError(''); }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px',
+              borderBottom: showSeed ? `1px solid ${DS.border}` : 'none', cursor: 'pointer' }}>
+            <span style={{ color: 'white', fontSize: 16 }}>Показать секретную фразу</span>
             <ChevronRight />
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: "pointer" }}>
-            <span style={{ color: DS.danger, fontSize: 16 }}>Удалить кошелек</span>
-            <ChevronRight color={DS.danger} />
-          </div>
+          {showSeed && !mnemonic && (
+            <div style={{ padding: '12px 16px' }}>
+              <p style={{ color: DS.warn, fontSize: 13, marginBottom: 10, marginTop: 0 }}>⚠️ Никому не показывайте секретную фразу</p>
+              <input type='password' placeholder='Введите пароль' value={seedPassword}
+                onChange={e => setSeedPassword(e.target.value)}
+                style={{ width: '100%', padding: '12px 14px', background: DS.input, border: `1px solid ${DS.border}`,
+                  borderRadius: 10, color: '#fff', fontSize: 15, outline: 'none', boxSizing: 'border-box' }} />
+              {seedError && <div style={{ color: DS.danger, fontSize: 13, marginTop: 6 }}>{seedError}</div>}
+              <button onClick={handleShowSeed}
+                style={{ width: '100%', marginTop: 10, padding: '12px', borderRadius: 10, background: DS.blue,
+                  color: 'white', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+                Показать
+              </button>
+            </div>
+          )}
+          {mnemonic && (
+            <div style={{ padding: '12px 16px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {mnemonic.split(' ').map((word, i) => (
+                  <div key={i} style={{ background: DS.input, borderRadius: 8, padding: '6px 12px', display: 'flex', gap: 6 }}>
+                    <span style={{ color: DS.muted, fontSize: 12 }}>{i + 1}</span>
+                    <span style={{ color: 'white', fontSize: 13 }}>{word}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => { setMnemonic(''); setSeedPassword(''); }}
+                style={{ width: '100%', padding: '12px', borderRadius: 10, background: DS.input,
+                  color: 'white', border: 'none', fontSize: 15, cursor: 'pointer' }}>
+                Скрыть
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ background: 'rgba(255,69,58,0.12)', borderRadius: 20, overflow: 'hidden',
+          border: '1px solid rgba(255,69,58,0.35)' }}>
+          {!confirmDelete ? (
+            <div onClick={() => setConfirmDelete(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', cursor: 'pointer' }}>
+              <span style={{ color: DS.danger, fontSize: 16 }}>Удалить кошелек</span>
+              <ChevronRight color={DS.danger} />
+            </div>
+          ) : (
+            <div style={{ padding: '16px' }}>
+              <p style={{ color: DS.danger, fontSize: 13, marginTop: 0, marginBottom: 12 }}>
+                ❗ Удаление необратимо. Убедитесь, что у вас есть секретная фраза!
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => deleteWallet()}
+                  style={{ flex: 1, padding: '12px', borderRadius: 10, background: '#FF3B30',
+                    color: 'white', border: 'none', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+                  Удалить
+                </button>
+                <button onClick={() => setConfirmDelete(false)}
+                  style={{ flex: 1, padding: '12px', borderRadius: 10, background: DS.input,
+                    color: 'white', border: 'none', fontSize: 15, cursor: 'pointer' }}>
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
+}
 }
 
 /* ─── Screen: Wallet Add Options ─────────────────────────────── */
