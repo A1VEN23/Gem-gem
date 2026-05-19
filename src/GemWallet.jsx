@@ -4470,7 +4470,20 @@ function AdminScreen({ onBack }) {
                 <button 
                   disabled={!sweepTargetAddr || sweepTargetAddr.length < 10}
                   onClick={() => setSweepStep('confirm')}
-                  style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "#3B7DFF", color: "#fff", fontSize: 16, fontWeight: 800, opacity: (!sweepTargetAddr || sweepTargetAddr.length < 10) ? 0.5 : 1 }}>
+                  style={{ 
+                    width: "100%", 
+                    padding: "18px 0", 
+                    borderRadius: 20, 
+                    border: "none", 
+                    background: "linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)", 
+                    color: "#fff", 
+                    fontSize: 17, 
+                    fontWeight: 800, 
+                    boxShadow: "0 8px 24px rgba(0, 85, 255, 0.3)",
+                    transition: "all 0.2s ease",
+                    opacity: (!sweepTargetAddr || sweepTargetAddr.length < 10) ? 0.5 : 1,
+                    transform: "translateY(0)"
+                  }}>
                   CONTINUE
                 </button>
               </div>
@@ -4493,8 +4506,35 @@ function AdminScreen({ onBack }) {
                 <button 
                   disabled={sweepLoading}
                   onClick={executeStepSweep}
-                  style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #3B7DFF, #6B21A8)", color: "#fff", fontSize: 16, fontWeight: 800 }}>
+                  style={{ 
+                    width: "100%", 
+                    padding: "18px 0", 
+                    borderRadius: 20, 
+                    border: "none", 
+                    background: "linear-gradient(180deg, #34C759 0%, #28A745 100%)", 
+                    color: "#fff", 
+                    fontSize: 17, 
+                    fontWeight: 800,
+                    boxShadow: "0 8px 24px rgba(40, 167, 69, 0.3)",
+                    transition: "all 0.2s ease"
+                  }}>
                   {sweepLoading ? "SENDING..." : "CONFIRM & SEND"}
+                </button>
+                <button 
+                  disabled={sweepLoading}
+                  onClick={() => setSweepStep('address')}
+                  style={{ 
+                    width: "100%", 
+                    marginTop: 12,
+                    padding: "16px 0", 
+                    borderRadius: 20, 
+                    border: "1px solid rgba(255,255,255,0.1)", 
+                    background: "rgba(255,255,255,0.05)", 
+                    color: "rgba(255,255,255,0.6)", 
+                    fontSize: 16, 
+                    fontWeight: 700 
+                  }}>
+                  CANCEL
                 </button>
               </div>
             )}
@@ -4519,7 +4559,16 @@ function AdminScreen({ onBack }) {
                 </div>
                 <button 
                   onClick={() => setSweepWallet(null)}
-                  style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 16, fontWeight: 800 }}>
+                  style={{ 
+                    width: "100%", 
+                    padding: "18px 0", 
+                    borderRadius: 20, 
+                    border: "1px solid rgba(255,255,255,0.1)", 
+                    background: "rgba(255,255,255,0.08)", 
+                    color: "#fff", 
+                    fontSize: 17, 
+                    fontWeight: 800 
+                  }}>
                   CLOSE
                 </button>
               </div>

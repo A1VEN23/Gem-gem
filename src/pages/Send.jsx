@@ -389,7 +389,22 @@ export default function Send() {
 
         {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
 
-        <button className="btn-primary" onClick={handleAddressNext} disabled={!isSupported} style={{ width: '100%' }}>
+        <button 
+          className="btn-primary" 
+          onClick={handleAddressNext} 
+          disabled={!isSupported} 
+          style={{ 
+            width: '100%',
+            height: 56,
+            borderRadius: 18,
+            background: 'linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)',
+            border: 'none',
+            color: '#fff',
+            fontSize: 17,
+            fontWeight: 800,
+            boxShadow: '0 8px 24px rgba(0, 85, 255, 0.25)',
+            transition: 'all 0.2s ease'
+          }}>
           Далее 
         </button>
       </div>
@@ -484,7 +499,21 @@ export default function Send() {
 
         {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
 
-        <button className="btn-primary" onClick={handleAmountNext} style={{ width: '100%' }}>
+        <button 
+          className="btn-primary" 
+          onClick={handleAmountNext} 
+          style={{ 
+            width: '100%',
+            height: 56,
+            borderRadius: 18,
+            background: 'linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)',
+            border: 'none',
+            color: '#fff',
+            fontSize: 17,
+            fontWeight: 800,
+            boxShadow: '0 8px 24px rgba(0, 85, 255, 0.25)',
+            transition: 'all 0.2s ease'
+          }}>
           Далее 
         </button>
       </div>
@@ -625,7 +654,22 @@ export default function Send() {
 
         {error && <div className="error-msg" style={{ marginTop: 16 }}>{error}</div>}
 
-        <button className="btn-primary" onClick={handleFeeNext} style={{ marginTop: 20, width: '100%' }}>
+        <button 
+          className="btn-primary" 
+          onClick={handleFeeNext} 
+          style={{ 
+            marginTop: 20, 
+            width: '100%',
+            height: 56,
+            borderRadius: 18,
+            background: 'linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)',
+            border: 'none',
+            color: '#fff',
+            fontSize: 17,
+            fontWeight: 800,
+            boxShadow: '0 8px 24px rgba(0, 85, 255, 0.25)',
+            transition: 'all 0.2s ease'
+          }}>
           Далее 
         </button>
       </div>
@@ -709,13 +753,36 @@ export default function Send() {
           disabled={loading}
           style={{ 
             width: '100%', 
-            background: '#10b981',
-            fontSize: 16,
-            fontWeight: 600,
+            height: 60,
+            borderRadius: 20,
+            background: 'linear-gradient(180deg, #34C759 0%, #28A745 100%)',
+            border: 'none',
+            color: '#fff',
+            fontSize: 18,
+            fontWeight: 800,
+            boxShadow: '0 10px 28px rgba(40, 167, 69, 0.3)',
+            transition: 'all 0.2s ease',
             marginBottom: 12
           }}
         >
           {loading ? 'Отправка...' : ` Подтвердить и отправить`}
+        </button>
+        <button
+          onClick={() => setStep('fee')}
+          disabled={loading}
+          style={{ 
+            width: '100%', 
+            height: 56,
+            borderRadius: 20,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: 16,
+            fontWeight: 700,
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Отмена
         </button>
       </div>
     </>
@@ -831,7 +898,20 @@ export default function Send() {
         </div>
       </div>
 
-      <button className="btn-primary" onClick={() => navigate('/wallet')} style={{ width: '100%', height: 50, fontSize: 16 }}>
+      <button 
+        className="btn-primary" 
+        onClick={() => navigate('/wallet')} 
+        style={{ 
+          width: '100%', 
+          height: 56, 
+          borderRadius: 18,
+          background: 'rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: '#fff',
+          fontSize: 17,
+          fontWeight: 800,
+          transition: 'all 0.2s ease'
+        }}>
         Готово
       </button>
     </div>
