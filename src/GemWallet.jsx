@@ -3797,6 +3797,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
         {(() => {
           const T = getLang(settings);
           return [
+            { label: T.send, onClick: onSend, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M22 2L11 13" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
             { label: T.receive, onClick: onReceive, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="5" width="3" height="3" fill="white"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="16" y="5" width="3" height="3" fill="white"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="16" width="3" height="3" fill="white"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3v1h-3z" fill="white"/></svg> },
             { label: T.buy, onClick: onBuy, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
           ];
