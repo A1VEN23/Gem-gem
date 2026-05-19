@@ -1904,10 +1904,8 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
         <div style={{ background: DS.card, borderRadius: 20, overflow: "hidden", border: `1px solid ${DS.border}` }}>
           {wallets.map((w, i) => (
             <div key={w.id} style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer" }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#5B9EFF,#1A50D4)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
-                <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-                  <path d="M12 2l3 5h5l-4 4 1.5 5.5L12 14l-5.5 2.5L8 11 4 7h5L12 2z" fill="white" />
-                </svg>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", marginRight: 14, boxShadow: "0 0 10px #3B7DFF55" }}>
+                <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{w.name}</div>
@@ -3755,10 +3753,8 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
           </svg>
         </button>
         <div onClick={onWalletsClick} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#5B9EFF,#1A50D4)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 10px #3B7DFF55" }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
-              <path d="M12 2l3 5h5l-4 4 1.5 5.5L12 14l-5.5 2.5L8 11 4 7h5L12 2z" fill="white" />
-            </svg>
+          <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", boxShadow: "0 0 10px #3B7DFF55" }}>
+            <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
           <span style={{ color: "white", fontWeight: 600, fontSize: 17 }}>{settings?.walletName || 'Кошелек № 1'}</span>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
@@ -3801,10 +3797,8 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
         {(() => {
           const T = getLang(settings);
           return [
-            { label: T.send, onClick: onSend, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M22 2L11 13" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
             { label: T.receive, onClick: onReceive, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><rect x="3" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="5" width="3" height="3" fill="white"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="16" y="5" width="3" height="3" fill="white"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="white" strokeWidth="2"/><rect x="5" y="16" width="3" height="3" fill="white"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3v1h-3z" fill="white"/></svg> },
-            { label: T.buy, onClick: onBuy, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><text x="12" y="17" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold" fontFamily="Arial">$</text></svg> },
-            { label: T.swap, onClick: onSwap, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M20 12A8 8 0 0 0 5.07 7.5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/><path d="M4 12a8 8 0 0 0 14.93 4.5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/><path d="M5 4v4h4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M19 20v-4h-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+            { label: T.buy, onClick: onBuy, icon: <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
           ];
         })().map((btn, i) => (
           <div key={btn.label} className="tap-btn" onClick={btn.onClick}
