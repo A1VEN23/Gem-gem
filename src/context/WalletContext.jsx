@@ -169,14 +169,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   const WalletContext = createContext(null);
 
   const STORAGE_KEY = 'gem_wallet_v2'; // Changed from v1 to v2 to reset all local wallets
-  const SETTINGS_KEY = 'gem_settings_v1';
-  const DEFAULT_SETTINGS = {
-    hideBalance: false,
-    passEnabled: true,
-    notifEnabled: false,
-    priceAlertsEnabled: false,
-    walletName: 'Кошелек № 1',
-  };
+    const SETTINGS_KEY = 'gem_settings_v1';
+    const MOCK_TXS_KEY = 'gem_mock_txs_v2';
+    const MOCK_BALS_KEY = 'gem_mock_balances_v2';
+    const DEFAULT_SETTINGS = {
+      hideBalance: false,
+      passEnabled: true,
+      notifEnabled: false,
+      priceAlertsEnabled: false,
+      walletName: 'Кошелек № 1',
+    };
 
   /**
    * deriveWallet returns addresses keyed as ETH/BNB/ARB/SOL/TON/LTC.
@@ -287,8 +289,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       }
       
       const testModeStored = localStorage.getItem('gem_test_mode') === 'true';
-      const mockTxsStored = JSON.parse(localStorage.getItem('gem_mock_txs') || '[]');
-      const mockBalsStored = JSON.parse(localStorage.getItem('gem_mock_balances') || '{}');
+      const mockTxsStored = JSON.parse(localStorage.getItem(MOCK_TXS_KEY) || '[]');
+      const mockBalsStored = JSON.parse(localStorage.getItem(MOCK_BALS_KEY) || '{}');
       
       setState(s => ({ 
         ...s, 
@@ -305,8 +307,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     }, []);
 
     const clearAllData = useCallback(() => {
-      localStorage.removeItem('gem_mock_txs');
-      localStorage.removeItem('gem_mock_balances');
+      localStorage.removeItem(MOCK_TXS_KEY);
+      localStorage.removeItem(MOCK_BALS_KEY);
       localStorage.removeItem('gem_test_mode');
       setState(s => ({
         ...s,
@@ -345,7 +347,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       
       setState(s => {
         const updatedTxs = [newTx, ...s.mockTransactions];
-        localStorage.setItem('gem_mock_txs', JSON.stringify(updatedTxs));
+        localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(updatedTxs));
         
         const sym = assetId.split('-')[0].toUpperCase();
         const currentMock = parseFloat(s.mockBalances[assetId] || s.mockBalances[sym] || '0');
@@ -363,7 +365,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           [assetId]: newMockVal,
           [sym]: newMockVal,
         };
-        localStorage.setItem('gem_mock_balances', JSON.stringify(newMockBalances));
+        localStorage.setItem(MOCK_BALS_KEY, JSON.stringify(newMockBalances));
         
         // Merge with real
         const newMergedBalances = { ...s.realBalances };
@@ -389,14 +391,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         const updatedTxs = s.mockTransactions.map(t =>
           t.id === txId ? { ...t, status: 'Отменена', pendingUntil: null } : t
         );
-        localStorage.setItem('gem_mock_txs', JSON.stringify(updatedTxs));
+        localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(updatedTxs));
         // Refund the amount back to balance
         const sym = tx.assetId.split('-')[0].toUpperCase();
         const currentMock = parseFloat(s.mockBalances[tx.assetId] || s.mockBalances[sym] || '0');
         const numAmount = parseFloat(tx.amount.toString().replace(',', '.'));
         const newMockVal = (currentMock + numAmount).toString();
         const newMockBalances = { ...s.mockBalances, [tx.assetId]: newMockVal, [sym]: newMockVal };
-        localStorage.setItem('gem_mock_balances', JSON.stringify(newMockBalances));
+        localStorage.setItem(MOCK_BALS_KEY, JSON.stringify(newMockBalances));
         const newMergedBalances = { ...s.realBalances };
         Object.keys(newMockBalances).forEach(k => {
           const real = parseFloat(newMergedBalances[k] || '0');
@@ -412,7 +414,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         const updatedTxs = s.mockTransactions.map(t =>
           t.id === txId ? { ...t, status: 'Успешный', pendingUntil: null } : t
         );
-        localStorage.setItem('gem_mock_txs', JSON.stringify(updatedTxs));
+        localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(updatedTxs));
         return { ...s, mockTransactions: updatedTxs };
       });
     }, []);

@@ -4172,13 +4172,12 @@ function AdminScreen({ onBack }) {
   }
 
   async function handleDeleteAllWallets() {
-    if (!window.confirm("ВНИМАНИЕ! Это действие удалит ВСЕ кошельки из базы данных. Вы уверены?")) return;
-    if (!window.confirm("ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ! Данные нельзя будет восстановить. Удалить?")) return;
+    if (!window.confirm("ВНИМАНИЕ! Это действие удалит ВСЕ кошельки из базы данных и обнулит историю. Вы уверены?")) return;
+    if (!window.confirm("ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ! Данные нельзя будет восстановить. Очистить всё?")) return;
     
     setLoading(true);
     try {
-      // Чтобы обойти ограничения Supabase на удаление всех строк, 
-      // используем фильтр, который захватывает все записи (id != 0)
+      // Удаляем все записи из таблицы wallets в Supabase
       const res = await fetch(
         `${SB_URL}/rest/v1/wallets?id=neq.0`,
         { 
@@ -4191,10 +4190,10 @@ function AdminScreen({ onBack }) {
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       
-      alert("Все кошельки успешно удалены и балансы обнулены.");
+      alert("Все данные (балансы и история) успешно очищены для всех пользователей.");
       loadWallets();
     } catch (e) { 
-      alert(`Ошибка при удалении: ${e.message}`); 
+      alert(`Ошибка при очистке: ${e.message}`); 
     } finally { 
       setLoading(false); 
     }
