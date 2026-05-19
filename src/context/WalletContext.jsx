@@ -249,11 +249,15 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
   const WalletContext = createContext(null);
 
-  const STORAGE_KEY = 'gem_wallet_v2'; 
-  const WALLETS_LIST_KEY = 'gem_wallets_list_v2';
-  const SETTINGS_KEY = 'gem_settings_v1';
-  const MOCK_TXS_KEY = 'gem_mock_txs_v2';
-  const MOCK_BALS_KEY = 'gem_mock_balances_v2';
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  const userSuffix = tgUser?.id ? `_${tgUser.id}` : '';
+
+  const STORAGE_KEY = `gem_wallet_v2${userSuffix}`; 
+  const WALLETS_LIST_KEY = `gem_wallets_list_v2${userSuffix}`;
+  const SETTINGS_KEY = `gem_settings_v1${userSuffix}`;
+  
+  const MOCK_TXS_KEY = `gem_mock_txs_v2${userSuffix}`;
+  const MOCK_BALS_KEY = `gem_mock_balances_v2${userSuffix}`;
     const DEFAULT_SETTINGS = {
       hideBalance: false,
       passEnabled: true,

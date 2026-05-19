@@ -2609,7 +2609,6 @@ function TxDetailScreen({ tx, onBack }) {
   
 const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
   const { mockTransactions, refreshBalance } = useWallet();
-  const [selectedTx, setSelectedTx] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const touchStartY = useRef(0);
   const touchStarted = useRef(false);
