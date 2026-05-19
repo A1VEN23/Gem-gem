@@ -2608,9 +2608,17 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
     if (!touchStarted.current) return;
     const delta = e.touches[0].clientY - touchStartY.current;
     if (delta > 0 && pullIndicatorRef.current) {
-      const progress = Math.min(delta / 70, 1);
+      const progress = Math.min(delta / 90, 1);
+      const rotate = delta * 2.5;
       pullIndicatorRef.current.style.opacity = String(progress);
-      pullIndicatorRef.current.style.transform = `translateY(${Math.min(delta * 0.4, 28)}px) scale(${0.6 + progress * 0.4})`;
+      pullIndicatorRef.current.style.transform = `translateX(-50%) translateY(${Math.min(delta * 0.5, 40)}px) scale(${0.7 + progress * 0.3}) rotate(${rotate}deg)`;
+      
+      // Feedback haptic-like effect at trigger point
+      if (delta > 90 && delta < 100) {
+        pullIndicatorRef.current.style.filter = "brightness(1.3)";
+      } else {
+        pullIndicatorRef.current.style.filter = "none";
+      }
     }
   }
 
@@ -2618,14 +2626,36 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
     if (!touchStarted.current) return;
     touchStarted.current = false;
     const delta = e.changedTouches[0].clientY - touchStartY.current;
-    if (pullIndicatorRef.current) {
-      pullIndicatorRef.current.style.opacity = "0";
-      pullIndicatorRef.current.style.transform = "translateY(0) scale(0.6)";
-    }
-    if (delta > 70 && !isRefreshing) {
+    
+    if (delta > 90 && !isRefreshing) {
       setIsRefreshing(true);
-      try { await refreshBalance(); } catch (_) {}
-      setIsRefreshing(false);
+      if (pullIndicatorRef.current) {
+        pullIndicatorRef.current.style.opacity = "1";
+        pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(40px) scale(1)";
+      }
+      try { 
+        await refreshBalance(); 
+        // Show success briefly
+        if (pullIndicatorRef.current) {
+          pullIndicatorRef.current.style.background = DS.green;
+        }
+      } catch (_) {}
+      
+      setTimeout(() => {
+        setIsRefreshing(false);
+        if (pullIndicatorRef.current) {
+          pullIndicatorRef.current.style.opacity = "0";
+          pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(0) scale(0.6)";
+          setTimeout(() => {
+            pullIndicatorRef.current.style.background = DS.card;
+          }, 300);
+        }
+      }, 800);
+    } else {
+      if (pullIndicatorRef.current) {
+        pullIndicatorRef.current.style.opacity = "0";
+        pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(0) scale(0.6)";
+      }
     }
   }
 
@@ -2644,14 +2674,15 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
     const shortTo = tx.to ? (tx.to.slice(0,4)+"..."+tx.to.slice(-4)) : "—";
     const shortFrom = tx.from ? (tx.from.slice(0,4)+"..."+tx.from.slice(-4)) : "—";
     const sign = tx.type === 'Отправлено' ? '-' : '+';
-    const symbol = asset ? asset.symbol : '';
+    const symbol = asset ? asset.symbol : (tx.assetId || '').split('-')[0].toUpperCase();
+    const tokenId = asset ? asset.tokenId : (tx.assetId || '').split('-')[0].toUpperCase();
     return {
       id: tx.id,
       hash: tx.hash,
       type: tx.type,
       fee: tx.fee,
       timestamp: tx.timestamp,
-      tokenId: asset ? asset.tokenId : 'TON',
+      tokenId: tokenId,
       amount: `${sign}${fmtCryptoAmt(tx.amount)}`,
       symbol,
       rawAmount: parseFloat(tx.amount),
@@ -2665,7 +2696,7 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
       usdValue: (parseFloat(tx.amount) * getActPrice(tx.assetId)).toFixed(2).replace(".", ","),
       pendingUntil: tx.pendingUntil || null,
     };
-  });
+  }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   if (selectedTx) {
     return <TxDetailScreen tx={selectedTx} onBack={() => setSelectedTx(null)} />;
@@ -2673,15 +2704,15 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
 
   return (
     <>
-      <div style={{ position: "relative", overflow: "hidden", height: 0 }}>
-        <div ref={pullIndicatorRef} style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%) scale(0.6)", opacity: 0, transition: "opacity 0.15s", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", background: DS.card }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, overflow: "visible", zIndex: 100, pointerEvents: "none" }}>
+        <div ref={pullIndicatorRef} style={{ position: "absolute", top: -40, left: "50%", transform: "translateX(-50%) scale(0.6)", opacity: 0, transition: "opacity 0.15s, background 0.3s", display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", background: DS.card, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", border: `1px solid ${DS.border}` }}>
           {isRefreshing ? (
             <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }}>
               <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           ) : (
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
               <path d="M12 17V7M7 12l5 5 5-5" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
