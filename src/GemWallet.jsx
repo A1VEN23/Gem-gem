@@ -4946,25 +4946,107 @@ function OnboardingScreen() {
   };
 
   if (step === 'welcome') return (
-    <ORoot>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", padding: "40px 0" }}>
-        <div style={{ width: 120, height: 120, borderRadius: 28,
-          overflow: "hidden",
-          boxShadow: "0 8px 40px rgba(59,125,255,0.45)",
-          animation: "scaleIn 0.4s cubic-bezier(.22,.68,0,1.2) both" }}>
-          <img src={gemIcon} alt="Gem Wallet" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+    <div style={{ background: DS.bg, minHeight: "100vh", display: "flex", justifyContent: "center", fontFamily: DS.font, overflowX: "hidden" }}>
+      <AnimStyles />
+      <style>{`
+        @keyframes floatGem { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-10px)} }
+        @keyframes glowPulse { 0%,100%{opacity:0.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.08)} }
+        @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        @keyframes dotPop { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
+      `}</style>
+      <div style={{ width: "100%", maxWidth: 420, minHeight: "100vh", display: "flex",
+        flexDirection: "column", padding: "0 24px 40px", boxSizing: "border-box", position: "relative" }}>
+
+        {/* Background decorations */}
+        <div style={{ position: "absolute", top: -80, left: -80, width: 280, height: 280,
+          borderRadius: "50%", background: "radial-gradient(circle, rgba(59,125,255,0.12) 0%, transparent 70%)",
+          pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 120, right: -60, width: 200, height: 200,
+          borderRadius: "50%", background: "radial-gradient(circle, rgba(100,65,255,0.10) 0%, transparent 70%)",
+          pointerEvents: "none" }} />
+
+        {/* Logo area */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+          justifyContent: "center", paddingTop: 20 }}>
+
+          {/* Glow ring */}
+          <div style={{ position: "relative", animation: "floatGem 3.5s ease-in-out infinite" }}>
+            <div style={{ position: "absolute", inset: -18, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(59,125,255,0.35) 0%, transparent 70%)",
+              animation: "glowPulse 3s ease-in-out infinite" }} />
+            <div style={{ position: "absolute", inset: -8, borderRadius: 38,
+              boxShadow: "0 0 0 1px rgba(59,125,255,0.25), 0 0 40px rgba(59,125,255,0.25)",
+              borderRadius: 36 }} />
+            <div style={{ width: 128, height: 128, borderRadius: 30, overflow: "hidden",
+              boxShadow: "0 12px 48px rgba(59,125,255,0.55), 0 4px 16px rgba(0,0,0,0.4)",
+              animation: "scaleIn 0.5s cubic-bezier(.22,.68,0,1.2) both", position: "relative", zIndex: 1 }}>
+              <img src={gemIcon} alt="Gem Wallet" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </div>
+          </div>
+
+          {/* Title */}
+          <div style={{ marginTop: 32, animation: "fadeSlideUp 0.35s 0.12s cubic-bezier(.22,.68,0,1.2) both",
+            textAlign: "center" }}>
+            <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1,
+              background: "linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.85) 100%)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+              Gem Wallet
+            </div>
+            <div style={{ color: "#8E8E93", fontSize: 16, marginTop: 8, lineHeight: 1.5, fontWeight: 400 }}>
+              Ваш надёжный крипто-кошелёк
+            </div>
+          </div>
+
+          {/* Feature highlights */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%",
+            marginTop: 40, animation: "fadeSlideUp 0.35s 0.22s cubic-bezier(.22,.68,0,1.2) both" }}>
+            {[
+              { icon: "🔐", title: "Полная безопасность", desc: "Ключи хранятся только на вашем устройстве" },
+              { icon: "⚡", title: "Мгновенные переводы", desc: "TON, ETH, BTC, SOL и другие сети" },
+              { icon: "💎", title: "Только ваши монеты", desc: "Никаких посредников, полный контроль" },
+            ].map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14,
+                background: "rgba(255,255,255,0.04)", borderRadius: 16,
+                border: "1px solid rgba(255,255,255,0.07)", padding: "14px 16px",
+                animation: `dotPop 0.4s ${0.28 + i * 0.08}s cubic-bezier(.22,.68,0,1.2) both` }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  background: "rgba(59,125,255,0.12)", border: "1px solid rgba(59,125,255,0.2)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                  {f.icon}
+                </div>
+                <div>
+                  <div style={{ color: "#fff", fontWeight: 600, fontSize: 15, lineHeight: 1.2 }}>{f.title}</div>
+                  <div style={{ color: "#8E8E93", fontSize: 13, marginTop: 2, lineHeight: 1.4 }}>{f.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 32,
+          animation: "fadeSlideUp 0.35s 0.52s cubic-bezier(.22,.68,0,1.2) both" }}>
+          <button onClick={handleStartCreate} disabled={localLoading}
+            style={{ width: "100%", padding: "17px 0", borderRadius: 16, border: "none",
+              background: localLoading ? "#2A4A9A" : "linear-gradient(135deg, #4F8FFF 0%, #1A55E3 100%)",
+              color: "#fff", fontSize: 17, fontWeight: 700, cursor: localLoading ? "not-allowed" : "pointer",
+              fontFamily: DS.font, letterSpacing: 0.1,
+              boxShadow: localLoading ? "none" : "0 4px 24px rgba(59,125,255,0.45)", transition: "all 0.2s" }}>
+            {localLoading ? "Создание…" : "Создать новый кошелёк"}
+          </button>
+          <button onClick={() => { setStep('import'); setError(''); setPassword(''); setPassword2(''); setImportPhrase(''); }}
+            style={{ width: "100%", padding: "17px 0", borderRadius: 16,
+              border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)",
+              color: "#fff", fontSize: 17, fontWeight: 600, cursor: "pointer",
+              fontFamily: DS.font, transition: "all 0.2s" }}>
+            У меня уже есть кошелёк
+          </button>
+          <div style={{ textAlign: "center", color: "#555", fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+            Продолжая, вы принимаете условия использования
+          </div>
         </div>
       </div>
-      <div style={{ animation: "fadeSlideUp 0.32s 0.10s cubic-bezier(.22,.68,0,1.2) both", display: "flex", flexDirection: "column", gap: 12 }}>
-        <OBtn onClick={handleStartCreate} disabled={localLoading}>
-          {localLoading ? "Создание..." : "Создать новый кошелек"}
-        </OBtn>
-        <OBtn onClick={() => { setStep('import'); setError(''); setPassword(''); setPassword2(''); setImportPhrase(''); }}>
-          Импорт существующего кошелька
-        </OBtn>
-      </div>
-    </ORoot>
+    </div>
   );
 
   if (step === 'create-password') return (
