@@ -1087,7 +1087,7 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
   const liveAssets = useAssets();
   const livePriceMap = useLivePriceMap();
   const asset = liveAssets.find((a) => a.id === assetId);
-  const { sendTransaction, addMockTransaction, testMode, settings: sendSettings } = useWallet();
+  const { sendTransaction, addMockTransaction, settings: sendSettings } = useWallet();
   const shortRecipient = recipient && recipient.length > 16 ? recipient.slice(0, 7) + "…" + recipient.slice(-7) : (recipient || "");
 
   const [status, setStatus] = useState("idle");
@@ -1114,20 +1114,14 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
     setStatus("sending");
     setTxError("");
     try {
-      if (!testMode) {
-        await sendTransaction({
-          assetId,
-          to: recipient,
-          amount: amount.replace(",", "."),
-          feeMultiplier: fi.multiplier,
-          btcFeeRateSatVb: fi.btcFeeRateSatVb,
-        });
-      }
+      const txHash = await sendTransaction({
+        assetId,
+        to: recipient,
+        amount: amount.replace(",", "."),
+        feeMultiplier: fi.multiplier,
+        btcFeeRateSatVb: fi.btcFeeRateSatVb,
+      });
       const finalFeeStr = `${fi.nativeFormatted} ${fi.unitLabel}`.trim();
-      const isPending = !!fi.isTooLow;
-      const pendingUntil = isPending
-        ? Date.now() + (Math.floor(Math.random() * 46) + 15) * 60 * 1000
-        : null;
       await addMockTransaction({
         assetId,
         amount,
@@ -1135,8 +1129,9 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
         to: recipient,
         type: "Отправлено",
         fee: finalFeeStr,
-        status: isPending ? "В процессе" : "Успешный",
-        pendingUntil,
+        status: "Успешный",
+        pendingUntil: null,
+        txHash,
       });
       setStatus("success");
       setTimeout(() => onConfirm(), 1500);
@@ -1682,7 +1677,7 @@ function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, on
 
 /* ─── Screen: Swap confirm ───────────────────────────────────── */
 function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
-  const { fireNotif, settings: swapSettings, addMockTransaction, testMode } = useWallet();
+  const { fireNotif, settings: swapSettings, addMockTransaction } = useWallet();
   const payAsset = swapPayAssets.find((a) => a.id === payId);
   const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
   const receiveAmountNum = parseFloat(payAmount.replace(",", ".")) * 0.03384;
@@ -2576,8 +2571,45 @@ function TxDetailScreen({ tx, onBack }) {
   }
   
 const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
-  const { mockTransactions } = useWallet();
+  const { mockTransactions, refreshBalance } = useWallet();
   const [selectedTx, setSelectedTx] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const touchStarted = useRef(false);
+  const pullIndicatorRef = useRef(null);
+
+  function handleTouchStart(e) {
+    const scrollEl = e.currentTarget;
+    if (scrollEl.scrollTop === 0) {
+      touchStartY.current = e.touches[0].clientY;
+      touchStarted.current = true;
+    }
+  }
+
+  function handleTouchMove(e) {
+    if (!touchStarted.current) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0 && pullIndicatorRef.current) {
+      const progress = Math.min(delta / 70, 1);
+      pullIndicatorRef.current.style.opacity = String(progress);
+      pullIndicatorRef.current.style.transform = `translateY(${Math.min(delta * 0.4, 28)}px) scale(${0.6 + progress * 0.4})`;
+    }
+  }
+
+  async function handleTouchEnd(e) {
+    if (!touchStarted.current) return;
+    touchStarted.current = false;
+    const delta = e.changedTouches[0].clientY - touchStartY.current;
+    if (pullIndicatorRef.current) {
+      pullIndicatorRef.current.style.opacity = "0";
+      pullIndicatorRef.current.style.transform = "translateY(0) scale(0.6)";
+    }
+    if (delta > 70 && !isRefreshing) {
+      setIsRefreshing(true);
+      try { await refreshBalance(); } catch (_) {}
+      setIsRefreshing(false);
+    }
+  }
 
   const _livePriceMapAct = useLivePriceMap();
   const getActPrice = (id) => {
@@ -2623,17 +2655,42 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px" }}>
-        <span style={{ color: "white", fontWeight: 700, fontSize: 20 }}>Активность</span>
-        <div style={{ position: "absolute", right: 16 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-            <path d="M3 6h18M7 12h10M11 18h2" stroke="white" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+      <div style={{ position: "relative", overflow: "hidden", height: 0 }}>
+        <div ref={pullIndicatorRef} style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%) scale(0.6)", opacity: 0, transition: "opacity 0.15s", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", background: DS.card }}>
+          {isRefreshing ? (
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }}>
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
+              <path d="M12 17V7M7 12l5 5 5-5" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
         </div>
       </div>
 
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px" }}>
+        <span style={{ color: "white", fontWeight: 700, fontSize: 20 }}>Активность</span>
+        {isRefreshing && (
+          <div style={{ position: "absolute", right: 16 }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }}>
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{ flex: 1, overflowY: "auto" }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+
       {allTx.length === 0 ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "0 40px" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "0 40px", minHeight: 300 }}>
           <div style={{ width: 80, height: 80, borderRadius: "50%", background: DS.card, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg viewBox="0 0 24 24" fill="none" style={{ width: 40, height: 40 }}>
               <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.8" opacity="0.2" />
@@ -2717,7 +2774,7 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
         </div>
       )}
 
-      <div style={{ flex: 1 }} />
+      </div>
     </>
   );
 });
@@ -3208,17 +3265,12 @@ function AboutScreen({ onBack }) {
 }
 
 const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, onWalletsClick }) => {
-  const { lock, testMode, setTestMode, addMockTransaction } = useWallet();
+  const { lock } = useWallet();
   const [subScreen, setSubScreen] = useState(null);
   const [tapCount, setTapCount] = useState(0);
   const [showAdminPin, setShowAdminPin] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [pinError, setPinError] = useState("");
-  
-  const [showMockTxModal, setShowMockTxModal] = useState(false);
-  const [mockAsset, setMockAsset] = useState(BASE_ASSETS[0]);
-  const [mockAmount, setMockAmount] = useState("");
-  const [mockFrom, setMockFrom] = useState("");
 
   const tapTimerRef = useRef(null);
 
@@ -3298,19 +3350,6 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
     ],
     [
       {
-        label: "Тестовый режим",
-        badge: testMode ? "ВКЛ" : "ВЫКЛ",
-        icon: <IconBox bg={testMode ? "#34C759" : "#555"}><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></IconBox>,
-        onPress: () => setTestMode(!testMode),
-      },
-      ...(testMode ? [{
-        label: "Создать транзакцию",
-        icon: <IconBox bg="#3B7DFF"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2" strokeLinecap="round" /></svg></IconBox>,
-        onPress: () => setShowMockTxModal(true),
-      }] : []),
-    ],
-    [
-      {
         label: "Поддержка",
         icon: <IconBox bg="#30D158"><svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}><path d="M3 18v-2a9 9 0 0 1 18 0v2" stroke="white" strokeWidth="1.8" strokeLinecap="round" /><rect x="1" y="16" width="4" height="6" rx="2" fill="white" /><rect x="19" y="16" width="4" height="6" rx="2" fill="white" /></svg></IconBox>,
         onPress: () => { const tg = window.Telegram?.WebApp; if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/GemWalletSupport'); else openInApp('https://t.me/GemWalletSupport'); },
@@ -3366,101 +3405,6 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
                 fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
               Войти
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Mock Transaction Modal */}
-      {showMockTxModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 10000,
-          background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-          onClick={() => setShowMockTxModal(false)}>
-          <div style={{ background: "#181820", borderRadius: "24px 24px 0 0", padding: "24px 20px 40px",
-            width: "100%", maxWidth: 420, animation: "fadeSlideUp 0.3s ease both" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-              <span style={{ color: "white", fontWeight: 700, fontSize: 19 }}>Создать транзакцию</span>
-              <button onClick={() => setShowMockTxModal(false)}
-                style={{ background: "#252530", border: "none", borderRadius: "50%", width: 32, height: 32,
-                  color: "#888", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                ✕
-              </button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div>
-                <div style={{ color: "#888", fontSize: 13, marginBottom: 10, marginLeft: 4 }}>Выберите токен</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  {BASE_ASSETS.slice(0, 6).map(a => (
-                    <button key={a.id}
-                      onClick={() => setMockAsset(a)}
-                      style={{ 
-                        background: mockAsset?.id === a.id ? "rgba(59, 125, 255, 0.15)" : "#252530", 
-                        border: `1px solid ${mockAsset?.id === a.id ? "#3B7DFF" : "#333"}`, 
-                        borderRadius: 12, padding: "10px 8px",
-                        display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer",
-                        transition: "all 0.2s"
-                      }}>
-                      <div style={{ width: 24, height: 24 }}>
-                        <TokenIcon tokenId={a.tokenId} size={24} badgeSize={10} />
-                      </div>
-                      <span style={{ color: "white", fontSize: 12, fontWeight: 600 }}>{a.symbol}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ color: "#888", fontSize: 13, marginBottom: 8, marginLeft: 4 }}>Сумма поступления</div>
-                <div style={{ background: "#252530", borderRadius: 12, padding: "12px 16px", border: "1px solid #333" }}>
-                  <input 
-                    type="number" 
-                    placeholder="0.00"
-                    value={mockAmount}
-                    onChange={e => setMockAmount(e.target.value)}
-                    style={{ background: "none", border: "none", outline: "none", color: "white", fontSize: 17, width: "100%", fontWeight: 600 }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ color: "#888", fontSize: 13, marginBottom: 8, marginLeft: 4 }}>Адрес отправителя</div>
-                <div style={{ background: "#252530", borderRadius: 12, padding: "12px 16px", border: "1px solid #333" }}>
-                  <input 
-                    placeholder="0x... или адрес"
-                    value={mockFrom}
-                    onChange={e => setMockFrom(e.target.value)}
-                    style={{ background: "none", border: "none", outline: "none", color: "#ccc", fontSize: 14, width: "100%" }}
-                  />
-                </div>
-              </div>
-
-              <button 
-                disabled={!mockAmount || !mockFrom}
-                onClick={() => {
-                  addMockTransaction({ 
-                    assetId: mockAsset.id, 
-                    amount: mockAmount, 
-                    from: mockFrom 
-                  });
-                  setShowMockTxModal(false);
-                  setMockAmount("");
-                  setMockFrom("");
-                  setActiveTab('home'); // Уходим на главный экран
-                }}
-                style={{ 
-                  background: (!mockAmount || !mockFrom) ? "#333" : "#3B7DFF", 
-                  color: "white", border: "none", borderRadius: 14, padding: "16px", 
-                  fontSize: 16, fontWeight: 700, cursor: "pointer", marginTop: 8,
-                  opacity: (!mockAmount || !mockFrom) ? 0.5 : 1
-                }}>
-                Создать транзакцию
-              </button>
-            </div>
-            
-            <div style={{ marginTop: 24, color: "#555", fontSize: 12, textAlign: "center", lineHeight: 1.5 }}>
-              Транзакция мгновенно отобразится в истории и обновит баланс. Только для тестирования интерфейса.
-            </div>
           </div>
         </div>
       )}
@@ -3605,14 +3549,6 @@ function SecurityScreen({ onBack, onLock }) {
             <button onClick={() => { setMnemonic(''); setSeedPassword(''); }} style={{ width: "100%", padding: "12px", borderRadius: 10, background: "#252530", color: "white", border: "none", fontSize: 15, cursor: "pointer" }}>Скрыть</button>
           </div>
         )}
-      </div>
-
-      <div style={{ background: "#181820", borderRadius: 16, margin: "12px 16px 0", overflow: "hidden" }}>
-        <div onClick={() => { if(window.confirm("Вы уверены, что хотите очистить все данные?")) clearAllData(); }}
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", cursor: "pointer" }}>
-          <span style={{ color: "white", fontSize: 16 }}>Очистить активность и баланс</span>
-          <span style={{ color: "#888", fontSize: 18 }}>›</span>
-        </div>
       </div>
 
       <div style={{ background: "rgba(255,59,48,0.1)", borderRadius: 16, margin: "12px 16px 24px", border: "1px solid rgba(255,59,48,0.3)", overflow: "hidden" }}>
@@ -3917,7 +3853,7 @@ function fmtBal(num, sym) {
 
 /* ─── Screen: Home ───────────────────────────────────────────── */
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
-  const { balances, addresses, refreshBalance, testMode, settings, updateSetting } = useWallet();
+  const { balances, addresses, refreshBalance, settings, updateSetting } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const assets = useAssets();
   const livePriceMap = useLivePriceMap();
