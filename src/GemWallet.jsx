@@ -233,6 +233,44 @@ const copyToClipboard = async (text) => {
   }
 };
 
+/* ─── Explorer URL helpers ──────────────────────────────────── */
+function getExplorerTxUrl(assetId, txHash) {
+  const base = {
+    ton: 'https://tonviewer.com/transaction/',
+    eth: 'https://etherscan.io/tx/',
+    btc: 'https://mempool.space/tx/',
+    bnb: 'https://bscscan.com/tx/',
+    sol: 'https://solscan.io/tx/',
+    arb: 'https://arbiscan.io/tx/',
+    ltc: 'https://litecoinspace.org/tx/',
+    'usdt-eth': 'https://etherscan.io/tx/',
+    'usdt-bnb': 'https://bscscan.com/tx/',
+    'usdt-sol': 'https://solscan.io/tx/',
+    'usdt-ton': 'https://tonviewer.com/transaction/',
+    'usdt-arb': 'https://arbiscan.io/tx/',
+  };
+  const baseUrl = base[(assetId || '').toLowerCase()] || 'https://etherscan.io/tx/';
+  return txHash ? baseUrl + txHash : null;
+}
+function getExplorerAddressUrl(assetId, address) {
+  const base = {
+    ton: 'https://tonviewer.com/',
+    eth: 'https://etherscan.io/address/',
+    btc: 'https://mempool.space/address/',
+    bnb: 'https://bscscan.com/address/',
+    sol: 'https://solscan.io/account/',
+    arb: 'https://arbiscan.io/address/',
+    ltc: 'https://litecoinspace.org/address/',
+    'usdt-eth': 'https://etherscan.io/address/',
+    'usdt-bnb': 'https://bscscan.com/address/',
+    'usdt-sol': 'https://solscan.io/account/',
+    'usdt-ton': 'https://tonviewer.com/',
+    'usdt-arb': 'https://arbiscan.io/address/',
+  };
+  const baseUrl = base[(assetId || '').toLowerCase()] || 'https://etherscan.io/address/';
+  return address && address !== '—' ? baseUrl + address : null;
+}
+
 /* BTC — Bitcoin ₿ glyph, geometric */
 const BtcIcon = memo(() => (
   <svg viewBox="0 0 32 32" fill="none" style={{ width: "100%", height: "100%" }}>
@@ -2119,36 +2157,28 @@ function WalletBackupMenu({ onBack, onOption }) {
   );
 }
 
-/* ─── Address row with copy button ──────────────────────────── */
-function AddressRow({ label, address }) {
-  const [copied, setCopied] = useState(false);
+/* ─── Address row with explorer arrow ───────────────────────── */
+function AddressRow({ label, address, assetId }) {
   const addrShort = shortAddress(address);
-  const handleCopy = async () => {
-    if (!address || address === "—") return;
-    await copyToClipboard(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const explorerUrl = assetId ? getExplorerAddressUrl(assetId, address) : null;
+  const handleOpen = () => {
+    if (!explorerUrl) return;
+    openInApp(explorerUrl);
   };
+  const isClickable = !!explorerUrl;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: `1px solid ${DS.border}` }}>
+    <div
+      onClick={isClickable ? handleOpen : undefined}
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: `1px solid ${DS.border}`, cursor: isClickable ? "pointer" : "default" }}>
       <span style={{ color: "white", fontSize: 15, fontWeight: 500, flexShrink: 0 }}>{label}</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
         <span style={{ color: DS.muted, fontSize: 14, fontWeight: 500, fontFamily: "monospace", letterSpacing: "0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {addrShort}
         </span>
-        {address && address !== "—" && (
-          <button onClick={handleCopy} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
-            {copied ? (
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-                <path d="M5 13l4 4L19 7" stroke={DS.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-                <rect x="9" y="9" width="11" height="11" rx="2" stroke={DS.muted} strokeWidth="1.8" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke={DS.muted} strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
+        {isClickable && (
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0 }}>
+            <path d="M9 18l6-6-6-6" stroke={DS.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         )}
       </div>
     </div>
@@ -2253,6 +2283,7 @@ function TxDetailScreen({ tx, onBack }) {
         <AddressRow
           label={tx.type === "Получено" ? "Отправитель" : "Получатель"}
           address={(tx.type === "Получено" ? tx.from : tx.to) || "—"}
+          assetId={tx.assetId}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px" }}>
           <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Сеть</span>
@@ -2268,19 +2299,22 @@ function TxDetailScreen({ tx, onBack }) {
       </div>
 
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 12px", border: `1px solid ${DS.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px" }}>
+        <div onClick={() => { const u = getExplorerTxUrl(tx.assetId, tx.hash); if (u) openInApp(u); }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: tx.hash ? "pointer" : "default" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Сетевая плата</span>
             <div style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid #555", display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: 12, fontWeight: 700 }}>i</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>{formatTxFee(tx.fee, tx.assetId) || "0,001 " + (asset?.symbol || "")}</span>
+            {tx.hash && <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0 }}><path d="M9 18l6-6-6-6" stroke={DS.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </div>
         </div>
       </div>
 
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px", border: `1px solid ${DS.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px" }}>
+        <div onClick={() => { const u = getExplorerTxUrl(tx.assetId, tx.hash); if (u) openInApp(u); }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: "pointer" }}>
           <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Посмотреть в эксплорере</span>
           <ChevronRight />
         </div>
