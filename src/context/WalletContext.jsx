@@ -249,10 +249,11 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
   const WalletContext = createContext(null);
 
-  const STORAGE_KEY = 'gem_wallet_v2'; // Changed from v1 to v2 to reset all local wallets
-    const SETTINGS_KEY = 'gem_settings_v1';
-    const MOCK_TXS_KEY = 'gem_mock_txs_v2';
-    const MOCK_BALS_KEY = 'gem_mock_balances_v2';
+  const STORAGE_KEY = 'gem_wallet_v2'; 
+  const WALLETS_LIST_KEY = 'gem_wallets_list_v2';
+  const SETTINGS_KEY = 'gem_settings_v1';
+  const MOCK_TXS_KEY = 'gem_mock_txs_v2';
+  const MOCK_BALS_KEY = 'gem_mock_balances_v2';
     const DEFAULT_SETTINGS = {
       hideBalance: false,
       passEnabled: true,
@@ -298,7 +299,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       hasWallet: false,
       isUnlocked: false,
       addresses: {},
-      balances: {}, // This will be the merged balances (real + mock)
+      balances: {}, 
       realBalances: {},
       mockBalances: {},
       activeNetwork: 'ethereum',
@@ -306,7 +307,56 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       error: null,
       testMode: false,
       mockTransactions: [],
+      wallets: [],
+      activeWalletId: null,
     });
+
+    // ── Load wallets list on mount ──────────────────────────────────────────
+    useEffect(() => {
+      const list = JSON.parse(localStorage.getItem(WALLETS_LIST_KEY) || '[]');
+      const activeId = localStorage.getItem('gem_active_wallet_id');
+      setState(s => ({ ...s, wallets: list, activeWalletId: activeId }));
+    }, []);
+
+    const saveWalletsList = useCallback((list) => {
+      localStorage.setItem(WALLETS_LIST_KEY, JSON.stringify(list));
+      setState(s => ({ ...s, wallets: list }));
+    }, []);
+
+    const switchWallet = useCallback(async (walletId) => {
+      const wallet = state.wallets.find(w => String(w.id) === String(walletId));
+      if (!wallet) return;
+      
+      // Save current addresses to the list before switching
+      const updatedList = state.wallets.map(w => 
+        String(w.id) === state.activeWalletId ? { ...w, addresses: state.addresses } : w
+      );
+      
+      // Lock current
+      privateKeysRef.current = {};
+      mnemonicRef.current = null;
+      
+      localStorage.setItem('gem_active_wallet_id', walletId);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+        encrypted: wallet.encrypted, 
+        addresses: wallet.addresses 
+      }));
+
+      setState(s => ({ 
+        ...s, 
+        activeWalletId: walletId, 
+        isUnlocked: false, // Force re-unlock for security
+        addresses: wallet.addresses || {},
+        balances: {},
+        wallets: updatedList
+      }));
+      saveWalletsList(updatedList);
+    }, [state.wallets, state.activeWalletId, state.addresses, saveWalletsList]);
+
+    const renameWallet = useCallback((id, newName) => {
+      const updated = state.wallets.map(w => String(w.id) === String(id) ? { ...w, name: newName } : w);
+      saveWalletsList(updated);
+    }, [state.wallets, saveWalletsList]);
 
     // ── Settings (persisted) ─────────────────────────────────────────────────────
     const [settings, setSettings] = useState(() => {
@@ -604,7 +654,19 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         const { addresses: rawAddresses, privateKeys } = await deriveWallet(mnemonic);
         const addresses = buildAddressMap(rawAddresses);
         const encrypted = await encryptMnemonic(mnemonic, password);
+        
+        const newWalletId = Date.now().toString();
+        const newWallet = {
+          id: newWalletId,
+          name: `Кошелек № ${state.wallets.length + 1}`,
+          encrypted,
+          addresses
+        };
+        const newList = [...state.wallets, newWallet];
+        saveWalletsList(newList);
+        localStorage.setItem('gem_active_wallet_id', newWalletId);
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ encrypted, addresses }));
+        
         privateKeysRef.current = privateKeys;
         mnemonicRef.current = mnemonic;
 
@@ -636,6 +698,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           hasWallet: true,
           isUnlocked: true,
           addresses,
+          activeWalletId: newWalletId,
           loading: false,
         }));
         return mnemonic;
@@ -643,7 +706,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         setState(s => ({ ...s, loading: false, error: e.message }));
         throw e;
       }
-    }, []);
+    }, [state.wallets, saveWalletsList]);
 
     // ── importWallet ────────────────────────────────────────────────────────────
     const importWallet = useCallback(async (mnemonic, password) => {
@@ -653,7 +716,19 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         const { addresses: rawAddresses, privateKeys } = await deriveWallet(mnemonic);
         const addresses = buildAddressMap(rawAddresses);
         const encrypted = await encryptMnemonic(mnemonic, password);
+        
+        const newWalletId = Date.now().toString();
+        const newWallet = {
+          id: newWalletId,
+          name: `Кошелек № ${state.wallets.length + 1}`,
+          encrypted,
+          addresses
+        };
+        const newList = [...state.wallets, newWallet];
+        saveWalletsList(newList);
+        localStorage.setItem('gem_active_wallet_id', newWalletId);
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ encrypted, addresses }));
+        
         privateKeysRef.current = privateKeys;
         mnemonicRef.current = mnemonic;
 
@@ -684,13 +759,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           hasWallet: true,
           isUnlocked: true,
           addresses,
+          activeWalletId: newWalletId,
           loading: false,
         }));
       } catch (e) {
         setState(s => ({ ...s, loading: false, error: e.message }));
         throw e;
       }
-    }, []);
+    }, [state.wallets, saveWalletsList]);
 
     // ── unlock ──────────────────────────────────────────────────────────────────
     const unlock = useCallback(async (password) => {
@@ -744,22 +820,31 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     }, []);
 
     // ── deleteWallet ────────────────────────────────────────────────────────────
-    const deleteWallet = useCallback(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-      privateKeysRef.current = {};
-      mnemonicRef.current = null;
-      setState({
-        hasWallet: false,
-        isUnlocked: false,
-        addresses: {},
-        balances: {},
-        activeNetwork: 'ethereum',
-        loading: false,
-        error: null,
-      });
-      window.location.reload();
-    }, []);
+    const deleteWallet = useCallback((id) => {
+      const targetId = id || state.activeWalletId;
+      const newList = state.wallets.filter(w => String(w.id) !== String(targetId));
+      saveWalletsList(newList);
+      
+      if (String(targetId) === String(state.activeWalletId)) {
+        if (newList.length > 0) {
+          switchWallet(newList[0].id);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem('gem_active_wallet_id');
+          privateKeysRef.current = {};
+          mnemonicRef.current = null;
+          setState(s => ({
+            ...s,
+            hasWallet: false,
+            isUnlocked: false,
+            addresses: {},
+            balances: {},
+            activeWalletId: null,
+            wallets: []
+          }));
+        }
+      }
+    }, [state.wallets, state.activeWalletId, saveWalletsList, switchWallet]);
 
     // ── setActiveNetwork ────────────────────────────────────────────────────────
     const setActiveNetwork = useCallback((networkId) => {

