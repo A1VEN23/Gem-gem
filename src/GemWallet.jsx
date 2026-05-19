@@ -1731,7 +1731,7 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
 
 /* ─── Screen: Asset Detail ───────────────────────────────────── */
 function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }) {
-  const { balances, mockTransactions } = useWallet();
+  const { balances, mockTransactions, settings: detailSettings } = useWallet();
   const liveAssets = useAssets();
   const asset = liveAssets.find((a) => a.id === assetId);
 
@@ -1825,9 +1825,11 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
           <TokenIcon tokenId={asset.tokenId} size={64} badgeSize={24} />
         </div>
         <div style={{ color: "white", fontSize: 32, fontWeight: 700, marginTop: 16, letterSpacing: -0.5 }}>
-          {balStr}
+          {detailSettings?.hideBalance ? "•••••" : balStr}
         </div>
-        <div style={{ color: "#888", fontSize: 15, marginTop: 4 }}>{usdVal}</div>
+        <div style={{ color: "#888", fontSize: 15, marginTop: 4 }}>
+          {detailSettings?.hideBalance ? "•••••" : usdVal}
+        </div>
       </div>
 
       {/* Action buttons — те же что на главном */}
