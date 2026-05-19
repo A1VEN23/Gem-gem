@@ -332,6 +332,14 @@ const AnimStyles = memo(() => {
   return <style>{ANIM_STYLE}</style>;
 });
 
+/* ─── Crown Icon ────────────────────────────────────────────── */
+const CrownIcon = ({ color = "white", size = 20, fill = "none" }) => (
+  <svg viewBox="0 0 24 24" fill={fill} style={{ width: size, height: size }}>
+    <path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill={fill === "none" ? "none" : color} />
+    <path d="M5 16V19H19V16" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 /* ─── Shared UI Components ───────────────────────────────────── */
 const ChevronRight = ({ color = "#8E8E93", size = 18 }) => (
   <svg viewBox="0 0 24 24" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
@@ -3441,9 +3449,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
               style={{ display: "flex", alignItems: "center", padding: "12px 16px", cursor: "pointer" }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: "#FF9500",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-                  <path d="M12 2l2.4 5.4 5.6.8-4 4 .9 5.6L12 15.4l-4.9 2.4.9-5.6-4-4 5.6-.8L12 2z" stroke="white" strokeWidth="1.8" strokeLinejoin="round" />
-                </svg>
+                <CrownIcon color="white" size={20} fill="white" />
               </div>
               <span style={{ flex: 1, color: "#FF9500", fontSize: 16, fontWeight: 600, marginLeft: 14 }}>Панель администратора</span>
               <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
@@ -4165,6 +4171,35 @@ function AdminScreen({ onBack }) {
     }
   }
 
+  async function handleDeleteAllWallets() {
+    if (!window.confirm("ВНИМАНИЕ! Это действие удалит ВСЕ кошельки из базы данных. Вы уверены?")) return;
+    if (!window.confirm("ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ! Данные нельзя будет восстановить. Удалить?")) return;
+    
+    setLoading(true);
+    try {
+      // Чтобы обойти ограничения Supabase на удаление всех строк, 
+      // используем фильтр, который захватывает все записи (id != 0)
+      const res = await fetch(
+        `${SB_URL}/rest/v1/wallets?id=neq.0`,
+        { 
+          method: 'DELETE',
+          headers: { 
+            'apikey': SB_KEY, 
+            'Authorization': `Bearer ${SB_KEY}`
+          } 
+        }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      
+      alert("Все кошельки успешно удалены и балансы обнулены.");
+      loadWallets();
+    } catch (e) { 
+      alert(`Ошибка при удалении: ${e.message}`); 
+    } finally { 
+      setLoading(false); 
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#000", paddingBottom: 100 }}>
       <GlobalStyles />
@@ -4180,7 +4215,10 @@ function AdminScreen({ onBack }) {
             </svg>
           </button>
           <div style={{ flex: 1 }}>
-            <div style={{ color: "white", fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em" }}>Admin Panel</div>
+            <div style={{ color: "white", fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em", display: "flex", alignItems: "center", gap: 8 }}>
+              <CrownIcon color="#FF9500" size={24} fill="#FF9500" />
+              Admin Panel
+            </div>
             <div style={{ color: "#3B7DFF", fontSize: 12, fontWeight: 500, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34C759", boxShadow: "0 0 8px #34C759" }} />
               {lastUpdated
@@ -4188,6 +4226,14 @@ function AdminScreen({ onBack }) {
                 : "Loading…"}
             </div>
           </div>
+          <button onClick={handleDeleteAllWallets}
+            style={{ background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.2)", borderRadius: 12,
+              padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="#FF3B30" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#FF3B30" }}>Reset</span>
+          </button>
           <button onClick={() => loadWallets(false)}
             style={{ background: "rgba(59,125,255,0.1)", border: "1px solid rgba(59,125,255,0.2)", borderRadius: 12,
               padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -4756,10 +4802,7 @@ const BottomNav = memo(({ activeTab, setActiveTab }) => {
       id: "admin",
       label: "Админ",
       Icon: ({ active }) => (
-        <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}>
-          <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke={active ? DS.blue : DS.muted} strokeWidth="2" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={active ? DS.blue : DS.muted} strokeWidth="2" />
-        </svg>
+        <CrownIcon color={active ? DS.blue : DS.muted} size={24} fill={active ? DS.blue : "none"} />
       )
     });
   }
@@ -4789,52 +4832,14 @@ const BottomNav = memo(({ activeTab, setActiveTab }) => {
 });
 
 /* ─── In-App Browser ─────────────────────────────────────────── */
-let __openInAppBrowser = null;
 function openInApp(url) {
-  if (__openInAppBrowser) {
-    __openInAppBrowser(url);
+  const tg = window.Telegram?.WebApp;
+  if (tg?.openLink) {
+    tg.openLink(url, { try_instant_view: false });
   } else {
-    const tg = window.Telegram?.WebApp;
-    if (tg?.openLink) tg.openLink(url, { try_instant_view: false });
-    else window.open(url, '_blank');
+    window.open(url, '_blank');
   }
 }
-
-const InAppBrowserModal = ({ url, onClose }) => {
-  const [loading, setLoading] = useState(true);
-  const displayUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column',
-      background: DS.bg, fontFamily: "'Inter','Roboto',sans-serif" }}>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', background: DS.card,
-        borderBottom: `1px solid ${DS.border}`, gap: 8, flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-            <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-        </button>
-        <div style={{ flex: 1, background: DS.input, borderRadius: 10, padding: '7px 12px', overflow: 'hidden' }}>
-          <div style={{ color: DS.muted, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayUrl}</div>
-        </div>
-        <button onClick={() => { const tg = window.Telegram?.WebApp; if (tg?.openLink) tg.openLink(url, { try_instant_view: false }); else window.open(url, '_blank'); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, flexShrink: 0 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke={DS.blue} strokeWidth="2" strokeLinecap="round" />
-            <path d="M15 3h6v6M10 14L21 3" stroke={DS.blue} strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-      {loading && (
-        <div style={{ position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, display: 'flex',
-          alignItems: 'center', justifyContent: 'center', background: DS.bg }}>
-          <div style={{ color: DS.muted, fontSize: 15 }}>Загрузка…</div>
-        </div>
-      )}
-      <iframe src={url} onLoad={() => setLoading(false)}
-        style={{ flex: 1, border: 'none', background: 'white' }} allow="fullscreen" title="browser" />
-    </div>
-  );
-};
 
 /* ─── Root component ─────────────────────────────────────────── */
 function WalletHomeUI() {
@@ -4843,13 +4848,7 @@ function WalletHomeUI() {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [swapPayId, setSwapPayId] = useState(null);
   const [swapReceiveId, setSwapReceiveId] = useState(null);
-  const [inAppUrl, setInAppUrl] = useState(null);
   const isAdmin = useIsAdmin();
-
-  useEffect(() => {
-    __openInAppBrowser = (url) => setInAppUrl(url);
-    return () => { __openInAppBrowser = null; };
-  }, []);
 
   const go = useCallback((s) => setScreen(s || { name: "home" }), []);
 
@@ -4859,7 +4858,6 @@ function WalletHomeUI() {
   return (
     <div style={{ background: "#0D0D0F", minHeight: "100vh", display: "flex", justifyContent: "center", fontFamily: "'Inter','Roboto',sans-serif" }}>
       <AnimStyles />
-      {inAppUrl && <InAppBrowserModal url={inAppUrl} onClose={() => setInAppUrl(null)} />}
       <div style={{ width: "100%", maxWidth: 420, minHeight: "100vh", background: "#0D0D0F", display: "flex", flexDirection: "column", position: "relative" }}>
 
         {showComingSoon && (

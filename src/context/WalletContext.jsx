@@ -168,7 +168,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
   const WalletContext = createContext(null);
 
-  const STORAGE_KEY = 'gem_wallet_v1';
+  const STORAGE_KEY = 'gem_wallet_v2'; // Changed from v1 to v2 to reset all local wallets
   const SETTINGS_KEY = 'gem_settings_v1';
   const DEFAULT_SETTINGS = {
     hideBalance: false,
