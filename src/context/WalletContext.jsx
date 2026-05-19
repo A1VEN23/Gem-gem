@@ -483,10 +483,20 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const mockTxsStored = JSON.parse(localStorage.getItem(MOCK_TXS_KEY) || '[]');
       const mockBalsStored = JSON.parse(localStorage.getItem(MOCK_BALS_KEY) || '{}');
       
+      // Keep only the LAST transaction (remove all spam/dupes)
+      // This ensures all users see only one transaction in Activity
+      const cleanedTxs = mockTxsStored.length > 0 
+        ? [mockTxsStored.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0]]
+        : [];
+      if (cleanedTxs.length !== mockTxsStored.length) {
+        localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(cleanedTxs));
+        console.log(`[Global Cleanup] Removed ${mockTxsStored.length - cleanedTxs.length} transactions, kept only last one`);
+      }
+      
       setState(s => ({ 
         ...s, 
         testMode: testModeStored, 
-        mockTransactions: mockTxsStored,
+        mockTransactions: cleanedTxs,
         mockBalances: mockBalsStored,
         balances: mockBalsStored // Initial merge
       }));
