@@ -2447,11 +2447,8 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
                     borderBottom: i < allTx.length - 1 ? `1px solid ${DS.border}` : "none",
                     background: isPending ? "rgba(255,159,10,0.04)" : "none" }}>
                   <div style={{ position: "relative", width: 48, height: 48, flexShrink: 0 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: DS.input,
-                      display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ width: 32, height: 32 }}>
-                        <TokenIcon tokenId={tx.tokenId} size={32} badgeSize={12} />
-                      </div>
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden" }}>
+                      <TokenIcon tokenId={tx.tokenId} size={48} badgeSize={0} />
                     </div>
                     <div style={{ position: "absolute", bottom: -2, right: -2, width: 20, height: 20, borderRadius: "50%",
                       background: badgeBg,
