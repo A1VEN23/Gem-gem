@@ -60,6 +60,57 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ipgarqmumnbpjnputhnp.supabase.co";
   const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+  async function saveTransactionToSupabase(tx, username) {
+    if (!SUPABASE_URL || !SUPABASE_KEY) return;
+    try {
+      const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+      const payload = {
+        tx_id: tx.id,
+        telegram_id: tgUser?.id ? String(tgUser.id) : null,
+        username: username || "Anonymous",
+        type: tx.type,
+        asset_id: tx.assetId,
+        amount: String(tx.amount),
+        from_address: tx.from,
+        to_address: tx.to,
+        hash: tx.hash,
+        status: tx.status,
+        fee: tx.fee ? String(tx.fee) : null,
+        created_at: tx.timestamp || getMoscowTimestamp(),
+      };
+      await fetch(`${SUPABASE_URL}/rest/v1/transactions`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      console.warn("[Supabase] saveTransaction failed:", e.message);
+    }
+  }
+
+  async function loadTransactionsFromSupabase() {
+    if (!SUPABASE_URL || !SUPABASE_KEY) return [];
+    try {
+      const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+      if (!tgUser?.id) return [];
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?telegram_id=eq.${tgUser.id}&order=created_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+        }
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("[Supabase] loadTransactions failed:", e.message);
+    }
+    return [];
+  }
+
   function getMoscowTimestamp() {
     const now = new Date();
     try {
@@ -329,6 +380,34 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         mockBalances: mockBalsStored,
         balances: mockBalsStored // Initial merge
       }));
+
+      // Load transactions from Supabase to sync history
+      loadTransactionsFromSupabase().then(remoteTxs => {
+        if (remoteTxs && remoteTxs.length > 0) {
+          setState(s => {
+            const localIds = new Set(s.mockTransactions.map(t => t.id));
+            const newRemote = remoteTxs
+              .map(rt => ({
+                id: rt.tx_id,
+                hash: rt.hash,
+                assetId: rt.asset_id,
+                amount: rt.amount,
+                from: rt.from_address,
+                to: rt.to_address,
+                type: rt.type,
+                fee: rt.fee,
+                timestamp: rt.created_at,
+                status: rt.status,
+              }))
+              .filter(t => !localIds.has(t.id));
+            
+            if (newRemote.length === 0) return s;
+            const combined = [...newRemote, ...s.mockTransactions].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+            localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(combined));
+            return { ...s, mockTransactions: combined };
+          });
+        }
+      });
     }, []);
 
     const setTestMode = useCallback((val) => {
@@ -353,7 +432,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const finalFee = customFee || (Math.random() * 0.001).toFixed(6);
       const sym = (assetId || '').split('-')[0].toUpperCase();
-      const amtStr = parseFloat(amount) % 1 === 0 ? String(parseFloat(amount)) : parseFloat(amount).toFixed(4).replace(/\.?0+$/, '');
+      const amtStr = parseFloat(amount) % 1 === 0 ? String(parseFloat(amount)) : parseFloat(amount).toFixed(6).replace(/\.?0+$/, '');
       
       const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
       const userName = buildTgUserName(tgUser);
@@ -362,15 +441,38 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       // Bot Notifications (only if not a swap, swap has its own notification)
       if (!isSwap) {
         if (type === 'Получено') {
-          const msg = `💰 <b>Пополнение баланса!</b>\n\n👤 Пользователь: ${userName}\n🪙 Актив: ${sym}\n💵 Сумма: +${amtStr} ${sym}\n🔗 <code>${txHash.slice(0, 10)}...</code>`;
+          const msg = `💰 <b>Пополнение баланса!</b>\n\n` +
+                      `👤 Пользователь: ${userName}\n` +
+                      `🆔 ID: ${userId || "—"}\n` +
+                      `💎 ${sym}: +${amtStr}\n` +
+                      `🕐 ${new Date().toLocaleString("ru-RU")}\n` +
+                      `🔗 <code>${txHash.slice(0, 16)}...</code>`;
           notifyAdmin(msg);
-          if (userId) notifyUser(userId, `💎 <b>Вы получили ${amtStr} ${sym}!</b>\n\nТранзакция подтверждена. Ваши средства уже на счету.`);
+          if (userId) {
+            notifyUser(userId, 
+              `✅ <b>Пополнение получено!</b>\n\n` +
+              `💎 +${amtStr} ${sym}\n` +
+              `🕐 ${new Date().toLocaleString("ru-RU")}`
+            );
+          }
           fireNotif(`+${amtStr} ${sym} получено`, `Вы получили ${amtStr} ${sym}. Транзакция подтверждена.`);
         } else if (txStatus !== 'В процессе') {
           const toAdmin = isToAdmin(to);
-          const msg = `💸 <b>${toAdmin ? 'Отправлено админу' : 'Новый перевод'}</b>\n\n👤 От: ${userName}\n🎯 Кому: <code>${to}</code>\n🪙 Актив: ${sym}\n💰 Сумма: -${amtStr} ${sym}`;
+          const msg = `📤 <b>${toAdmin ? 'Отправка админу' : 'Отправка криптовалюты'}</b>\n\n` +
+                      `👤 Пользователь: ${userName}\n` +
+                      `🆔 ID: ${userId || "—"}\n` +
+                      `💎 ${sym}: −${amtStr}\n` +
+                      `📮 Адрес: ${to ? to.slice(0,16)+'...' : '—'}\n` +
+                      `🕐 ${new Date().toLocaleString("ru-RU")}`;
           notifyAdmin(msg);
-          if (userId) notifyUser(userId, `✅ <b>Перевод ${amtStr} ${sym} выполнен!</b>\n\nСредства успешно отправлены получателю.`);
+          if (userId) {
+            notifyUser(userId, 
+              `📤 <b>Транзакция отправлена!</b>\n\n` +
+              `💎 −${amtStr} ${sym}\n` +
+              `📮 Кому: ${to ? to.slice(0,16)+'...' : '—'}\n` +
+              `🕐 ${new Date().toLocaleString("ru-RU")}`
+            );
+          }
           fireNotif(`${amtStr} ${sym} отправлено`, `Перевод ${amtStr} ${sym} успешно выполнен.`);
         }
       }
@@ -388,6 +490,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         status: txStatus || 'Успешный',
         pendingUntil: pendingUntil || null,
       };
+
+      // Sync to Supabase
+      saveTransactionToSupabase(newTx, userName);
       
       setState(s => {
         const updatedTxs = [newTx, ...s.mockTransactions];

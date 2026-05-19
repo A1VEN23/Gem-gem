@@ -2669,7 +2669,10 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
     return base?.usdPrice || 0;
   };
 
-  const allTx = (mockTransactions || []).map(tx => {
+  const [selectedTx, setSelectedTx] = useState(null);
+  const [filter, setFilter] = useState("all"); // all, received, sent
+
+  const allTxRaw = (mockTransactions || []).map(tx => {
     const asset = BASE_ASSETS.find(a => a.id === tx.assetId);
     const shortTo = tx.to ? (tx.to.slice(0,4)+"..."+tx.to.slice(-4)) : "—";
     const shortFrom = tx.from ? (tx.from.slice(0,4)+"..."+tx.from.slice(-4)) : "—";
@@ -2698,6 +2701,12 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
     };
   }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+  const allTx = allTxRaw.filter(tx => {
+    if (filter === "received") return tx.type === "Получено";
+    if (filter === "sent") return tx.type === "Отправлено";
+    return true;
+  });
+
   if (selectedTx) {
     return <TxDetailScreen tx={selectedTx} onBack={() => setSelectedTx(null)} />;
   }
@@ -2719,16 +2728,34 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px 8px" }}>
-        <span style={{ color: "white", fontWeight: 700, fontSize: 20 }}>Активность</span>
-        {isRefreshing && (
-          <div style={{ position: "absolute", right: 16 }}>
+      <div style={{ padding: "16px 20px 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <span style={{ color: "white", fontWeight: 700, fontSize: 20 }}>Активность</span>
+          {isRefreshing && (
             <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }}>
               <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Filter Pills */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+          {[
+            { id: "all", label: "Все" },
+            { id: "received", label: "Получено" },
+            { id: "sent", label: "Отправлено" }
+          ].map(p => (
+            <div key={p.id} onClick={() => setFilter(p.id)}
+              style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                background: filter === p.id ? DS.blue : DS.card,
+                color: filter === p.id ? "white" : DS.muted,
+                border: `1px solid ${filter === p.id ? DS.blue : DS.border}`,
+                transition: "all 0.2s" }}>
+              {p.label}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div
