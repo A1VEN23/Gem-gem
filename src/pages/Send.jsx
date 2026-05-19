@@ -748,26 +748,26 @@ export default function Send() {
         {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
 
         <button
-          className="btn-primary"
+          className="btn-primary btn-animate btn-confirm-shimmer"
           onClick={handleSend}
           disabled={loading}
           style={{ 
             width: '100%', 
             height: 60,
             borderRadius: 20,
-            background: 'linear-gradient(180deg, #34C759 0%, #28A745 100%)',
+            background: 'linear-gradient(90deg, #34C759 0%, #28A745 50%, #34C759 100%)',
             border: 'none',
             color: '#fff',
             fontSize: 18,
             fontWeight: 800,
             boxShadow: '0 10px 28px rgba(40, 167, 69, 0.3)',
-            transition: 'all 0.2s ease',
             marginBottom: 12
           }}
         >
           {loading ? 'Отправка...' : ` Подтвердить и отправить`}
         </button>
         <button
+          className="btn-animate btn-cancel-hover"
           onClick={() => setStep('fee')}
           disabled={loading}
           style={{ 
@@ -779,7 +779,6 @@ export default function Send() {
             color: 'rgba(255,255,255,0.6)',
             fontSize: 16,
             fontWeight: 700,
-            transition: 'all 0.2s ease'
           }}
         >
           Отмена

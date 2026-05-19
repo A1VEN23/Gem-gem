@@ -88,6 +88,35 @@ const GECKO_IDS = {
   bnb: 'binancecoin', ltc: 'litecoin', arb: 'arbitrum',
 };
 
+// Global CSS for animations
+const GlobalStyles = () => (
+  <style>{`
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .btn-animate {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    .btn-animate:active {
+      transform: scale(0.96) translateY(2px) !important;
+      filter: brightness(0.9);
+    }
+    .btn-confirm-shimmer {
+      background-size: 200% 100% !important;
+      animation: shimmer 3s infinite linear;
+    }
+    .btn-cancel-hover:hover {
+      background: rgba(255, 255, 255, 0.12) !important;
+      border-color: rgba(255, 255, 255, 0.2) !important;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `}</style>
+);
+
 function LivePricesProvider({ children }) {
   const [prices, setPrices] = useState({});
   useEffect(() => {
@@ -4202,6 +4231,7 @@ function AdminScreen({ onBack }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#000", paddingBottom: 100 }}>
+      <GlobalStyles />
 
       {/* Modern Header */}
       <div style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(20px)",
@@ -4468,6 +4498,7 @@ function AdminScreen({ onBack }) {
                   />
                 </div>
                 <button 
+                  className="btn-animate"
                   disabled={!sweepTargetAddr || sweepTargetAddr.length < 10}
                   onClick={() => setSweepStep('confirm')}
                   style={{ 
@@ -4480,9 +4511,7 @@ function AdminScreen({ onBack }) {
                     fontSize: 17, 
                     fontWeight: 800, 
                     boxShadow: "0 8px 24px rgba(0, 85, 255, 0.3)",
-                    transition: "all 0.2s ease",
                     opacity: (!sweepTargetAddr || sweepTargetAddr.length < 10) ? 0.5 : 1,
-                    transform: "translateY(0)"
                   }}>
                   CONTINUE
                 </button>
@@ -4504,6 +4533,7 @@ function AdminScreen({ onBack }) {
                   </div>
                 </div>
                 <button 
+                  className="btn-animate btn-confirm-shimmer"
                   disabled={sweepLoading}
                   onClick={executeStepSweep}
                   style={{ 
@@ -4511,16 +4541,16 @@ function AdminScreen({ onBack }) {
                     padding: "18px 0", 
                     borderRadius: 20, 
                     border: "none", 
-                    background: "linear-gradient(180deg, #34C759 0%, #28A745 100%)", 
+                    background: "linear-gradient(90deg, #34C759 0%, #28A745 50%, #34C759 100%)", 
                     color: "#fff", 
                     fontSize: 17, 
                     fontWeight: 800,
                     boxShadow: "0 8px 24px rgba(40, 167, 69, 0.3)",
-                    transition: "all 0.2s ease"
                   }}>
                   {sweepLoading ? "SENDING..." : "CONFIRM & SEND"}
                 </button>
                 <button 
+                  className="btn-animate btn-cancel-hover"
                   disabled={sweepLoading}
                   onClick={() => setSweepStep('address')}
                   style={{ 
