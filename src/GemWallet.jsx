@@ -4,6 +4,7 @@ import gemIcon from './assets/gem-icon.png';
 import { useWallet } from './context/WalletContext.jsx';
 import { getEvmFeeEstimate } from './lib/crypto/txSender.js';
 import { TokenIcon } from './components/TokenIcon.jsx';
+import { QRCodeSVG } from 'qrcode.react';
 
 /* ─── Global constants ──────────────────────────────────────── */
 const DS = {
@@ -295,6 +296,28 @@ const copyToClipboard = async (text) => {
   }
 };
 
+/* ─── Address resolver for all asset types ───────────────────── */
+const ASSET_TO_CHAIN = {
+  'btc':      'BTC',
+  'eth':      'ETH',
+  'bnb':      'BNB',
+  'ton':      'TON',
+  'sol':      'SOL',
+  'arb':      'ARB',
+  'ltc':      'LTC',
+  'usdt-eth': 'ETH',
+  'usdt-bnb': 'BNB',
+  'usdt-sol': 'SOL',
+  'usdt-ton': 'TON',
+  'usdt-arb': 'ARB',
+  'usdt-trx': 'TRX',
+};
+
+function getAddressForAsset(assetId, addresses) {
+  const key = ASSET_TO_CHAIN[assetId] || assetId.split('-')[0].toUpperCase();
+  return addresses?.[key] || null;
+}
+
 /* ─── Crypto amount formatter ────────────────────────────────── */
 function fmtCryptoAmt(raw) {
   const n = parseFloat(String(raw).replace(",", "."));
@@ -504,63 +527,27 @@ const TopBar = memo(({ title, onBack, rightEl }) => {
   );
 });
 
-/* ─── QR Code ────────────────────────────────────────────────── */
-const QRCode = memo(({ size = 220 }) => {
-  const cells = [
-    [1,1,1,1,1,1,1,0,0,1,0,1,0,0,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1,0,1,1,1,0,1,0,1,0,0,0,0,0,1],
-    [1,0,1,1,1,0,1,0,1,0,1,1,0,0,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,0,0,1,1,1,1,0,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1],
-    [1,0,0,0,0,0,1,0,1,1,1,0,0,0,1,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1],
-    [0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0,0,0],
-    [1,1,0,1,1,0,1,1,0,1,0,1,0,1,1,0,1,1,0,1,0],
-    [0,1,0,0,1,0,0,0,1,1,1,0,1,1,0,1,0,0,1,0,1],
-    [1,1,1,0,1,1,1,0,0,1,0,1,0,1,1,1,0,1,1,0,1],
-    [0,0,1,0,1,0,0,1,1,0,1,1,1,1,0,0,1,0,0,1,0],
-    [1,0,1,1,0,1,1,0,1,0,1,0,1,0,1,0,0,1,0,1,1],
-    [0,0,0,0,0,0,0,0,1,1,1,1,0,1,1,0,0,1,0,1,0],
-    [1,1,1,1,1,1,1,0,0,1,0,1,1,0,1,0,1,1,0,1,1],
-    [1,0,0,0,0,0,1,0,1,1,1,0,0,1,1,1,0,0,1,0,0],
-    [1,0,1,1,1,0,1,1,0,1,1,1,1,0,1,1,1,0,0,1,1],
-    [1,0,1,1,1,0,1,0,1,1,0,1,0,1,0,1,1,0,1,0,1],
-    [1,0,1,1,1,0,1,0,0,1,1,0,1,0,1,1,0,1,1,1,0],
-    [1,0,0,0,0,0,1,0,1,0,1,1,0,1,1,0,1,0,0,0,1],
-    [1,1,1,1,1,1,1,0,0,1,1,0,1,1,1,1,0,1,1,0,1],
-  ];
-  const n = cells.length;
-  const cell = size / n;
-  const dr = cell * 0.38;
-  // finder pattern zones: top-left (0-6,0-6), top-right (0-6,14-20), bottom-left (14-20,0-6)
-  const isFinderZone = (row, col) =>
-    (row < 7 && col < 7) || (row < 7 && col > 13) || (row > 13 && col < 7);
-  const fp = cell; // finder pattern corner radius
+/* ─── QR Code — real, encodes actual wallet address ─────────── */
+const WalletQRCode = memo(({ address, size = 210 }) => {
+  if (!address) {
+    return (
+      <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#F2F2F7', borderRadius: 12 }}>
+        <div style={{ color: '#888', fontSize: 13, textAlign: 'center', padding: 16 }}>
+          Адрес не найден.<br />Разблокируйте кошелёк.
+        </div>
+      </div>
+    );
+  }
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <rect width={size} height={size} fill="white" rx={fp * 1.5} />
-      {/* data cells — rounded dots */}
-      {cells.map((row, ri) =>
-        row.map((v, ci) =>
-          v && !isFinderZone(ri, ci)
-            ? <rect key={`${ri}-${ci}`} x={ci * cell + 1} y={ri * cell + 1}
-                width={cell - 2} height={cell - 2} fill="#111" rx={dr} />
-            : null
-        )
-      )}
-      {/* ── Finder: Top-Left ── */}
-      <rect x={0.5} y={0.5} width={7*cell-1} height={7*cell-1} rx={fp*1.2} fill="#111" />
-      <rect x={cell+0.5} y={cell+0.5} width={5*cell-1} height={5*cell-1} rx={fp*0.8} fill="white" />
-      <rect x={2*cell+0.5} y={2*cell+0.5} width={3*cell-1} height={3*cell-1} rx={fp*0.5} fill="#111" />
-      {/* ── Finder: Top-Right ── */}
-      <rect x={14*cell+0.5} y={0.5} width={7*cell-1} height={7*cell-1} rx={fp*1.2} fill="#111" />
-      <rect x={15*cell+0.5} y={cell+0.5} width={5*cell-1} height={5*cell-1} rx={fp*0.8} fill="white" />
-      <rect x={16*cell+0.5} y={2*cell+0.5} width={3*cell-1} height={3*cell-1} rx={fp*0.5} fill="#111" />
-      {/* ── Finder: Bottom-Left ── */}
-      <rect x={0.5} y={14*cell+0.5} width={7*cell-1} height={7*cell-1} rx={fp*1.2} fill="#111" />
-      <rect x={cell+0.5} y={15*cell+0.5} width={5*cell-1} height={5*cell-1} rx={fp*0.8} fill="white" />
-      <rect x={2*cell+0.5} y={16*cell+0.5} width={3*cell-1} height={3*cell-1} rx={fp*0.5} fill="#111" />
-    </svg>
+    <QRCodeSVG
+      value={address}
+      size={size}
+      bgColor="#FFFFFF"
+      fgColor="#111111"
+      level="M"
+      style={{ display: 'block', borderRadius: 8 }}
+    />
   );
 });
 
@@ -1190,12 +1177,8 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
   );
 
   const handleSelect = (assetId) => {
-    const asset = BASE_ASSETS.find(a => a.id === assetId);
-    const chain = assetId.split('-')[0].toUpperCase();
-    const addr = addresses[chain] || addresses[asset.symbol] || "—";
-    
-    // Copy to clipboard
-    copyToClipboard(addr);
+    const addr = getAddressForAsset(assetId, addresses);
+    if (addr) copyToClipboard(addr);
     onSelect(assetId);
   };
 
@@ -1322,15 +1305,18 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
 function ReceiveQRScreen({ assetId, onBack }) {
   const { addresses } = useWallet();
   const asset = BASE_ASSETS.find((a) => a.id === assetId);
-  const chain = assetId.split('-')[0].toUpperCase();
-  const address = addresses[chain] || addresses[asset.symbol] || "—";
+  const address = getAddressForAsset(assetId, addresses);
+  const displayAddress = address || "—";
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
+    if (!address) return;
     copyToClipboard(address);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const networkName = ASSET_TO_CHAIN[assetId] || assetId.toUpperCase();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative', background: DS.bg }}>
@@ -1351,16 +1337,15 @@ function ReceiveQRScreen({ assetId, onBack }) {
           <TokenIcon tokenId={asset.tokenId} size={60} badgeSize={22} />
         </div>
         <div style={{ color: 'white', fontWeight: 700, fontSize: 17, marginTop: 8 }}>{asset.name}</div>
-        <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{asset.symbol} сеть</div>
+        <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{networkName} сеть</div>
       </div>
 
       {/* QR card */}
       <div style={{ margin: '0 20px', background: 'white', borderRadius: 28,
         padding: '24px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
         boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
-        {/* QR code — clean, no extra background */}
-        <div style={{ borderRadius: 18, overflow: 'hidden', lineHeight: 0 }}>
-          <QRCode size={210} />
+        <div style={{ borderRadius: 12, overflow: 'hidden', lineHeight: 0 }}>
+          <WalletQRCode address={address} size={210} />
         </div>
 
         {/* address pill */}
@@ -1370,7 +1355,7 @@ function ReceiveQRScreen({ assetId, onBack }) {
             Адрес кошелька
           </div>
           <div style={{ color: '#111', fontSize: 12, fontWeight: 600, wordBreak: 'break-all', lineHeight: 1.5 }}>
-            {address}
+            {displayAddress}
           </div>
         </div>
       </div>
@@ -1380,7 +1365,7 @@ function ReceiveQRScreen({ assetId, onBack }) {
         <div style={{ color: DS.muted, fontSize: 12, lineHeight: 1.6 }}>
           Отправляйте только{' '}
           <span style={{ color: 'white', fontWeight: 600 }}>{asset.symbol}</span>{' '}
-          в сети <span style={{ color: 'white', fontWeight: 600 }}>{asset.symbol}</span>. Мемо не требуется.
+          в сети <span style={{ color: 'white', fontWeight: 600 }}>{networkName}</span>. Мемо не требуется.
         </div>
       </div>
 
@@ -1388,10 +1373,12 @@ function ReceiveQRScreen({ assetId, onBack }) {
       <div style={{ padding: '8px 20px 20px', marginTop: 'auto' }}>
         <button onClick={handleCopy}
           style={{ width: '100%', padding: '16px 0', borderRadius: 16, border: 'none',
-            background: copied ? DS.green : DS.blue, color: 'white', fontSize: 16,
-            fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 8, transition: 'background 0.25s, transform 0.1s',
-            boxShadow: copied ? '0 4px 16px rgba(52,199,89,0.4)' : '0 4px 16px rgba(0,122,255,0.4)' }}>
+            background: !address ? DS.muted : copied ? DS.green : DS.blue,
+            color: 'white', fontSize: 16,
+            fontWeight: 600, cursor: address ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 8, transition: 'background 0.25s',
+            boxShadow: copied ? '0 4px 16px rgba(52,199,89,0.4)' : '0 4px 16px rgba(0,122,255,0.3)' }}>
           <svg viewBox='0 0 24 24' fill='none' style={{ width: 18, height: 18 }}>
             <rect x='8' y='2' width='13' height='17' rx='2' stroke='white' strokeWidth='1.7' />
             <path d='M3 6v13a2 2 0 0 0 2 2h10' stroke='white' strokeWidth='1.7' strokeLinecap='round' />
