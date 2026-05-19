@@ -3989,7 +3989,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ color: realBal === 0 ? "#555" : "white", fontWeight: 600, fontSize: 15 }}>
-                  {settings?.hideBalance ? (realBal === 0 ? "0" : "•••••") : balStr}
+                  {settings?.hideBalance ? "•••" : balStr}
                 </div>
                 {realBal > 0 && !settings?.hideBalance
                   ? <div style={{ color: "#8E8E93", fontSize: 13, marginTop: 2 }}>{fmtCurrency(realBal * getApproxPrice(asset.id), settings?.currencyCode || 'USD')}</div>
