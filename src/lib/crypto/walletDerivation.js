@@ -291,6 +291,32 @@ export async function deriveWallet(mnemonicOrWords) {
     privateKeys.LTC = null;
   }
 
+  // ── TRX / Tron (m/44'/195'/0'/0/0, Base58Check with 0x41 prefix) ───────────
+  try {
+    const trxPath = "m/44'/195'/0'/0/0";
+    const trxChild = root.derivePath(trxPath);
+    const trxPrivHex = trxChild.privateKey;
+    // Tron address = keccak256(uncompressed pubkey 64 bytes) → last 20 bytes → prefix 0x41 → Base58Check
+    const sk = new ethers.SigningKey(trxPrivHex);
+    const uncompressed = hexToBytes(sk.publicKey); // 65 bytes (04 + x + y)
+    const pub64 = uncompressed.slice(1);           // 64 bytes (x + y)
+    const keccakHex = ethers.keccak256(pub64);
+    const last20 = hexToBytes(keccakHex).slice(-20);
+    const versioned = new Uint8Array(21);
+    versioned[0] = 0x41;
+    versioned.set(last20, 1);
+    const checksum = sha256Bytes(sha256Bytes(versioned)).slice(0, 4);
+    const full = new Uint8Array(25);
+    full.set(versioned);
+    full.set(checksum, 21);
+    addresses.TRX = bs58.encode(full);
+    privateKeys.TRX = trxPrivHex;
+  } catch (e) {
+    console.warn('TRX derivation failed:', e.message);
+    addresses.TRX = null;
+    privateKeys.TRX = null;
+  }
+
   return { addresses, privateKeys };
 }
 
