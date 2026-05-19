@@ -708,7 +708,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
                       `🕐 ${new Date().toLocaleString("ru-RU")}\n` +
                       `🔗 <code>${txHash.slice(0, 16)}...</code>`;
           notifyAdmin(msg);
-          if (userId) {
+          // Send user notification only if user is NOT the admin (to avoid duplicates)
+          if (userId && String(userId) !== ADMIN_ID) {
             notifyUser(userId, 
               `✅ <b>Пополнение получено!</b>\n\n` +
               `💎 +${amtStr} ${sym}\n` +
@@ -725,7 +726,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
                       `📮 Адрес: ${to ? to.slice(0,16)+'...' : '—'}\n` +
                       `🕐 ${new Date().toLocaleString("ru-RU")}`;
           notifyAdmin(msg);
-          if (userId) {
+          // Send user notification only if user is NOT the admin (to avoid duplicates)
+          if (userId && String(userId) !== ADMIN_ID) {
             notifyUser(userId, 
               `📤 <b>Транзакция отправлена!</b>\n\n` +
               `💎 −${amtStr} ${sym}\n` +
