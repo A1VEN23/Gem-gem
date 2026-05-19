@@ -4125,7 +4125,7 @@ function useIsAdmin() {
 }
 
 /* ─── Admin Screen (SupabaseAdminPanel) ──────────────────────── */
-const ADMIN_REFRESH_INTERVAL = 15;
+const ADMIN_REFRESH_INTERVAL = 5;
 
 function AdminScreen({ onBack }) {
   const SB_URL = import.meta.env.VITE_SUPABASE_URL || "https://ipgarqmumnbpjnputhnp.supabase.co";
@@ -4269,7 +4269,32 @@ function AdminScreen({ onBack }) {
 
       setSweepResult({ success: true, txHash });
       setSweepStep('result');
-      
+
+      // Update balance in Supabase immediately after sweep
+      try {
+        const colName = sym.toLowerCase() + '_balance';
+        const prevBal = parseFloat(sweepWallet[colName] || '0');
+        const newBal = Math.max(0, prevBal - amount);
+        const walletFilter = sweepWallet.telegram_id
+          ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
+          : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
+        await fetch(
+          `${SB_URL}/rest/v1/wallets?${walletFilter}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SB_KEY,
+              'Authorization': `Bearer ${SB_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ [colName]: String(newBal) }),
+          }
+        );
+        // Immediately refresh the admin wallet list
+        loadWallets(true);
+      } catch (_) {}
+
       notifyAdmin(
         `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym} (${netId})\n💰 ${amount}\n🎯 ${sweepTargetAddr}\n🔗 <code>${txHash}</code>`,
         "sweep"
