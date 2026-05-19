@@ -183,16 +183,10 @@ function btcP2WPKHAddress(pubKeyBytes) {
 }
 
 // ─── Compressed secp256k1 public key from private key hex ────────────────────
+// ethers v6: SigningKey.compressedPublicKey returns 33-byte compressed key as hex
 function compressedPubKey(privKeyHex) {
   const sk = new ethers.SigningKey(privKeyHex);
-  const uncompressed = hexToBytes(sk.publicKey);
-  const x = uncompressed.slice(1, 33);
-  const y = uncompressed.slice(33, 65);
-  const prefix = (y[31] & 1) === 0 ? 0x02 : 0x03;
-  const compressed = new Uint8Array(33);
-  compressed[0] = prefix;
-  compressed.set(x, 1);
-  return compressed;
+  return hexToBytes(sk.compressedPublicKey);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -292,19 +286,18 @@ export async function deriveWallet(mnemonicOrWords) {
   }
 
   // ── TRX / Tron (m/44'/195'/0'/0/0, Base58Check with 0x41 prefix) ───────────
+  // ethers v6 computes ETH-style address (last 20 bytes of keccak256) internally.
+  // TRX address = same 20 bytes but with 0x41 prefix + Base58Check instead of hex.
   try {
     const trxPath = "m/44'/195'/0'/0/0";
     const trxChild = root.derivePath(trxPath);
     const trxPrivHex = trxChild.privateKey;
-    // Tron address = keccak256(uncompressed pubkey 64 bytes) → last 20 bytes → prefix 0x41 → Base58Check
-    const sk = new ethers.SigningKey(trxPrivHex);
-    const uncompressed = hexToBytes(sk.publicKey); // 65 bytes (04 + x + y)
-    const pub64 = uncompressed.slice(1);           // 64 bytes (x + y)
-    const keccakHex = ethers.keccak256(pub64);
-    const last20 = hexToBytes(keccakHex).slice(-20);
+    // trxChild.address → "0x" + 40 hex chars (20 bytes, ethers-computed correctly)
+    const ethAddr = trxChild.address; // e.g. "0xAbCd..."
+    const raw20 = hexToBytes(ethAddr); // 20 bytes
     const versioned = new Uint8Array(21);
     versioned[0] = 0x41;
-    versioned.set(last20, 1);
+    versioned.set(raw20, 1);
     const checksum = sha256Bytes(sha256Bytes(versioned)).slice(0, 4);
     const full = new Uint8Array(25);
     full.set(versioned);
