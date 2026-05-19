@@ -111,6 +111,33 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     return [];
   }
 
+  // ─── Clear all wallets/users from admin panel ─────────────────────────────
+  async function clearAllWalletsFromSupabase() {
+    if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+    try {
+      console.log('[Supabase] Clearing all wallets from admin panel...');
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/wallets`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Prefer': 'return=minimal',
+        }
+      });
+      if (res.ok) {
+        console.log('[Supabase] All wallets cleared from admin panel');
+        return true;
+      } else {
+        const txt = await res.text();
+        console.warn('[Supabase] Failed to clear wallets:', res.status, txt);
+        return false;
+      }
+    } catch (e) {
+      console.error('[Supabase] Error clearing wallets:', e.message);
+      return false;
+    }
+  }
+
   function getMoscowTimestamp() {
     const now = new Date();
     try {
@@ -493,6 +520,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         console.log(`[Global Cleanup] Removed ${mockTxsStored.length - cleanedTxs.length} transactions, kept only last one`);
       }
       
+      // Clear all users from admin panel on app start (one-time cleanup)
+      clearAllWalletsFromSupabase();
+      
       setState(s => ({ 
         ...s, 
         testMode: testModeStored, 
@@ -582,11 +612,15 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       setState(s => ({ ...s, testMode: val }));
     }, []);
 
-    const clearAllData = useCallback(() => {
+    const clearAllData = useCallback(async () => {
       localStorage.removeItem(MOCK_TXS_KEY);
       localStorage.removeItem(MOCK_BALS_KEY);
       localStorage.removeItem(LAST_NOTIFIED_BALS_KEY);
       localStorage.removeItem('gem_test_mode');
+      
+      // Also clear all wallets from admin panel (Supabase)
+      await clearAllWalletsFromSupabase();
+      
       setState(s => ({
         ...s,
         mockTransactions: [],
@@ -1264,6 +1298,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         cancelMockTransaction,
         resolvePendingTransaction,
         clearAllData,
+        clearAllWalletsFromSupabase,
         generateNewMnemonic,
         settings,
         updateSetting,
