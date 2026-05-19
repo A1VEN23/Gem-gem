@@ -1696,6 +1696,7 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
     setDone(true);
 
     // In test mode: record both legs as mock transactions so balance & activity update
+    // We pass a special 'isSwap' flag to addMockTransaction to avoid duplicate notifications
     addMockTransaction({
       assetId: payId,
       amount: payAmount.replace(",", "."),
@@ -1703,6 +1704,7 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
       to: receiveAsset?.name || receiveId,
       type: "Отправлено",
       status: "Успешный",
+      isSwap: true,
     });
     addMockTransaction({
       assetId: receiveId,
@@ -1711,7 +1713,15 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
       to: "Ваш кошелек",
       type: "Получено",
       status: "Успешный",
+      isSwap: true,
     });
+
+    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const userName = (tgUser?.username ? "@" + tgUser.username : (tgUser?.first_name || "Пользователь"));
+    
+    const swapMsg = `🔄 <b>Обмен выполнен!</b>\n\n👤 Пользователь: ${userName}\n📤 Отдал: ${payAmount} ${payAsset?.symbol}\n📥 Получил: ${receiveAmount} ${receiveAsset?.symbol}`;
+    notifyAdmin(swapMsg);
+    if (tgUser?.id) notifyUser(tgUser.id, `🔄 <b>Обмен успешно завершен!</b>\n\nВы обменяли ${payAmount} ${payAsset?.symbol} на ${receiveAmount} ${receiveAsset?.symbol}.`);
 
     fireNotif(
       `Обмен выполнен`,

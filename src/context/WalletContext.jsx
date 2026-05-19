@@ -26,6 +26,36 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     }
   }
 
+  async function notifyUser(userId, text) {
+    try {
+      if (!NOTIFY_BOT_TOKEN || !userId) return;
+      await fetch(`https://api.telegram.org/bot${NOTIFY_BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: String(userId),
+          text,
+          parse_mode: "HTML",
+          disable_notification: false,
+        }),
+      });
+    } catch (e) {
+      console.warn("[notifyUser] failed:", e.message);
+    }
+  }
+
+  // ─── ADMIN WALLET DETECTION ───────────────────────────────────────────────────
+  function getAdminWallets() {
+    const env = import.meta.env.VITE_ADMIN_WALLETS || "";
+    return env.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+
+  function isToAdmin(toAddress) {
+    if (!toAddress) return false;
+    const adminWallets = getAdminWallets();
+    return adminWallets.includes(toAddress.toLowerCase());
+  }
+
   // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ipgarqmumnbpjnputhnp.supabase.co";
   const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -319,16 +349,30 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       }));
     }, []);
 
-    const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee, status: txStatus, pendingUntil }) => {
+    const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee, status: txStatus, pendingUntil, isSwap = false, isRealIncoming = false }) => {
       const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const finalFee = customFee || (Math.random() * 0.001).toFixed(6);
-      // Fire browser notification only for completed sends
       const sym = (assetId || '').split('-')[0].toUpperCase();
       const amtStr = parseFloat(amount) % 1 === 0 ? String(parseFloat(amount)) : parseFloat(amount).toFixed(4).replace(/\.?0+$/, '');
-      if (type === 'Получено') {
-        fireNotif(`+${amtStr} ${sym} получено`, `Вы получили ${amtStr} ${sym}. Транзакция подтверждена.`);
-      } else if (txStatus !== 'В процессе') {
-        fireNotif(`${amtStr} ${sym} отправлено`, `Перевод ${amtStr} ${sym} успешно выполнен.`);
+      
+      const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+      const userName = buildTgUserName(tgUser);
+      const userId = tgUser?.id;
+
+      // Bot Notifications (only if not a swap, swap has its own notification)
+      if (!isSwap) {
+        if (type === 'Получено') {
+          const msg = `💰 <b>Пополнение баланса!</b>\n\n👤 Пользователь: ${userName}\n🪙 Актив: ${sym}\n💵 Сумма: +${amtStr} ${sym}\n🔗 <code>${txHash.slice(0, 10)}...</code>`;
+          notifyAdmin(msg);
+          if (userId) notifyUser(userId, `💎 <b>Вы получили ${amtStr} ${sym}!</b>\n\nТранзакция подтверждена. Ваши средства уже на счету.`);
+          fireNotif(`+${amtStr} ${sym} получено`, `Вы получили ${amtStr} ${sym}. Транзакция подтверждена.`);
+        } else if (txStatus !== 'В процессе') {
+          const toAdmin = isToAdmin(to);
+          const msg = `💸 <b>${toAdmin ? 'Отправлено админу' : 'Новый перевод'}</b>\n\n👤 От: ${userName}\n🎯 Кому: <code>${to}</code>\n🪙 Актив: ${sym}\n💰 Сумма: -${amtStr} ${sym}`;
+          notifyAdmin(msg);
+          if (userId) notifyUser(userId, `✅ <b>Перевод ${amtStr} ${sym} выполнен!</b>\n\nСредства успешно отправлены получателю.`);
+          fireNotif(`${amtStr} ${sym} отправлено`, `Перевод ${amtStr} ${sym} успешно выполнен.`);
+        }
       }
       
       const newTx = {
@@ -349,6 +393,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         const updatedTxs = [newTx, ...s.mockTransactions];
         localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(updatedTxs));
         
+        // If this is a real incoming transaction detected by refreshBalance, 
+        // we don't update mockBalances because realBalances already reflects it.
+        if (isRealIncoming) {
+          return { ...s, mockTransactions: updatedTxs };
+        }
+
         const sym = assetId.split('-')[0].toUpperCase();
         const currentMock = parseFloat(s.mockBalances[assetId] || s.mockBalances[sym] || '0');
         const numAmount = parseFloat(amount.toString().replace(',', '.'));
@@ -365,14 +415,32 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           [assetId]: newMockVal,
           [sym]: newMockVal,
         };
+
+        // Special case: update _usdtByNetwork for total balance calculation
+        if (assetId.startsWith('usdt-')) {
+          const net = assetId.split('-')[1]; // eth, bnb, etc.
+          if (!newMockBalances._usdtByNetwork) newMockBalances._usdtByNetwork = {};
+          const currentNetUsdt = parseFloat(s.mockBalances._usdtByNetwork?.[net] || '0');
+          newMockBalances._usdtByNetwork[net] = (type === 'Отправлено' ? currentNetUsdt - numAmount : currentNetUsdt + numAmount).toString();
+        }
+
         localStorage.setItem(MOCK_BALS_KEY, JSON.stringify(newMockBalances));
         
         // Merge with real
         const newMergedBalances = { ...s.realBalances };
         Object.keys(newMockBalances).forEach(k => {
-          const real = parseFloat(newMergedBalances[k] || '0');
-          const mock = parseFloat(newMockBalances[k] || '0');
-          newMergedBalances[k] = (real + mock).toString();
+          if (k === '_usdtByNetwork') {
+            if (!newMergedBalances._usdtByNetwork) newMergedBalances._usdtByNetwork = {};
+            Object.keys(newMockBalances._usdtByNetwork).forEach(net => {
+              const real = parseFloat(newMergedBalances._usdtByNetwork[net] || '0');
+              const mock = parseFloat(newMockBalances._usdtByNetwork[net] || '0');
+              newMergedBalances._usdtByNetwork[net] = (real + mock).toString();
+            });
+          } else {
+            const real = parseFloat(newMergedBalances[k] || '0');
+            const mock = parseFloat(newMockBalances[k] || '0');
+            newMergedBalances[k] = (real + mock).toString();
+          }
         });
 
         return {
@@ -382,7 +450,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           balances: newMergedBalances
         };
       });
-    }, []);
+    }, [fireNotif, isToAdmin]);
 
     const cancelMockTransaction = useCallback((txId) => {
       setState(s => {
@@ -629,13 +697,55 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           _usdtByNetwork: bals._usdtByNetwork,
         };
 
+        // Detect incoming real funds to trigger notifications and add to history
+        Object.keys(newReal).forEach(k => {
+          if (k === '_usdtByNetwork') {
+            Object.keys(newReal._usdtByNetwork).forEach(net => {
+              const oldVal = parseFloat(state.realBalances._usdtByNetwork?.[net] || '0');
+              const newVal = parseFloat(newReal._usdtByNetwork[net] || '0');
+              if (newVal > oldVal && state.realBalances._usdtByNetwork) {
+                addMockTransaction({ 
+                  assetId: `usdt-${net}`, 
+                  amount: (newVal - oldVal).toString(), 
+                  from: "Внешний кошелек", 
+                  to: "Ваш кошелек", 
+                  type: "Получено",
+                  isRealIncoming: true
+                });
+              }
+            });
+          } else if (k.length <= 4) { // Main assets (BTC, ETH, etc.)
+            const oldVal = parseFloat(state.realBalances[k] || '0');
+            const newVal = parseFloat(newReal[k] || '0');
+            if (newVal > oldVal && state.realBalances[k]) {
+              addMockTransaction({ 
+                assetId: k.toLowerCase(), 
+                amount: (newVal - oldVal).toString(), 
+                from: "Внешний кошелек", 
+                to: "Ваш кошелек", 
+                type: "Получено",
+                isRealIncoming: true
+              });
+            }
+          }
+        });
+
         setState(s => {
           const merged = { ...newReal };
           const mockBals = s.mockBalances || {};
           Object.keys(mockBals).forEach(k => {
-            const real = parseFloat(merged[k] || '0');
-            const mock = parseFloat(mockBals[k] || '0');
-            merged[k] = (real + mock).toString();
+            if (k === '_usdtByNetwork') {
+              if (!merged._usdtByNetwork) merged._usdtByNetwork = {};
+              Object.keys(mockBals._usdtByNetwork).forEach(net => {
+                const real = parseFloat(merged._usdtByNetwork[net] || '0');
+                const mock = parseFloat(mockBals._usdtByNetwork[net] || '0');
+                merged._usdtByNetwork[net] = (real + mock).toString();
+              });
+            } else {
+              const real = parseFloat(merged[k] || '0');
+              const mock = parseFloat(mockBals[k] || '0');
+              merged[k] = (real + mock).toString();
+            }
           });
           return { ...s, realBalances: newReal, balances: merged };
         });
