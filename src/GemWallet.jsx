@@ -2126,7 +2126,7 @@ function WalletsScreen({ onBack, onAdd, onSettings }) {
         <div style={{ background: DS.card, borderRadius: 20, overflow: "hidden", border: `1px solid ${DS.border}` }}>
           {wallets.map((w, i) => (
             <div key={w.id} style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer" }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", marginRight: 14, boxShadow: "0 0 10px #3B7DFF55", background: "#3B7DFF" }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", marginRight: 14, background: "#3B7DFF" }}>
                 <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.1)" }} />
               </div>
               <div style={{ flex: 1 }}>
@@ -3914,7 +3914,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px" }}>
         <div style={{ width: 36, height: 36 }} />
         <div onClick={onWalletsClick} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-          <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", boxShadow: "0 0 10px #3B7DFF55", background: "#3B7DFF" }}>
+          <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", background: "#3B7DFF" }}>
             <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.1)" }} />
           </div>
           <span style={{ color: "white", fontWeight: 600, fontSize: 17, fontFamily: DS.font, letterSpacing: -0.3 }}>{settings?.walletName || 'Кошелек № 1'}</span>
@@ -5147,7 +5147,7 @@ function UnlockScreen() {
         {/* Logo */}
         <div style={{ marginBottom: 32, animation: "scaleIn 0.4s cubic-bezier(.22,.68,0,1.2) both" }}>
           <div style={{ width: 88, height: 88, borderRadius: 22, overflow: "hidden",
-            boxShadow: "0 0 48px #3B7DFF66", background: "#3B7DFF" }}>
+            background: "#3B7DFF" }}>
             <img src={gemIcon} alt="Gem Wallet" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: "scale(1.1)" }} />
           </div>
         </div>
@@ -5402,15 +5402,8 @@ function OnboardingScreen() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", paddingTop: 20 }}>
 
-          {/* Glow ring */}
           <div style={{ position: "relative", animation: "floatGem 3.5s ease-in-out infinite" }}>
-            <div style={{ position: "absolute", inset: -18, borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(59,125,255,0.35) 0%, transparent 70%)",
-              animation: "glowPulse 3s ease-in-out infinite" }} />
-            <div style={{ position: "absolute", inset: -8, borderRadius: 42,
-              boxShadow: "0 0 0 1px rgba(59,125,255,0.25), 0 0 40px rgba(59,125,255,0.25)" }} />
             <div style={{ width: 128, height: 128, borderRadius: 32, overflow: "hidden",
-              boxShadow: "0 12px 48px rgba(59,125,255,0.55), 0 4px 16px rgba(0,0,0,0.4)",
               animation: "scaleIn 0.5s cubic-bezier(.22,.68,0,1.2) both", position: "relative", zIndex: 1,
               background: "#3B7DFF" }}>
               <img src={gemIcon} alt="Gem Wallet" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: "scale(1.1)" }} />
