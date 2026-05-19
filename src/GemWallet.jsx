@@ -148,6 +148,11 @@ const ANIM_STYLE = `
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
   }
+  @keyframes refreshDone {
+    0%   { transform: scale(1); opacity: 1; }
+    40%  { transform: scale(1.18); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
   .anim-page    { 
     animation: slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) both; 
     will-change: transform, opacity; 
@@ -3700,6 +3705,7 @@ function fmtBal(num, sym) {
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
   const { balances, addresses, refreshBalance, testMode, settings, updateSetting } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshDone, setRefreshDone] = useState(false);
 
   // Build real balances mapped to asset ids
   const getRealBalance = (assetId) => {
@@ -3758,13 +3764,24 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
         </div>
         <button onClick={async () => {
           if (isRefreshing) return;
+          setRefreshDone(false);
           setIsRefreshing(true);
           try { await refreshBalance(); } catch(e) {}
           setIsRefreshing(false);
-        }} style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
-            <path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-            <path d="M18 4v4h-4M6 20v-4H2" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          setRefreshDone(true);
+          setTimeout(() => setRefreshDone(false), 600);
+        }} style={{ width: 36, height: 36, borderRadius: "50%", background: "transparent", border: "none", cursor: isRefreshing ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "opacity 0.2s", opacity: isRefreshing ? 0.6 : 1 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{
+            width: 22, height: 22,
+            animation: isRefreshing
+              ? "spin 0.7s cubic-bezier(0.4,0,0.2,1) infinite"
+              : refreshDone
+                ? "refreshDone 0.5s cubic-bezier(0.4,0,0.2,1) both"
+                : "none",
+            transition: "stroke 0.2s"
+          }}>
+            <path d="M21 12a9 9 0 1 1-9-9c2.39 0 4.68.94 6.36 2.64L21 8" stroke={refreshDone ? "#34C759" : "white"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M21 3v5h-5" stroke={refreshDone ? "#34C759" : "white"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
       </div>
