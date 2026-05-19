@@ -295,6 +295,20 @@ const copyToClipboard = async (text) => {
   }
 };
 
+/* ─── Crypto amount formatter ────────────────────────────────── */
+function fmtCryptoAmt(raw) {
+  const n = parseFloat(String(raw).replace(",", "."));
+  if (isNaN(n)) return String(raw);
+  if (Number.isInteger(n)) return n.toString();
+  // Smart decimal count based on magnitude
+  let decimals;
+  if (n >= 1000) decimals = 2;
+  else if (n >= 100) decimals = 2;
+  else if (n >= 1)   decimals = 4;
+  else               decimals = 6;
+  return parseFloat(n.toFixed(decimals)).toString().replace(".", ",");
+}
+
 /* ─── Explorer URL helpers ──────────────────────────────────── */
 function getExplorerTxUrl(assetId, txHash) {
   const base = {
@@ -772,7 +786,7 @@ function SendAmountScreen({ assetId, onBack, onContinue }) {
     }
   };
 
-  const finalAmountCoin = isUsdMode ? (currentNum / price).toString() : amount;
+  const finalAmountCoin = isUsdMode ? parseFloat((currentNum / price).toFixed(6)).toString() : amount;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
@@ -1754,7 +1768,7 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
   const transactions = mockTransactions.filter(tx => tx.assetId === assetId).map(tx => ({
     id: tx.id,
     type: tx.type,
-    amount: `${tx.type === 'Отправлено' ? '-' : '+'}${tx.amount} ${asset.symbol}`,
+    amount: `${tx.type === 'Отправлено' ? '-' : '+'}${fmtCryptoAmt(tx.amount)} ${asset.symbol}`,
     sub: tx.type === 'Отправлено' ? (tx.to ? `На: ${tx.to.slice(0,8)}…` : 'Ваш кошелек') : `От: ${tx.from || 'Ваш кошелек'}`,
     positive: tx.type !== 'Отправлено',
     status: tx.status,
@@ -1897,9 +1911,9 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
                   <div style={{ color: "white", fontWeight: 700, fontSize: 16 }}>{tx.type}</div>
                   <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{tx.sub}</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ color: amtColor, fontWeight: 700, fontSize: 15 }}>{tx.amount}</div>
-                  <div style={{ color: isCancelled ? DS.danger : isPending ? '#FF9F0A' : DS.muted, fontSize: 12, marginTop: 2 }}>
+                <div style={{ textAlign: "right", minWidth: 0 }}>
+                  <div style={{ color: amtColor, fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>{tx.amount}</div>
+                  <div style={{ color: isCancelled ? DS.danger : isPending ? '#FF9F0A' : DS.muted, fontSize: 12, marginTop: 3 }}>
                     {isCancelled ? 'Отменена' : isPending ? 'В процессе' : 'Успешно'}
                   </div>
                 </div>
@@ -2356,7 +2370,10 @@ function TxDetailScreen({ tx, onBack }) {
             <TokenIcon tokenId={tx.tokenId} size={54} badgeSize={20} />
           )}
         </div>
-        <div style={{ color: "white", fontSize: 32, fontWeight: 700, marginTop: 20, letterSpacing: -1, textAlign: "center", padding: "0 16px", wordBreak: "break-all" }}>{tx.amount}</div>
+        <div style={{ marginTop: 20, textAlign: "center", padding: "0 16px" }}>
+          <div style={{ color: "white", fontSize: 36, fontWeight: 700, letterSpacing: -1 }}>{tx.amount}</div>
+          <div style={{ color: "white", fontSize: 18, fontWeight: 600, opacity: 0.7, marginTop: 2 }}>{tx.symbol || ''}</div>
+        </div>
         <div style={{ color: DS.muted, fontSize: 15, marginTop: 6, fontWeight: 500 }}>~ {tx.usdValue || "0,00"} $</div>
       </div>
 
@@ -2495,17 +2512,12 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
     return base?.usdPrice || 0;
   };
 
-  const fmtAmt = (raw) => {
-    const n = parseFloat(raw);
-    if (isNaN(n)) return raw;
-    if (Number.isInteger(n)) return n.toString().replace(".", ",");
-    return parseFloat(n.toFixed(8)).toString().replace(".", ",");
-  };
-
   const allTx = (mockTransactions || []).map(tx => {
     const asset = BASE_ASSETS.find(a => a.id === tx.assetId);
     const shortTo = tx.to ? (tx.to.slice(0,4)+"..."+tx.to.slice(-4)) : "—";
     const shortFrom = tx.from ? (tx.from.slice(0,4)+"..."+tx.from.slice(-4)) : "—";
+    const sign = tx.type === 'Отправлено' ? '-' : '+';
+    const symbol = asset ? asset.symbol : '';
     return {
       id: tx.id,
       hash: tx.hash,
@@ -2513,7 +2525,8 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
       fee: tx.fee,
       timestamp: tx.timestamp,
       tokenId: asset ? asset.tokenId : 'TON',
-      amount: `${tx.type === 'Отправлено' ? '-' : '+'}${fmtAmt(tx.amount)} ${asset ? asset.symbol : ''}`,
+      amount: `${sign}${fmtCryptoAmt(tx.amount)}`,
+      symbol,
       rawAmount: parseFloat(tx.amount),
       sub: tx.type === 'Отправлено' ? `Кому ${shortTo}` : `От ${shortFrom}`,
       positive: tx.type !== 'Отправлено',
@@ -2606,16 +2619,17 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
                     </div>
                     <div style={{ color: DS.muted, fontSize: 13, marginTop: 2 }}>{tx.sub}</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ color: amtColor, fontWeight: 700, fontSize: 15 }}>{tx.amount}</div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 2 }}>
+                  <div style={{ textAlign: "right", minWidth: 0 }}>
+                    <div style={{ color: amtColor, fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>{tx.amount}</div>
+                    <div style={{ color: amtColor, fontWeight: 600, fontSize: 12, opacity: 0.85, marginTop: 1 }}>{tx.symbol}</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 3 }}>
                       {isPending ? (
                         <>
-                          <span style={{ color: "#FF9F0A", fontSize: 12, fontWeight: 600 }}>В процессе</span>
+                          <span style={{ color: "#FF9F0A", fontSize: 11, fontWeight: 600 }}>В процессе</span>
                           <PendingActivityTimer pendingUntil={tx.pendingUntil} />
                         </>
                       ) : (
-                        <span style={{ color: DS.muted, fontSize: 12 }}>{tx.status === 'Отменена' ? 'Отменена' : tx.status === 'Ошибка' ? 'Ошибка' : 'Успешно'}</span>
+                        <span style={{ color: DS.muted, fontSize: 11 }}>{tx.status === 'Отменена' ? 'Отменена' : tx.status === 'Ошибка' ? 'Ошибка' : 'Успешно'}</span>
                       )}
                     </div>
                   </div>
