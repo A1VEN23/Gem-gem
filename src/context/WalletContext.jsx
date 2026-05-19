@@ -304,7 +304,11 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       isUnlocked: false,
       addresses: {},
       balances: {}, 
-      realBalances: {},
+      realBalances: {
+        BTC: "0", ETH: "0", TON: "0", BNB: "0", LTC: "0", ARB: "0", SOL: "0", USDT: "0",
+        bitcoin: "0", ethereum: "0", bsc: "0", arbitrum: "0", solana: "0", ton: "0", litecoin: "0",
+        _usdtByNetwork: { eth: "0", bnb: "0", sol: "0", ton: "0", trx: "0" }
+      },
       mockBalances: {},
       activeNetwork: 'ethereum',
       loading: false,
@@ -486,7 +490,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const finalFee = customFee || (Math.random() * 0.001).toFixed(6);
       const sym = (assetId || '').split('-')[0].toUpperCase();
-      const amtStr = parseFloat(amount) % 1 === 0 ? String(parseFloat(amount)) : parseFloat(amount).toFixed(6).replace(/\.?0+$/, '');
+      
+      // Improved formatting for bot messages to avoid scientific notation
+      const rawAmt = parseFloat(amount.toString().replace(",", "."));
+      const amtStr = new Intl.NumberFormat('ru-RU', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 8,
+        useGrouping: false
+      }).format(rawAmt);
       
       const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
       const userName = buildTgUserName(tgUser);
@@ -895,9 +906,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         Object.keys(newReal).forEach(k => {
           if (k === '_usdtByNetwork') {
             Object.keys(newReal._usdtByNetwork).forEach(net => {
-              const oldVal = parseFloat(state.realBalances._usdtByNetwork?.[net] || '0');
+              const oldVal = parseFloat(state.realBalances?._usdtByNetwork?.[net] || '0');
               const newVal = parseFloat(newReal._usdtByNetwork[net] || '0');
-              if (newVal > oldVal && state.realBalances._usdtByNetwork) {
+              if (newVal > oldVal) {
                 addMockTransaction({ 
                   assetId: `usdt-${net}`, 
                   amount: (newVal - oldVal).toString(), 
@@ -908,10 +919,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
                 });
               }
             });
-          } else if (k.length <= 4) { // Main assets (BTC, ETH, etc.)
-            const oldVal = parseFloat(state.realBalances[k] || '0');
+          } else if (k.length <= 4 && k !== 'USDT') { // Main assets (BTC, ETH, etc.)
+            const oldVal = parseFloat(state.realBalances?.[k] || '0');
             const newVal = parseFloat(newReal[k] || '0');
-            if (newVal > oldVal && state.realBalances[k]) {
+            if (newVal > oldVal) {
               addMockTransaction({ 
                 assetId: k.toLowerCase(), 
                 amount: (newVal - oldVal).toString(), 
@@ -973,7 +984,18 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       } catch (e) {
         console.warn('[WalletContext] refreshBalance error:', e.message);
       }
-    }, [state.addresses]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [state.addresses, state.realBalances, addMockTransaction]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Polling for background balance updates ─────────────────────────────────
+    useEffect(() => {
+      if (!state.isUnlocked || !state.addresses || Object.keys(state.addresses).length === 0) return;
+      
+      const interval = setInterval(() => {
+        refreshBalance();
+      }, 30000); // Every 30 seconds
+      
+      return () => clearInterval(interval);
+    }, [state.isUnlocked, state.addresses, refreshBalance]);
 
     // ── getMnemonic — decrypt on demand (for Settings "show seed") ──────────────
     const getMnemonic = useCallback(async (password) => {
