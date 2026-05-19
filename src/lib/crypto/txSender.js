@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { fetchBtcUtxos } from './balanceFetcher.js';
 
 const EVM_RPCS = {
   ETH: 'https://eth.llamarpc.com',
@@ -150,4 +151,148 @@ export async function sendTonTx(mnemonic, to, amountStr) {
   });
 
   return `ton-tx-${Date.now()}`;
+}
+
+// ─── Bitcoin send via @scure/btc-signer ──────────────────────────────────────
+
+/**
+ * Estimate BTC fee for a simple P2WPKH → P2WPKH transaction.
+ * Typical segwit tx: ~141 vBytes for 1-in-2-out.
+ * @param {number} feeRateSatVb  sat/vByte
+ * @returns {number}  fee in satoshis
+ */
+export function estimateBtcFee(inputCount, feeRateSatVb) {
+  // P2WPKH: overhead=10, input=68 vB, output=31 vB (2 outputs: to + change)
+  const vsize = 10 + inputCount * 68 + 2 * 31;
+  return Math.ceil(vsize * feeRateSatVb);
+}
+
+/**
+ * Send BTC using @scure/btc-signer.
+ * @param {string} privateKeyHex  32-byte hex private key (with or without 0x)
+ * @param {string} fromAddress    sender's bc1q... address
+ * @param {string} toAddress      recipient address
+ * @param {number} amountBtc      amount to send in BTC
+ * @param {number} feeRateSatVb   fee rate in sat/vByte
+ * @returns {Promise<string>}     txid
+ */
+export async function sendBtcTx(privateKeyHex, fromAddress, toAddress, amountBtc, feeRateSatVb = 10) {
+  const { p2wpkh, Transaction } = await import('@scure/btc-signer');
+  const { hex: hexCodec } = await import('@scure/base');
+
+  const privKeyHex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
+  const privKeyBytes = hexCodec.decode(privKeyHex);
+
+  const amountSats = Math.round(amountBtc * 1e8);
+
+  // Fetch UTXOs
+  const utxos = await fetchBtcUtxos(fromAddress);
+  if (!utxos || utxos.length === 0) {
+    throw new Error('Нет доступных UTXO для отправки');
+  }
+
+  // Sort UTXOs by value descending
+  const sorted = [...utxos].sort((a, b) => b.value - a.value);
+
+  // Coin selection: pick UTXOs until we have enough for amount + fee
+  const selectedUtxos = [];
+  let totalInput = 0;
+  let fee = estimateBtcFee(1, feeRateSatVb);
+
+  for (const utxo of sorted) {
+    selectedUtxos.push(utxo);
+    totalInput += utxo.value;
+    fee = estimateBtcFee(selectedUtxos.length, feeRateSatVb);
+    if (totalInput >= amountSats + fee) break;
+  }
+
+  if (totalInput < amountSats + fee) {
+    const availBtc = (totalInput / 1e8).toFixed(8);
+    throw new Error(`Недостаточно средств. Доступно: ${availBtc} BTC (включая комиссию)`);
+  }
+
+  const change = totalInput - amountSats - fee;
+
+  // Build P2WPKH payment descriptor for the sender address
+  const payment = p2wpkh(privKeyBytes, undefined, { network: 'mainnet' });
+
+  // Build transaction
+  const tx = new Transaction({ allowUnknownOutputs: true });
+
+  // Fetch raw transactions for each UTXO input
+  for (const utxo of selectedUtxos) {
+    const rawRes = await fetch(`https://mempool.space/api/tx/${utxo.txid}/hex`);
+    if (!rawRes.ok) throw new Error(`Не удалось получить транзакцию ${utxo.txid}`);
+    const rawHex = await rawRes.text();
+    const rawBytes = hexCodec.decode(rawHex.trim());
+
+    tx.addInput({
+      txid:         utxo.txid,
+      index:        utxo.vout,
+      witnessUtxo:  { script: payment.script, amount: BigInt(utxo.value) },
+      nonWitnessUtxo: rawBytes,
+    });
+  }
+
+  // Output: recipient
+  tx.addOutputAddress(toAddress, BigInt(amountSats));
+
+  // Output: change (if any, above dust ~546 sats)
+  if (change > 546) {
+    tx.addOutputAddress(fromAddress, BigInt(change));
+  }
+
+  // Sign all inputs
+  tx.sign(privKeyBytes);
+  tx.finalize();
+
+  const txHex = hexCodec.encode(tx.extract());
+
+  // Broadcast via mempool.space
+  const broadcastRes = await fetch('https://mempool.space/api/tx', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: txHex,
+  });
+
+  if (!broadcastRes.ok) {
+    const errText = await broadcastRes.text();
+    throw new Error(`Ошибка трансляции: ${errText}`);
+  }
+
+  const txid = await broadcastRes.text();
+  return txid.trim();
+}
+
+/**
+ * Get BTC fee estimate in BTC and USD.
+ * @returns {Promise<{ slow, normal, fast }>}
+ */
+export async function getBtcFeeEstimate(btcPriceUsd = 95000) {
+  try {
+    const res = await fetch('https://mempool.space/api/v1/fees/recommended');
+    const data = await res.json();
+    const rates = {
+      slow:   data.hourFee       || 5,
+      normal: data.halfHourFee   || 10,
+      fast:   data.fastestFee    || 20,
+    };
+    const makeFee = (satVb) => {
+      const feeSats = estimateBtcFee(1, satVb);
+      const feeBtc  = feeSats / 1e8;
+      const feeUsd  = (feeBtc * btcPriceUsd).toFixed(2);
+      return { native: feeBtc.toFixed(8), usd: feeUsd, satVb };
+    };
+    return {
+      slow:   makeFee(rates.slow),
+      normal: makeFee(rates.normal),
+      fast:   makeFee(rates.fast),
+    };
+  } catch {
+    return {
+      slow:   { native: '0.00001500', usd: '1.43', satVb: 5  },
+      normal: { native: '0.00002960', usd: '2.81', satVb: 10 },
+      fast:   { native: '0.00005920', usd: '5.62', satVb: 20 },
+    };
+  }
 }

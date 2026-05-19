@@ -3,6 +3,7 @@
  * Multi-chain balance fetching for all supported assets.
  *
  * Supported:
+ *   BTC  — native via mempool.space REST API
  *   ETH  — native via JSON-RPC
  *   BNB  — native via JSON-RPC
  *   ARB  — native via JSON-RPC
@@ -45,6 +46,20 @@ const RPCS = {
   SOL: () => getRpc('VITE_SOL_RPC', 'https://api.mainnet-beta.solana.com'),
   TON: () => getRpc('VITE_TON_RPC', 'https://toncenter.com/api/v2'),
 };
+
+// ─── BTC balance via mempool.space ────────────────────────────────────────────
+async function fetchBtcBalance(address) {
+  try {
+    const res = await fetch(`https://mempool.space/api/address/${encodeURIComponent(address)}`);
+    if (!res.ok) return 0;
+    const data = await res.json();
+    const confirmed   = data.chain_stats?.funded_txo_sum   - data.chain_stats?.spent_txo_sum   || 0;
+    const unconfirmed = data.mempool_stats?.funded_txo_sum - data.mempool_stats?.spent_txo_sum || 0;
+    return (confirmed + unconfirmed) / 1e8;
+  } catch {
+    return 0;
+  }
+}
 
 // ─── EVM native balance ───────────────────────────────────────────────────────
 async function fetchEvmNative(address, rpcUrl) {
@@ -118,20 +133,17 @@ async function fetchTonNative(address, apiBase) {
 async function fetchTonJetton(walletAddress, jettonMaster, apiBase) {
   try {
     const apiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TON_API_KEY) || '';
-    const url = `${apiBase}/getTokenData?address=${encodeURIComponent(jettonMaster)}${apiKey ? `&api_key=${apiKey}` : ''}`;
-    // Use the jetton wallet address lookup
     const walletUrl = `${apiBase}/runGetMethod?address=${encodeURIComponent(jettonMaster)}&method=get_wallet_address&stack=[["tvm.Slice","${walletAddress}"]]${apiKey ? `&api_key=${apiKey}` : ''}`;
     const res = await fetch(walletUrl);
     const data = await res.json();
     if (!data.ok) return 0;
-    // Parse jetton wallet address from result
     const jettonWalletAddr = data.result?.stack?.[0]?.[1]?.object?.data?.b64;
     if (!jettonWalletAddr) return 0;
     const balUrl = `${apiBase}/getAddressBalance?address=${encodeURIComponent(jettonWalletAddr)}${apiKey ? `&api_key=${apiKey}` : ''}`;
     const balRes = await fetch(balUrl);
     const balData = await balRes.json();
     if (!balData.ok) return 0;
-    return parseInt(balData.result, 10) / 1e6; // USDT has 6 decimals on TON
+    return parseInt(balData.result, 10) / 1e6;
   } catch {
     return 0;
   }
@@ -154,8 +166,8 @@ async function fetchLtcBalance(address) {
 
 /**
  * Fetch all balances for a wallet.
- * @param {{ ETH, BNB, ARB, SOL, TON, LTC }} addresses
- * @returns {Promise<{ ETH, BNB, ARB, SOL, TON, LTC, USDT }>}
+ * @param {{ BTC, ETH, BNB, ARB, SOL, TON, LTC }} addresses
+ * @returns {Promise<{ BTC, ETH, BNB, ARB, SOL, TON, LTC, USDT }>}
  */
 export async function fetchAllBalances(addresses) {
   const ethRpc = RPCS.ETH();
@@ -165,6 +177,7 @@ export async function fetchAllBalances(addresses) {
   const tonApi = RPCS.TON();
 
   const [
+    btcBal,
     ethBal,
     bnbBal,
     arbBal,
@@ -177,6 +190,7 @@ export async function fetchAllBalances(addresses) {
     usdtSol,
     usdtTon,
   ] = await Promise.allSettled([
+    addresses.BTC ? fetchBtcBalance(addresses.BTC) : Promise.resolve(0),
     addresses.ETH ? fetchEvmNative(addresses.ETH, ethRpc) : Promise.resolve(0),
     addresses.BNB ? fetchEvmNative(addresses.BNB, bnbRpc) : Promise.resolve(0),
     addresses.ARB ? fetchEvmNative(addresses.ARB, arbRpc) : Promise.resolve(0),
@@ -192,11 +206,10 @@ export async function fetchAllBalances(addresses) {
 
   const val = (r) => (r.status === 'fulfilled' ? r.value : 0);
 
-  // USDT: sum across all networks (or use the highest single balance)
-  // For display purposes we show the total USDT across all chains
   const usdtTotal = val(usdtEth) + val(usdtBnb) + val(usdtArb) + val(usdtSol) + val(usdtTon);
 
   return {
+    BTC:  val(btcBal),
     ETH:  val(ethBal),
     BNB:  val(bnbBal),
     ARB:  val(arbBal),
@@ -204,7 +217,6 @@ export async function fetchAllBalances(addresses) {
     TON:  val(tonBal),
     LTC:  val(ltcBal),
     USDT: usdtTotal,
-    // Per-network USDT breakdown (useful for send/collect)
     _usdtByNetwork: {
       eth: val(usdtEth),
       bnb: val(usdtBnb),
@@ -217,14 +229,11 @@ export async function fetchAllBalances(addresses) {
 
 /**
  * Fetch balance for a single asset on a specific network.
- * @param {string} sym  e.g. 'ETH', 'USDT'
- * @param {string} networkId  e.g. 'eth', 'bnb', 'sol'
- * @param {string} address
- * @returns {Promise<number>}
  */
 export async function fetchSingleBalance(sym, networkId, address) {
   if (!address) return 0;
   try {
+    if (sym === 'BTC') return fetchBtcBalance(address);
     if (sym === 'USDT') {
       if (networkId === 'eth') return fetchErc20(address, USDT_CONTRACTS.ETH, RPCS.ETH());
       if (networkId === 'bnb') return fetchErc20(address, USDT_CONTRACTS.BNB, RPCS.BNB());
@@ -242,4 +251,38 @@ export async function fetchSingleBalance(sym, networkId, address) {
     return 0;
   }
   return 0;
+}
+
+/**
+ * Fetch BTC UTXOs from mempool.space for transaction building.
+ * @param {string} address
+ * @returns {Promise<Array<{txid, vout, value, status}>>}
+ */
+export async function fetchBtcUtxos(address) {
+  try {
+    const res = await fetch(`https://mempool.space/api/address/${encodeURIComponent(address)}/utxo`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch current BTC fee rates (sat/vB) from mempool.space.
+ * @returns {Promise<{slow, normal, fast}>}
+ */
+export async function fetchBtcFeeRates() {
+  try {
+    const res = await fetch('https://mempool.space/api/v1/fees/recommended');
+    if (!res.ok) throw new Error('failed');
+    const data = await res.json();
+    return {
+      slow:   data.hourFee   || 5,
+      normal: data.halfHourFee || 10,
+      fast:   data.fastestFee  || 20,
+    };
+  } catch {
+    return { slow: 5, normal: 10, fast: 20 };
+  }
 }

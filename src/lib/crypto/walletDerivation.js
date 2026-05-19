@@ -2,7 +2,8 @@
  * walletDerivation.js
  * Real BIP39 mnemonic generation + HD key derivation for all supported chains.
  * Chains: ETH, BNB, ARB (EVM m/44'/60'/0'/0/0), SOL (ed25519 m/44'/501'/0'/0'),
- *         TON (@ton/crypto mnemonicToPrivateKey), LTC (m/44'/2'/0'/0/0 P2PKH).
+ *         TON (@ton/crypto mnemonicToPrivateKey), LTC (m/44'/2'/0'/0/0 P2PKH),
+ *         BTC (m/84'/0'/0'/0/0 native SegWit P2WPKH, bc1q...).
  *
  * Private keys are NEVER persisted — callers must hold them in memory only.
  */
@@ -108,7 +109,6 @@ function ripemd160(msg) {
 }
 
 // ─── LTC P2PKH address encoder ────────────────────────────────────────────────
-// LTC mainnet P2PKH version byte = 0x30 (48)
 function ltcP2PKH(pubKeyBytes) {
   const hash160 = ripemd160(sha256Bytes(pubKeyBytes));
   const versioned = new Uint8Array(21);
@@ -121,12 +121,71 @@ function ltcP2PKH(pubKeyBytes) {
   return bs58.encode(full);
 }
 
+// ─── BTC native SegWit P2WPKH (bech32) ───────────────────────────────────────
+const BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+
+function bech32Polymod(values) {
+  let c = 1;
+  for (const v of values) {
+    const c0 = c >>> 25;
+    c = ((c & 0x1ffffff) << 5) ^ v;
+    if (c0 & 1)  c ^= 0x3b6a57b2;
+    if (c0 & 2)  c ^= 0x26508e6d;
+    if (c0 & 4)  c ^= 0x1ea119fa;
+    if (c0 & 8)  c ^= 0x3d4233dd;
+    if (c0 & 16) c ^= 0x2a1462b3;
+  }
+  return c;
+}
+
+function bech32HrpExpand(hrp) {
+  const ret = [];
+  for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) >> 5);
+  ret.push(0);
+  for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) & 31);
+  return ret;
+}
+
+function bech32CreateChecksum(hrp, data) {
+  const values = bech32HrpExpand(hrp).concat(data).concat([0, 0, 0, 0, 0, 0]);
+  const polymod = bech32Polymod(values) ^ 1;
+  const ret = [];
+  for (let i = 0; i < 6; i++) ret.push((polymod >>> (5 * (5 - i))) & 31);
+  return ret;
+}
+
+function bech32Encode(hrp, data) {
+  const checksum = bech32CreateChecksum(hrp, data);
+  const combined = data.concat(checksum);
+  return hrp + '1' + combined.map(d => BECH32_CHARSET[d]).join('');
+}
+
+function convertBits(data, fromBits, toBits, pad = true) {
+  let acc = 0, bits = 0;
+  const result = [];
+  const maxv = (1 << toBits) - 1;
+  for (const v of data) {
+    acc = (acc << fromBits) | v;
+    bits += fromBits;
+    while (bits >= toBits) {
+      bits -= toBits;
+      result.push((acc >> bits) & maxv);
+    }
+  }
+  if (pad && bits > 0) result.push((acc << (toBits - bits)) & maxv);
+  return result;
+}
+
+function btcP2WPKHAddress(pubKeyBytes) {
+  const hash160 = ripemd160(sha256Bytes(pubKeyBytes));
+  const words = convertBits(Array.from(hash160), 8, 5);
+  return bech32Encode('bc', [0].concat(words));
+}
+
 // ─── Compressed secp256k1 public key from private key hex ────────────────────
 function compressedPubKey(privKeyHex) {
   const sk = new ethers.SigningKey(privKeyHex);
-  // publicKey is "0x04<x><y>" (65 bytes uncompressed)
   const uncompressed = hexToBytes(sk.publicKey);
-  // uncompressed[0] === 0x04, x = [1..32], y = [33..64]
   const x = uncompressed.slice(1, 33);
   const y = uncompressed.slice(33, 65);
   const prefix = (y[31] & 1) === 0 ? 0x02 : 0x03;
@@ -138,30 +197,14 @@ function compressedPubKey(privKeyHex) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/**
- * Generate a fresh BIP39 12-word mnemonic.
- * @returns {string} space-separated mnemonic
- */
 export function generateMnemonic() {
-  return bip39.generateMnemonic(128); // 128 bits = 12 words
+  return bip39.generateMnemonic(128);
 }
 
-/**
- * Validate a mnemonic string.
- * @param {string} phrase
- * @returns {boolean}
- */
 export function validateMnemonic(phrase) {
   return bip39.validateMnemonic(phrase.trim().toLowerCase());
 }
 
-/**
- * Derive all wallet addresses and private keys from a mnemonic.
- * Returns { addresses, privateKeys } — privateKeys must stay in memory only.
- *
- * @param {string|string[]} mnemonicOrWords
- * @returns {Promise<{ addresses: Object, privateKeys: Object }>}
- */
 export async function deriveWallet(mnemonicOrWords) {
   const phrase = Array.isArray(mnemonicOrWords)
     ? mnemonicOrWords.join(' ')
@@ -187,6 +230,20 @@ export async function deriveWallet(mnemonicOrWords) {
   privateKeys.BNB = evmPrivKey;
   privateKeys.ARB = evmPrivKey;
 
+  // ── Bitcoin (m/84'/0'/0'/0/0 native SegWit P2WPKH, bc1q...) ────────────────
+  try {
+    const btcPath = "m/84'/0'/0'/0/0";
+    const btcChild = root.derivePath(btcPath);
+    const btcPrivHex = btcChild.privateKey;
+    const pubKey = compressedPubKey(btcPrivHex);
+    addresses.BTC = btcP2WPKHAddress(pubKey);
+    privateKeys.BTC = btcPrivHex;
+  } catch (e) {
+    console.warn('BTC derivation failed:', e.message);
+    addresses.BTC = null;
+    privateKeys.BTC = null;
+  }
+
   // ── Solana (ed25519, m/44'/501'/0'/0') ─────────────────────────────────────
   try {
     const { Keypair } = await import('@solana/web3.js');
@@ -195,7 +252,6 @@ export async function deriveWallet(mnemonicOrWords) {
     const solChild = hdKey.derive("m/44'/501'/0'/0'");
     const solKeypair = Keypair.fromSeed(solChild.privateKey.slice(0, 32));
     addresses.SOL = solKeypair.publicKey.toBase58();
-    // Store full 64-byte secret key as hex for signing
     privateKeys.SOL = Buffer.from(solKeypair.secretKey).toString('hex');
   } catch (e) {
     console.warn('SOL derivation failed:', e.message);
@@ -238,12 +294,6 @@ export async function deriveWallet(mnemonicOrWords) {
   return { addresses, privateKeys };
 }
 
-/**
- * Get only the private key for a specific chain from a mnemonic.
- * @param {string|string[]} mnemonicOrWords
- * @param {string} chain  e.g. 'ETH', 'SOL', 'TON', 'LTC'
- * @returns {Promise<string|null>}
- */
 export async function getPrivateKey(mnemonicOrWords, chain) {
   const { privateKeys } = await deriveWallet(mnemonicOrWords);
   return privateKeys[chain] || null;

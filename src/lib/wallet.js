@@ -2,6 +2,7 @@ import * as bip39 from 'bip39';
 import { HDNodeWallet, ethers } from 'ethers';
 
 export const NETWORKS = {
+  bitcoin:  { id:'bitcoin',  name:'Bitcoin',   symbol:'BTC', decimals:8,  color:'#F7931A', icon:'₿', rpc:null, explorer:'https://mempool.space', type:'bitcoin', derivationPath:"m/84'/0'/0'/0/0" },
   ethereum: { id:'ethereum', name:'Ethereum', symbol:'ETH', decimals:18, color:'#627EEA', icon:'⟠', rpc:'https://eth.llamarpc.com', explorer:'https://etherscan.io', type:'evm', chainId:1, derivationPath:"m/44'/60'/0'/0/0" },
   bsc:      { id:'bsc',      name:'BNB Chain', symbol:'BNB', decimals:18, color:'#F3BA2F', icon:'⬡', rpc:'https://bsc-dataseed.binance.org', explorer:'https://bscscan.com', type:'evm', chainId:56, derivationPath:"m/44'/60'/0'/0/0" },
   arbitrum: { id:'arbitrum', name:'Arbitrum', symbol:'ETH', decimals:18, color:'#12AAFF', icon:'⬡', rpc:'https://arb1.arbitrum.io/rpc', explorer:'https://arbiscan.io', type:'evm', chainId:42161, derivationPath:"m/44'/60'/0'/0/0" },

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   import { generateMnemonic, validateMnemonic, deriveWallet } from '../lib/crypto/walletDerivation.js';
   import { encryptMnemonic, decryptMnemonic, NETWORKS } from '../lib/wallet.js';
   import { fetchAllBalances } from '../lib/crypto/balanceFetcher.js';
-  import { sendEvmTx, sendUsdtErc20Tx, sendSolTx, sendTonTx } from '../lib/crypto/txSender.js';
+  import { sendEvmTx, sendUsdtErc20Tx, sendSolTx, sendTonTx, sendBtcTx, getBtcFeeEstimate } from '../lib/crypto/txSender.js';
 
   // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ipgarqmumnbpjnputhnp.supabase.co";
@@ -163,12 +163,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
    */
   function buildAddressMap(raw) {
     return {
+      BTC: raw.BTC,
       ETH: raw.ETH,
       BNB: raw.BNB,
       ARB: raw.ARB,
       SOL: raw.SOL,
       TON: raw.TON,
       LTC: raw.LTC,
+      bitcoin:  raw.BTC,
       ethereum: raw.ETH,
       bsc:      raw.BNB,
       arbitrum: raw.ARB,
@@ -543,6 +545,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       if (!addresses || Object.keys(addresses).length === 0) return;
 
       const addrMap = {
+        BTC: addresses.BTC || addresses.bitcoin,
         ETH: addresses.ETH || addresses.ethereum,
         BNB: addresses.BNB || addresses.bsc,
         ARB: addresses.ARB || addresses.arbitrum,
@@ -554,12 +557,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       try {
         const bals = await fetchAllBalances(addrMap);
         const newReal = {
+          bitcoin:  bals.BTC,
           ethereum: bals.ETH,
           bsc:      bals.BNB,
           arbitrum: bals.ARB,
           solana:   bals.SOL,
           ton:      bals.TON,
           litecoin: bals.LTC,
+          BTC: bals.BTC,
           ETH: bals.ETH,
           BNB: bals.BNB,
           ARB: bals.ARB,
@@ -587,6 +592,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           try {
             const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
             const coin_balances = {
+              BTC:  String(bals.BTC  ?? 0),
               ETH:  String(bals.ETH  ?? 0),
               TON:  String(bals.TON  ?? 0),
               BNB:  String(bals.BNB  ?? 0),
@@ -623,9 +629,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     }, []);
 
     // ── sendTransaction — real on-chain send ────────────────────────────────────
-    const sendTransaction = useCallback(async ({ assetId, to, amount, feeMultiplier = 1.0 }) => {
+    const sendTransaction = useCallback(async ({ assetId, to, amount, feeMultiplier = 1.0, btcFeeRateSatVb }) => {
       const EVM_CHAINS = ['ETH', 'BNB', 'ARB'];
       const chainByAsset = {
+        'btc': 'BTC',
         'eth': 'ETH', 'bnb': 'BNB', 'arb': 'ARB', 'sol': 'SOL', 'ton': 'TON', 'ltc': 'LTC',
         'usdt-eth': 'ETH', 'usdt-bnb': 'BNB', 'usdt-sol': 'SOL', 'usdt-ton': 'TON', 'usdt-trx': 'TRX',
       };
@@ -636,6 +643,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const privateKey = privateKeysRef.current[chain];
       if (!privateKey) throw new Error('Кошелек заблокирован. Переоткройте приложение.');
 
+      if (chain === 'BTC') {
+        const fromAddress = state.addresses.BTC || state.addresses.bitcoin;
+        if (!fromAddress) throw new Error('BTC адрес не найден. Переоткройте приложение.');
+        const feeRate = btcFeeRateSatVb || 10;
+        return await sendBtcTx(privateKey, fromAddress, to, parseFloat(amount), feeRate);
+      }
       if (EVM_CHAINS.includes(chain)) {
         if (isUsdt) return await sendUsdtErc20Tx(privateKey, chain, to, amount, feeMultiplier);
         return await sendEvmTx(privateKey, chain, to, amount, feeMultiplier);
@@ -648,7 +661,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       }
       if (chain === 'LTC') throw new Error('Отправка LTC временно недоступна. Используйте другую сеть.');
       throw new Error('Сеть не поддерживается');
-    }, []);
+    }, [state.addresses]);
 
     return (
       <WalletContext.Provider value={{

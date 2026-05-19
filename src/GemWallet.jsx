@@ -22,6 +22,7 @@ const DS = {
 };
 
 const assets = [
+  { id: "btc",      name: "Bitcoin",   symbol: "BTC",  price: "95 124,00 $", change: "+1,23 %", positive: true,  tokenId: "BTC",      usdPrice: 95124.00 },
   { id: "eth",      name: "Ethereum",  symbol: "ETH",  price: "2 191,35 $", change: "+0,49 %", positive: true,  tokenId: "ETH",      usdPrice: 2191.35 },
   { id: "sol",      name: "Solana",    symbol: "SOL",  price: "86,64 $",    change: "-0,13 %", positive: false, tokenId: "SOL",      usdPrice: 86.64 },
   { id: "ton",      name: "TON",       symbol: "TON",  price: "1,96 $",     change: "+1,98 %", positive: true,  tokenId: "TON",      usdPrice: 1.96 },
@@ -39,6 +40,7 @@ const swapReceiveAssets = assets;
 const receiveAssets = assets;
 
 const swapPayAssets = [
+  { id: "btc", name: "Bitcoin", symbol: "BTC", tokenId: "BTC" },
   { id: "ton", name: "TON", symbol: "TON", tokenId: "TON" },
   { id: "eth", name: "Ethereum", symbol: "ETH", tokenId: "ETH" },
 ];
@@ -686,7 +688,7 @@ function SendAmountScreen({ assetId, onBack, onContinue }) {
   const realBal = getRealBalance(assetId);
   const balStr = fmtBal(realBal, asset.symbol);
   
-  const APPROX_PRICES = { ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
   const price = APPROX_PRICES[assetId] || 1;
   
   const currentNum = parseFloat(amount.replace(",", ".")) || 0;
@@ -765,15 +767,17 @@ function SendAmountScreen({ assetId, onBack, onContinue }) {
 /* ─── Screen: Send — fee selection (standalone step) ────────── */
 function SendFeeScreen({ assetId, onBack, onContinue }) {
   const evmMap = {
+    btc: "BTC",
     eth: "ETH", bnb: "BNB", arb: "ARB", ltc: "LTC", sol: "SOL", ton: "TON",
     "usdt-eth": "ETH", "usdt-bnb": "BNB", "usdt-sol": "SOL", "usdt-ton": "TON", "usdt-arb": "ARB",
   };
   const evmSym = evmMap[assetId] || "ETH";
 
-  const UNITS = { ETH: "Gwei", BNB: "Gwei", ARB: "Gwei", LTC: "sat/vB", SOL: "Lamports", TON: "NanoTON" };
+  const UNITS = { BTC: "sat/vB", ETH: "Gwei", BNB: "Gwei", ARB: "Gwei", LTC: "sat/vB", SOL: "Lamports", TON: "NanoTON" };
   const unitLabel = UNITS[evmSym] || "Gwei";
 
   const FEE_TABLE = {
+    BTC: { slow: { native: 5,        usd: "1,43" }, normal: { native: 10,       usd: "2,81" }, fast: { native: 20,        usd: "5,62" } },
     ETH: { slow: { native: 15,       usd: "1,20" }, normal: { native: 30,        usd: "2,50" }, fast: { native: 60,        usd: "5,00" } },
     BNB: { slow: { native: 10,       usd: "0,02" }, normal: { native: 20,        usd: "0,04" }, fast: { native: 50,        usd: "0,10" } },
     ARB: { slow: { native: 10,       usd: "0,01" }, normal: { native: 20,        usd: "0,02" }, fast: { native: 50,        usd: "0,05" } },
@@ -800,14 +804,15 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
 
     function handleContinue() {
     if (!canContinue) return;
+    const isBtc = evmSym === "BTC";
     if (isCustom) {
       const raw = parseFloat(customVal) || 0;
       const slowVal = feeData.slow.native;
       const isTooLow = raw > 0 && raw <= slowVal / 10;
-      onContinue({ key: "custom", native: raw, nativeFormatted: formatFee(raw), usd: "—", unitLabel, multiplier: 1.0, isCustom: true, isTooLow, slowThreshold: slowVal / 10 });
+      onContinue({ key: "custom", native: raw, nativeFormatted: formatFee(raw), usd: "—", unitLabel, multiplier: 1.0, isCustom: true, isTooLow, slowThreshold: slowVal / 10, btcFeeRateSatVb: isBtc ? raw : undefined });
     } else {
       const d = feeData[selected];
-      onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false, isTooLow: false });
+      onContinue({ key: selected, native: d.native, nativeFormatted: formatFee(d.native), usd: d.usd, unitLabel, multiplier: FEE_MUL[selected], isCustom: false, isTooLow: false, btcFeeRateSatVb: isBtc ? d.native : undefined });
     }
   }
 
@@ -949,7 +954,7 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
   const [status, setStatus] = useState("idle");
   const [txError, setTxError] = useState("");
 
-  const APPROX_PRICES = { ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
   const usdValue = (parseFloat(amount.replace(",", ".")) * (APPROX_PRICES[assetId] || 1)).toFixed(2).replace(".", ",");
 
   const fi = feeInfo || { nativeFormatted: "—", usd: "—", unitLabel: "", multiplier: 1.0, key: "normal" };
@@ -971,6 +976,7 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
           to: recipient,
           amount: amount.replace(",", "."),
           feeMultiplier: fi.multiplier,
+          btcFeeRateSatVb: fi.btcFeeRateSatVb,
         });
       }
       const finalFeeStr = `${fi.nativeFormatted} ${fi.unitLabel}`.trim();
@@ -1084,7 +1090,7 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
     return true;
   });
 
-  const recentIds = ["ton", "eth"];
+  const recentIds = ["btc", "ton", "eth"];
   const recentItems = assets.filter((a) => recentIds.includes(a.id));
 
   const CopyIcon = () => (
@@ -1658,7 +1664,7 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
   const realBal = getRealBalance(assetId);
   const balStr = fmtBal(realBal, asset.symbol);
   
-  const APPROX_PRICES = { ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
   const getApproxPrice = (id) => {
     if (id.startsWith('usdt')) return APPROX_PRICES.usdt;
     return APPROX_PRICES[id] || 0;
@@ -3759,7 +3765,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
   };
 
   // Calculate total portfolio value (approximate, using rough prices)
-  const APPROX_PRICES = { ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
   const getApproxPrice = (assetId) => {
     if (assetId.startsWith('usdt')) return APPROX_PRICES.usdt;
     return APPROX_PRICES[assetId] || 0;
