@@ -117,10 +117,11 @@ export async function getNetworkFeeOptions(symbol) {
   try {
     // ──── APTOS ──────────────────────────────────────────────────────────
     if (tokenSymbol === 'apt') {
+      // Aptos fees are very low (measured in octas, 1 APT = 1e8 octas)
       return [
-        { name: 'Медленно', value: 100, time: '1-2 мин' },
-        { name: 'Стандартно', value: 500, time: '1-2 мин' },
-        { name: 'Быстро', value: 1000, time: '1-2 мин' },
+        { name: 'Эконом', value: 50, time: '5-10 мин' },
+        { name: 'Стандарт', value: 100, time: '2-5 мин' },
+        { name: 'Быстро', value: 200, time: '1-2 мин' },
       ];
     }
 
@@ -133,11 +134,15 @@ export async function getNetworkFeeOptions(symbol) {
       else if (tokenSymbol === 'adb') rpcUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADB_RPC) || 'https://eth.llamarpc.com'; // Fallback to ETH for ADB
 
       const baseGasPriceGwei = await fetchEvmGasPrice(rpcUrl) || 20;
+      // Use lower multipliers for cheaper fees (closer to MetaMask pricing)
+      const slow = Math.max(1, Math.round(baseGasPriceGwei * 0.3));
+      const standard = Math.max(2, Math.round(baseGasPriceGwei * 0.5));
+      const fast = Math.max(3, Math.round(baseGasPriceGwei * 0.8));
       
       return [
-        { name: 'Медленно', value: Math.round(baseGasPriceGwei * 0.8), time: '1-2 мин' },
-        { name: 'Стандартно', value: Math.round(baseGasPriceGwei * 1.0), time: '1-2 мин' },
-        { name: 'Быстро', value: Math.round(baseGasPriceGwei * 1.5), time: '1-2 мин' },
+        { name: 'Эконом', value: slow, time: '5-10 мин' },
+        { name: 'Стандарт', value: standard, time: '2-5 мин' },
+        { name: 'Быстро', value: fast, time: '1-2 мин' },
       ];
     }
 
@@ -145,21 +150,24 @@ export async function getNetworkFeeOptions(symbol) {
     if (tokenSymbol === 'sol') {
       const rpcUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SOL_RPC) || 'https://api.mainnet-beta.solana.com';
       const medianFee = await fetchSolPriorityFee(rpcUrl);
+      // Lower fees for Solana (base fee is 5000 lamports = 0.000005 SOL)
+      const baseFee = 5000;
       
       return [
-        { name: 'Медленно', value: Math.round(medianFee * 0.5), time: '1-2 мин' },
-        { name: 'Стандартно', value: Math.round(medianFee), time: '1-2 мин' },
-        { name: 'Быстро', value: Math.round(medianFee * 2), time: '1-2 мин' },
+        { name: 'Эконом', value: baseFee, time: '5-10 мин' },
+        { name: 'Стандарт', value: Math.max(baseFee * 2, Math.round(medianFee * 0.3)), time: '2-5 мин' },
+        { name: 'Быстро', value: Math.max(baseFee * 4, Math.round(medianFee * 0.6)), time: '1-2 мин' },
       ];
     }
 
     // ──── TON ─────────────────────────────────────────────────────────────
     if (tokenSymbol === 'ton') {
-      // TON fees are usually fixed per operation type
+      // TON fees are usually fixed per operation type (nanoTON)
+      // 1 TON = 1e9 nanoTON
       return [
-        { name: 'Медленно', value: 2000000, time: '1-2 мин' }, // 0.002 TON
-        { name: 'Стандартно', value: 5000000, time: '1-2 мин' }, // 0.005 TON
-        { name: 'Быстро', value: 10000000, time: '1-2 мин' }, // 0.01 TON
+        { name: 'Эконом', value: 500000, time: '5-10 мин' }, // 0.0005 TON
+        { name: 'Стандарт', value: 1000000, time: '2-5 мин' }, // 0.001 TON
+        { name: 'Быстро', value: 2000000, time: '1-2 мин' }, // 0.002 TON
       ];
     }
 
@@ -169,20 +177,22 @@ export async function getNetworkFeeOptions(symbol) {
       try {
         const res = await fetch('https://api.blockcypher.com/v1/ltc/main');
         const data = await res.json();
-        const low = Math.round(data.low_fee_per_kb / 1024) || 1;
-        const med = Math.round(data.medium_fee_per_kb / 1024) || 10;
-        const high = Math.round(data.high_fee_per_kb / 1024) || 50;
+        // Lower fees - LTC fees are very cheap, typical tx ~250 bytes
+        // 1 sat/byte = very cheap transactions
+        const low = Math.max(1, Math.round((data.low_fee_per_kb / 1024) * 0.5));
+        const med = Math.max(2, Math.round((data.medium_fee_per_kb / 1024) * 0.5));
+        const high = Math.max(5, Math.round((data.high_fee_per_kb / 1024) * 0.5));
 
         return [
-          { name: 'Медленно', value: low, time: '1-2 мин' },
-          { name: 'Стандартно', value: med, time: '1-2 мин' },
-          { name: 'Быстро', value: high, time: '1-2 мин' },
+          { name: 'Эконом', value: low, time: '10-30 мин' },
+          { name: 'Стандарт', value: med, time: '5-10 мин' },
+          { name: 'Быстро', value: high, time: '2-5 мин' },
         ];
       } catch (e) {
         return [
-          { name: 'Медленно', value: 1, time: '1-2 мин' },
-          { name: 'Стандартно', value: 10, time: '1-2 мин' },
-          { name: 'Быстро', value: 50, time: '1-2 мин' },
+          { name: 'Эконом', value: 1, time: '10-30 мин' },
+          { name: 'Стандарт', value: 2, time: '5-10 мин' },
+          { name: 'Быстро', value: 5, time: '2-5 мин' },
         ];
       }
     }
@@ -314,7 +324,7 @@ export async function calculateNetworkFee(symbol, network = '', isToken = false)
 
     // ──── APTOS ───────────────────────────────────────────────────────────
     if (tokenSymbol === 'apt') {
-      const feeInApt = 0.0001; // Base fee
+      const feeInApt = 0.00005; // Lower base fee (50 octas = 0.0000005 APT)
       const aptPrice = await getTokenPrice('aptos');
       
       return {

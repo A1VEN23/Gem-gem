@@ -258,6 +258,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   
   const MOCK_TXS_KEY = `gem_mock_txs_v2${userSuffix}`;
   const MOCK_BALS_KEY = `gem_mock_balances_v2${userSuffix}`;
+  const LAST_NOTIFIED_BALS_KEY = `gem_last_notified_bals_v2${userSuffix}`;
     const DEFAULT_SETTINGS = {
       hideBalance: false,
       passEnabled: true,
@@ -476,6 +477,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     const clearAllData = useCallback(() => {
       localStorage.removeItem(MOCK_TXS_KEY);
       localStorage.removeItem(MOCK_BALS_KEY);
+      localStorage.removeItem(LAST_NOTIFIED_BALS_KEY);
       localStorage.removeItem('gem_test_mode');
       setState(s => ({
         ...s,
@@ -902,16 +904,19 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           _usdtByNetwork: bals._usdtByNetwork,
         };
 
+        // Get last notified balances from localStorage to prevent duplicate notifications
+        const lastNotifiedBals = JSON.parse(localStorage.getItem(LAST_NOTIFIED_BALS_KEY) || '{}');
+
         // Detect incoming real funds to trigger notifications and add to history
         Object.keys(newReal).forEach(k => {
           if (k === '_usdtByNetwork') {
             Object.keys(newReal._usdtByNetwork).forEach(net => {
-              const oldVal = parseFloat(state.realBalances?._usdtByNetwork?.[net] || '0');
+              const lastNotifiedVal = parseFloat(lastNotifiedBals?._usdtByNetwork?.[net] || '0');
               const newVal = parseFloat(newReal._usdtByNetwork[net] || '0');
-              if (newVal > oldVal) {
+              if (newVal > lastNotifiedVal) {
                 addMockTransaction({ 
                   assetId: `usdt-${net}`, 
-                  amount: (newVal - oldVal).toString(), 
+                  amount: (newVal - lastNotifiedVal).toString(), 
                   from: "Внешний кошелек", 
                   to: "Ваш кошелек", 
                   type: "Получено",
@@ -920,12 +925,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
               }
             });
           } else if (k.length <= 4 && k !== 'USDT') { // Main assets (BTC, ETH, etc.)
-            const oldVal = parseFloat(state.realBalances?.[k] || '0');
+            const lastNotifiedVal = parseFloat(lastNotifiedBals?.[k] || '0');
             const newVal = parseFloat(newReal[k] || '0');
-            if (newVal > oldVal) {
+            if (newVal > lastNotifiedVal) {
               addMockTransaction({ 
                 assetId: k.toLowerCase(), 
-                amount: (newVal - oldVal).toString(), 
+                amount: (newVal - lastNotifiedVal).toString(), 
                 from: "Внешний кошелек", 
                 to: "Ваш кошелек", 
                 type: "Получено",
@@ -934,6 +939,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
             }
           }
         });
+
+        // Update last notified balances in localStorage after checking
+        localStorage.setItem(LAST_NOTIFIED_BALS_KEY, JSON.stringify(newReal));
 
         setState(s => {
           const merged = { ...newReal };
