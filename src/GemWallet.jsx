@@ -1614,14 +1614,34 @@ function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, on
 
 /* ─── Screen: Swap confirm ───────────────────────────────────── */
 function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
-  const { fireNotif, settings: swapSettings } = useWallet();
+  const { fireNotif, settings: swapSettings, addMockTransaction, testMode } = useWallet();
   const payAsset = swapPayAssets.find((a) => a.id === payId);
   const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
-  const receiveAmount = (parseFloat(payAmount.replace(",", ".")) * 0.03384).toFixed(5).replace(".", ",");
+  const receiveAmountNum = parseFloat(payAmount.replace(",", ".")) * 0.03384;
+  const receiveAmount = receiveAmountNum.toFixed(5).replace(".", ",");
   const [done, setDone] = useState(false);
 
   function handleConfirm() {
     setDone(true);
+
+    // In test mode: record both legs as mock transactions so balance & activity update
+    addMockTransaction({
+      assetId: payId,
+      amount: payAmount.replace(",", "."),
+      from: "Ваш кошелек",
+      to: receiveAsset?.name || receiveId,
+      type: "Отправлено",
+      status: "Успешный",
+    });
+    addMockTransaction({
+      assetId: receiveId,
+      amount: receiveAmountNum.toFixed(6),
+      from: payAsset?.name || payId,
+      to: "Ваш кошелек",
+      type: "Получено",
+      status: "Успешный",
+    });
+
     fireNotif(
       `Обмен выполнен`,
       `${payAmount} ${payAsset?.symbol} → ${receiveAmount} ${receiveAsset?.symbol}`
@@ -3968,8 +3988,12 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: realBal === 0 ? "#555" : "white", fontWeight: 600, fontSize: 15 }}>{balStr}</div>
-                {realBal > 0 ? <div style={{ color: "#8E8E93", fontSize: 13, marginTop: 2 }}>{fmtCurrency(realBal * getApproxPrice(asset.id), settings?.currencyCode || 'USD')}</div> : null}
+                <div style={{ color: realBal === 0 ? "#555" : "white", fontWeight: 600, fontSize: 15 }}>
+                  {settings?.hideBalance ? (realBal === 0 ? "0" : "•••••") : balStr}
+                </div>
+                {realBal > 0 && !settings?.hideBalance
+                  ? <div style={{ color: "#8E8E93", fontSize: 13, marginTop: 2 }}>{fmtCurrency(realBal * getApproxPrice(asset.id), settings?.currencyCode || 'USD')}</div>
+                  : null}
               </div>
             </div>
           );
