@@ -1,5 +1,5 @@
 /* ─── Gem Wallet — Updated ──────────────────────────────────── */
-import { useState, useEffect, useRef, memo, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useMemo, useCallback, createContext, useContext } from "react";
 import gemIcon from './assets/gem-icon.png';
 import { useWallet } from './context/WalletContext.jsx';
 import { getEvmFeeEstimate } from './lib/crypto/txSender.js';
@@ -21,7 +21,7 @@ const DS = {
   font:    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
 };
 
-const assets = [
+const BASE_ASSETS = [
   { id: "btc",      name: "Bitcoin",   symbol: "BTC",  price: "95 124,00 $", change: "+1,23 %", positive: true,  tokenId: "BTC",      usdPrice: 95124.00 },
   { id: "eth",      name: "Ethereum",  symbol: "ETH",  price: "2 191,35 $", change: "+0,49 %", positive: true,  tokenId: "ETH",      usdPrice: 2191.35 },
   { id: "sol",      name: "Solana",    symbol: "SOL",  price: "86,64 $",    change: "-0,13 %", positive: false, tokenId: "SOL",      usdPrice: 86.64 },
@@ -35,9 +35,69 @@ const assets = [
   { id: "usdt-bnb", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,02 %", positive: false, tokenId: "USDT_BNB", usdPrice: 1.00 },
   { id: "usdt-arb", name: "Tether",    symbol: "USDT", price: "1,00 $",     change: "-0,01 %", positive: false, tokenId: "USDT_ARB", usdPrice: 1.00 },
 ];
-const sendableAssets = assets;
-const swapReceiveAssets = assets;
-const receiveAssets = assets;
+const sendableAssets = BASE_ASSETS;
+const swapReceiveAssets = BASE_ASSETS;
+const receiveAssets = BASE_ASSETS;
+
+/* ─── Live Prices (CoinGecko) ────────────────────────────────── */
+const LivePricesContext = createContext({});
+
+const GECKO_IDS = {
+  btc: 'bitcoin', eth: 'ethereum', sol: 'solana', ton: 'toncoin',
+  bnb: 'binancecoin', ltc: 'litecoin', arb: 'arbitrum',
+};
+
+function LivePricesProvider({ children }) {
+  const [prices, setPrices] = useState({});
+  useEffect(() => {
+    async function fetchPrices() {
+      try {
+        const ids = Object.values(GECKO_IDS).join(',');
+        const res = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const result = {};
+        for (const [assetId, geckoId] of Object.entries(GECKO_IDS)) {
+          if (data[geckoId]) {
+            result[assetId] = {
+              usdPrice: data[geckoId].usd,
+              change24h: data[geckoId].usd_24h_change ?? 0,
+            };
+          }
+        }
+        setPrices(result);
+      } catch { /* silently keep static prices on error */ }
+    }
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+  return <LivePricesContext.Provider value={prices}>{children}</LivePricesContext.Provider>;
+}
+
+function useLivePriceMap() {
+  return useContext(LivePricesContext);
+}
+
+function useAssets() {
+  const prices = useContext(LivePricesContext);
+  return useMemo(() => BASE_ASSETS.map(a => {
+    const key = a.id.startsWith('usdt') ? null : a.id;
+    const live = key ? prices[key] : null;
+    if (!live) return a;
+    const { usdPrice, change24h } = live;
+    const positive = change24h >= 0;
+    const sign = positive ? '+' : '-';
+    const changeStr = `${sign}${Math.abs(change24h).toFixed(2).replace('.', ',')} %`;
+    let priceStr;
+    if (usdPrice >= 10000)      priceStr = usdPrice.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $';
+    else if (usdPrice >= 1)     priceStr = usdPrice.toFixed(2).replace('.', ',') + ' $';
+    else                        priceStr = usdPrice.toFixed(4).replace('.', ',') + ' $';
+    return { ...a, usdPrice, price: priceStr, change: changeStr, positive };
+  }), [prices]);
+}
 
 const swapPayAssets = [
   { id: "btc", name: "Bitcoin", symbol: "BTC", tokenId: "BTC" },
@@ -579,7 +639,7 @@ function SendSelectScreen({ onBack, onSelect }) {
 
 /* ─── Screen: Send — recipient ──────────────────────────────── */
 function SendRecipientScreen({ assetId, onBack, onContinue }) {
-  const asset = assets.find((a) => a.id === assetId);
+  const asset = BASE_ASSETS.find((a) => a.id === assetId);
   const [address, setAddress] = useState("");
   const [memoText, setMemoText] = useState("");
 
@@ -659,7 +719,9 @@ function SendRecipientScreen({ assetId, onBack, onContinue }) {
 /* ─── Screen: Send — amount ─────────────────────────────────── */
 function SendAmountScreen({ assetId, onBack, onContinue }) {
   const { balances } = useWallet();
-  const asset = assets.find((a) => a.id === assetId);
+  const liveAssets = useAssets();
+  const livePriceMap = useLivePriceMap();
+  const asset = liveAssets.find((a) => a.id === assetId);
   const [amount, setAmount] = useState("");
   const [isUsdMode, setIsUsdMode] = useState(true);
 
@@ -667,6 +729,7 @@ function SendAmountScreen({ assetId, onBack, onContinue }) {
     if (!balances) return 0;
     let val = 0;
     switch(id) {
+      case 'btc':      val = balances.BTC || balances.bitcoin || 0; break;
       case 'ltc':      val = balances.LTC || balances.litecoin || 0; break;
       case 'eth':      val = balances.ETH || balances.ethereum || 0; break;
       case 'ton':      val = balances.TON || balances.ton || 0; break;
@@ -688,8 +751,13 @@ function SendAmountScreen({ assetId, onBack, onContinue }) {
   const realBal = getRealBalance(assetId);
   const balStr = fmtBal(realBal, asset.symbol);
   
-  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
-  const price = APPROX_PRICES[assetId] || 1;
+  const getLivePrice = (id) => {
+    if (!id || id.startsWith('usdt')) return 1.00;
+    const live = livePriceMap[id];
+    if (live) return live.usdPrice;
+    return BASE_ASSETS.find(a => a.id === id)?.usdPrice || 1;
+  };
+  const price = getLivePrice(assetId);
   
   const currentNum = parseFloat(amount.replace(",", ".")) || 0;
   const convertedValue = isUsdMode 
@@ -947,15 +1015,22 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
 
 /* ─── Screen: Send — confirm ─────────────────────────────────── */
 const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, onConfirm }) => {
-  const asset = assets.find((a) => a.id === assetId);
+  const liveAssets = useAssets();
+  const livePriceMap = useLivePriceMap();
+  const asset = liveAssets.find((a) => a.id === assetId);
   const { sendTransaction, addMockTransaction, testMode, settings: sendSettings } = useWallet();
   const shortRecipient = recipient && recipient.length > 16 ? recipient.slice(0, 7) + "…" + recipient.slice(-7) : (recipient || "");
 
   const [status, setStatus] = useState("idle");
   const [txError, setTxError] = useState("");
 
-  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
-  const usdValue = (parseFloat(amount.replace(",", ".")) * (APPROX_PRICES[assetId] || 1)).toFixed(2).replace(".", ",");
+  const _confirmLivePrice = (() => {
+    if (!assetId || assetId.startsWith('usdt')) return 1.00;
+    const live = livePriceMap[assetId];
+    if (live) return live.usdPrice;
+    return BASE_ASSETS.find(a => a.id === assetId)?.usdPrice || 1;
+  })();
+  const usdValue = (parseFloat(amount.replace(",", ".")) * _confirmLivePrice).toFixed(2).replace(".", ",");
 
   const fi = feeInfo || { nativeFormatted: "—", usd: "—", unitLabel: "", multiplier: 1.0, key: "normal" };
 
@@ -1084,14 +1159,14 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
   const [showFilter, setShowFilter] = useState(false);
   const [hasBalance, setHasBalance] = useState(false);
 
-  const filtered = assets.filter((a) => {
+  const filtered = BASE_ASSETS.filter((a) => {
     if (tab === "stable" && a.symbol !== "USDT") return false;
     if (search && !a.name.toLowerCase().includes(search.toLowerCase()) && !a.symbol.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
   const recentIds = ["btc", "ton", "eth"];
-  const recentItems = assets.filter((a) => recentIds.includes(a.id));
+  const recentItems = BASE_ASSETS.filter((a) => recentIds.includes(a.id));
 
   const CopyIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
@@ -1101,7 +1176,7 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
   );
 
   const handleSelect = (assetId) => {
-    const asset = assets.find(a => a.id === assetId);
+    const asset = BASE_ASSETS.find(a => a.id === assetId);
     const chain = assetId.split('-')[0].toUpperCase();
     const addr = addresses[chain] || addresses[asset.symbol] || "—";
     
@@ -1232,7 +1307,7 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
 /* ─── Screen: Receive — QR code ─────────────────────────────── */
 function ReceiveQRScreen({ assetId, onBack }) {
   const { addresses } = useWallet();
-  const asset = assets.find((a) => a.id === assetId);
+  const asset = BASE_ASSETS.find((a) => a.id === assetId);
   const chain = assetId.split('-')[0].toUpperCase();
   const address = addresses[chain] || addresses[asset.symbol] || "—";
   const [copied, setCopied] = useState(false);
@@ -1636,13 +1711,15 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
 /* ─── Screen: Asset Detail ───────────────────────────────────── */
 function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }) {
   const { balances, mockTransactions } = useWallet();
-  const asset = assets.find((a) => a.id === assetId);
+  const liveAssets = useAssets();
+  const asset = liveAssets.find((a) => a.id === assetId);
 
   // Build real balance for this asset
   const getRealBalance = (id) => {
     if (!balances) return 0;
     let val = 0;
     switch(id) {
+      case 'btc':      val = balances.BTC || balances.bitcoin || 0; break;
       case 'ltc':      val = balances.LTC || balances.litecoin || 0; break;
       case 'eth':      val = balances.ETH || balances.ethereum || 0; break;
       case 'ton':      val = balances.TON || balances.ton || 0; break;
@@ -1664,10 +1741,12 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
   const realBal = getRealBalance(assetId);
   const balStr = fmtBal(realBal, asset.symbol);
   
-  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  const _detailLivePriceMap = useLivePriceMap();
   const getApproxPrice = (id) => {
-    if (id.startsWith('usdt')) return APPROX_PRICES.usdt;
-    return APPROX_PRICES[id] || 0;
+    if (!id || id.startsWith('usdt')) return 1.00;
+    const live = _detailLivePriceMap[id];
+    if (live) return live.usdPrice;
+    return BASE_ASSETS.find(a => a.id === id)?.usdPrice || 0;
   };
   const usdVal = realBal > 0 ? `${(realBal * getApproxPrice(assetId)).toFixed(2).replace(".", ",")} $` : "0,00 $";
 
@@ -2252,7 +2331,7 @@ function TxDetailScreen({ tx, onBack }) {
     </div>
   );
 
-  const asset = assets.find(a => a.id === tx.assetId);
+  const asset = BASE_ASSETS.find(a => a.id === tx.assetId);
   const dateStr = tx.timestamp ? new Date(tx.timestamp).toLocaleString("ru-RU", { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : "Недавно";
 
   return (
@@ -2406,8 +2485,15 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
   const { mockTransactions } = useWallet();
   const [selectedTx, setSelectedTx] = useState(null);
 
-  const APPROX_PRICES_ACT = { ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
-  const getActPrice = (id) => id?.startsWith('usdt') ? 1 : (APPROX_PRICES_ACT[id] || 0);
+  const _livePriceMapAct = useLivePriceMap();
+  const getActPrice = (id) => {
+    if (!id) return 0;
+    if (id.startsWith('usdt')) return 1.00;
+    const live = _livePriceMapAct[id];
+    if (live) return live.usdPrice;
+    const base = BASE_ASSETS.find(a => a.id === id);
+    return base?.usdPrice || 0;
+  };
 
   const fmtAmt = (raw) => {
     const n = parseFloat(raw);
@@ -2417,7 +2503,7 @@ const ActivityScreen = memo(({ activeTab, setActiveTab }) => {
   };
 
   const allTx = (mockTransactions || []).map(tx => {
-    const asset = assets.find(a => a.id === tx.assetId);
+    const asset = BASE_ASSETS.find(a => a.id === tx.assetId);
     const shortTo = tx.to ? (tx.to.slice(0,4)+"..."+tx.to.slice(-4)) : "—";
     const shortFrom = tx.from ? (tx.from.slice(0,4)+"..."+tx.from.slice(-4)) : "—";
     return {
@@ -3039,7 +3125,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
   const [pinError, setPinError] = useState("");
   
   const [showMockTxModal, setShowMockTxModal] = useState(false);
-  const [mockAsset, setMockAsset] = useState(assets[0]);
+  const [mockAsset, setMockAsset] = useState(BASE_ASSETS[0]);
   const [mockAmount, setMockAmount] = useState("");
   const [mockFrom, setMockFrom] = useState("");
 
@@ -3214,7 +3300,7 @@ const SettingsScreen = memo(({ activeTab, setActiveTab, isAdmin, onAdminPanel, o
               <div>
                 <div style={{ color: "#888", fontSize: 13, marginBottom: 10, marginLeft: 4 }}>Выберите токен</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  {assets.slice(0, 6).map(a => (
+                  {BASE_ASSETS.slice(0, 6).map(a => (
                     <button key={a.id}
                       onClick={() => setMockAsset(a)}
                       style={{ 
@@ -3742,12 +3828,15 @@ function fmtBal(num, sym) {
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
   const { balances, addresses, refreshBalance, testMode, settings, updateSetting } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const assets = useAssets();
+  const livePriceMap = useLivePriceMap();
 
   // Build real balances mapped to asset ids
   const getRealBalance = (assetId) => {
     if (!balances) return 0;
     let val = 0;
     switch(assetId) {
+      case 'btc':      val = balances.BTC || balances.bitcoin || 0; break;
       case 'ltc':      val = balances.LTC || balances.litecoin || 0; break;
       case 'eth':      val = balances.ETH || balances.ethereum || 0; break;
       case 'ton':      val = balances.TON || balances.ton || 0; break;
@@ -3764,11 +3853,13 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
     return parseFloat(val) || 0;
   };
 
-  // Calculate total portfolio value (approximate, using rough prices)
-  const APPROX_PRICES = { btc: 95124, ltc: 56, eth: 2191, ton: 1.96, arb: 0.12, bnb: 655, sol: 87, usdt: 1.00 };
+  // Calculate total portfolio value using live prices when available
   const getApproxPrice = (assetId) => {
-    if (assetId.startsWith('usdt')) return APPROX_PRICES.usdt;
-    return APPROX_PRICES[assetId] || 0;
+    if (assetId.startsWith('usdt')) return 1.00;
+    const live = livePriceMap[assetId];
+    if (live) return live.usdPrice;
+    const base = BASE_ASSETS.find(a => a.id === assetId);
+    return base?.usdPrice || 0;
   };
   const totalUsd = assets.reduce((sum, a) => {
     const bal = getRealBalance(a.id);
@@ -5279,7 +5370,7 @@ export default function GemWalletApp() {
       bypassUnlock();
     }
   }, [hasWallet, isUnlocked, settings, bypassUnlock]);
-  if (!hasWallet) return <OnboardingScreen />;
-  if (!isUnlocked) return <UnlockScreen />;
-  return <WalletHomeUI />;
+  if (!hasWallet) return <LivePricesProvider><OnboardingScreen /></LivePricesProvider>;
+  if (!isUnlocked) return <LivePricesProvider><UnlockScreen /></LivePricesProvider>;
+  return <LivePricesProvider><WalletHomeUI /></LivePricesProvider>;
 }

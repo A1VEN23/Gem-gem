@@ -1,5 +1,6 @@
 import React from 'react';
 
+import btcPng  from './coins/BTC.png';
 import bnbPng  from './coins/BNB.png';
 import arbPng  from './coins/ARB.png';
 import solPng  from './coins/SOL.png';
@@ -19,26 +20,13 @@ const makePngIcon = (src: string): IconComponent =>
     />
   );
 
+export const BtcIcon = makePngIcon(btcPng);
 export const BnbIcon = makePngIcon(bnbPng);
 export const ArbIcon = makePngIcon(arbPng);
 export const SolIcon = makePngIcon(solPng);
 export const TonIcon = makePngIcon(tonPng);
 
 // ─── SVG-based icons ──────────────────────────────────────────────────────────
-
-export const BtcIcon: IconComponent = ({ size = 40 }) => (
-  <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-    <circle cx="20" cy="20" r="20" fill="#F7931A"/>
-    {/* vertical stems */}
-    <path d="M16.5 10.5 V29.5 M18.5 10.5 V29.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-    {/* top bump */}
-    <path d="M16.5 11.5 H22 C24.5 11.5 25.5 13 25.5 14.8 C25.5 16.6 24.5 18 22 18 H16.5"
-      stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-    {/* bottom bump — wider */}
-    <path d="M16.5 18 H22.5 C25.5 18 27 19.5 27 21.5 C27 23.5 25.5 25.5 22.5 25.5 H16.5"
-      stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
 
 export const EthIcon: IconComponent = ({ size = 40 }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
