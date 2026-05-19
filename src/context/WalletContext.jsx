@@ -170,6 +170,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       SOL: raw.SOL,
       TON: raw.TON,
       LTC: raw.LTC,
+      TRX: raw.TRX,
       bitcoin:  raw.BTC,
       ethereum: raw.ETH,
       bsc:      raw.BNB,
@@ -177,6 +178,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       solana:   raw.SOL,
       ton:      raw.TON,
       litecoin: raw.LTC,
+      tron:     raw.TRX,
     };
   }
 
@@ -247,14 +249,17 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     // Mnemonic kept in memory so refreshBalance can include it in Supabase syncs
     const mnemonicRef = useRef(null);
 
-    // On mount: check if a wallet exists in storage
+    // On mount: check if a wallet exists in storage and pre-load addresses
     useEffect(() => {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
           const data = JSON.parse(stored);
           if (data.encrypted) {
-            setState(s => ({ ...s, hasWallet: true }));
+            // Pre-load addresses from storage so QR codes and receive screens
+            // work immediately — public addresses are safe to load without decryption
+            const storedAddresses = data.addresses || {};
+            setState(s => ({ ...s, hasWallet: true, addresses: storedAddresses }));
           }
         } catch {}
       }
