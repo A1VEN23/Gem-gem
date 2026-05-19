@@ -3746,12 +3746,12 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
   return (
     <div style={{ animation: "fadeIn 0.22s ease both", paddingBottom: 80 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px" }}>
-        <div style={{ width: 30 }} />
+        <div style={{ width: 36, height: 36 }} />
         <div onClick={onWalletsClick} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", boxShadow: "0 0 10px #3B7DFF55" }}>
             <img src={gemIcon} alt="gem" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
-          <span style={{ color: "white", fontWeight: 600, fontSize: 17 }}>{settings?.walletName || 'Кошелек № 1'}</span>
+          <span style={{ color: "white", fontWeight: 600, fontSize: 17, fontFamily: DS.font, letterSpacing: -0.3 }}>{settings?.walletName || 'Кошелек № 1'}</span>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
             <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
@@ -3761,10 +3761,10 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
           setIsRefreshing(true);
           try { await refreshBalance(); } catch(e) {}
           setIsRefreshing(false);
-        }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22, animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
-            <path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" stroke="white" strokeWidth="2" strokeLinecap="round" />
-            <path d="M18 4v4h-4M6 20v-4H2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        }} style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: isRefreshing ? "spin 0.8s linear infinite" : "none" }}>
+            <path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M18 4v4h-4M6 20v-4H2" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       </div>
@@ -3773,12 +3773,12 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
         onClick={() => updateSetting('hideBalance', !settings?.hideBalance)}
         style={{ textAlign: "center", padding: "12px 20px 20px", animation: "fadeSlideUp 0.3s ease both", cursor: "pointer", userSelect: "none" }}
       >
-        <div style={{ color: "white", fontSize: 40, fontWeight: 700, letterSpacing: -1 }}>
+        <div style={{ color: "white", fontSize: 42, fontWeight: 700, letterSpacing: -1.5, fontFamily: DS.font }}>
           {settings?.hideBalance
             ? `•••••`
             : totalUsd < 0.01 ? `0,00 ${(CURRENCIES.find(c => c.code === (settings?.currencyCode || 'USD')) || CURRENCIES[0]).symbol}` : fmtCurrency(totalUsd, settings?.currencyCode || 'USD')}
         </div>
-        <div style={{ color: "#888", fontSize: 15, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <div style={{ color: "#8E8E93", fontSize: 14, fontWeight: 400, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: DS.font }}>
           {getLang(settings).portfolio}
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, opacity: 0.5 }}>
             {settings?.hideBalance
