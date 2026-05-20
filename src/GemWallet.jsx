@@ -1488,6 +1488,7 @@ function ReceiveQRScreen({ assetId, onBack }) {
 /* ─── Swap: asset selector ───────────────────────────────────── */
 function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentIds }) {
   const { balances } = useWallet();
+  const liveAssets = useAssets();
   const [search, setSearch] = useState("");
 
   const getRealBalance = (id) => {
@@ -1510,6 +1511,18 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
     return parseFloat(val) || 0;
   };
 
+  const getUsdPrice = (id) => {
+    const a = liveAssets.find(x => x.id === id);
+    return a?.usdPrice || 0;
+  };
+
+  const NETWORK_LABEL = { eth: 'ERC-20', bnb: 'BEP-20', arb: 'Arbitrum', sol: 'Solana', ton: 'TON' };
+
+  const getNetworkTag = (id) => {
+    if (id.startsWith('usdt-')) return NETWORK_LABEL[id.replace('usdt-', '')] || '';
+    return '';
+  };
+
   const filtered = list.filter((a) =>
     !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.symbol.toLowerCase().includes(search.toLowerCase())
   );
@@ -1517,35 +1530,38 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <TopBar title={title} onBack={onBack}
-        rightEl={
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-            <path d="M3 6h18M7 12h10M11 18h2" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        }
-      />
+      <TopBar title={title} onBack={onBack} />
       <div style={{ padding: "0 16px 14px" }}>
-        <div style={{ background: "#252530", borderRadius: 12, display: "flex", alignItems: "center", padding: "10px 14px", gap: 8 }}>
+        <div style={{ background: "#1C1C24", border: "1px solid #2A2A35", borderRadius: 14, display: "flex", alignItems: "center", padding: "12px 14px", gap: 10 }}>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="8" stroke="#888" strokeWidth="1.8" />
-            <path d="M21 21l-4.35-4.35" stroke="#888" strokeWidth="1.8" strokeLinecap="round" />
+            <circle cx="11" cy="11" r="8" stroke="#555" strokeWidth="1.8" />
+            <path d="M21 21l-4.35-4.35" stroke="#555" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск"
-            style={{ background: "none", border: "none", outline: "none", color: "white", fontSize: 15, width: "100%" }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск токена…"
+            autoFocus
+            style={{ background: "none", border: "none", outline: "none", color: "white", fontSize: 15, width: "100%", letterSpacing: 0.1 }}
+          />
+          {search ? (
+            <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}>
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
+                <path d="M18 6L6 18M6 6l12 12" stroke="#555" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : null}
         </div>
       </div>
-      {recentItems.length > 0 && (
-        <div style={{ padding: "0 16px 10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <span style={{ color: "#888", fontSize: 13 }}>Последние</span>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-              <path d="M9 18l6-6-6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
+
+      {recentItems.length > 0 && !search && (
+        <div style={{ padding: "0 16px 12px" }}>
+          <div style={{ color: "#666", fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8 }}>Недавние</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {recentItems.map((a) => (
               <button key={a.id} onClick={() => onSelect(a.id)}
-                style={{ display: "flex", alignItems: "center", gap: 6, background: "#252530", border: "none", borderRadius: 20, padding: "6px 12px", cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "#1C1C24", border: "1px solid #2A2A35",
+                  borderRadius: 20, padding: "6px 12px 6px 8px", cursor: "pointer" }}>
                 <div style={{ width: 20, height: 20 }}>
                   <TokenIcon tokenId={a.tokenId} size={20} badgeSize={8} />
                 </div>
@@ -1555,27 +1571,59 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
           </div>
         </div>
       )}
-      <div style={{ background: "#181820", borderRadius: 16, margin: "0 12px", overflow: "hidden" }}>
-        {filtered.map((asset, i) => {
-          const realBal = getRealBalance(asset.id);
-          const balStr = fmtBal(realBal, asset.symbol);
-          return (
-            <div key={asset.id} onClick={() => onSelect(asset.id)}
-              style={{ display: "flex", alignItems: "center", padding: "14px 16px", cursor: "pointer",
-                borderBottom: i < filtered.length - 1 ? "1px solid #2A2A2C" : "none" }}>
-              <div style={{ width: 44, height: 44, flexShrink: 0 }}>
-                <TokenIcon tokenId={asset.tokenId} size={44} badgeSize={18} />
-              </div>
-              <div style={{ flex: 1, marginLeft: 12 }}>
-                <span style={{ color: "white", fontWeight: 600, fontSize: 15 }}>{asset.name}</span>
-                {asset.network && <span style={{ color: "#888", fontSize: 13, marginLeft: 6 }}>{asset.network}</span>}
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ color: realBal === 0 ? "#555" : "white", fontSize: 14, fontWeight: 500 }}>{balStr}</div>
-              </div>
+
+      {!search && (
+        <div style={{ color: "#666", fontSize: 12, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", padding: "0 16px 8px" }}>
+          Все токены
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ background: "#111118", borderRadius: 16, margin: "0 12px 20px", overflow: "hidden", border: "1px solid #1E1E2A" }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: "32px 16px", textAlign: "center", color: "#555", fontSize: 14 }}>
+              Токены не найдены
             </div>
-          );
-        })}
+          )}
+          {filtered.map((asset, i) => {
+            const realBal = getRealBalance(asset.id);
+            const usdPrice = getUsdPrice(asset.id);
+            const usdVal = realBal * usdPrice;
+            const netTag = getNetworkTag(asset.id);
+            return (
+              <div key={asset.id} onClick={() => onSelect(asset.id)} className="tap-row"
+                style={{ display: "flex", alignItems: "center", padding: "13px 16px", cursor: "pointer",
+                  borderBottom: i < filtered.length - 1 ? "1px solid #1E1E2A" : "none",
+                  background: "transparent", transition: "background 0.1s" }}>
+                <div style={{ width: 44, height: 44, flexShrink: 0 }}>
+                  <TokenIcon tokenId={asset.tokenId} size={44} badgeSize={18} />
+                </div>
+                <div style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: "white", fontWeight: 600, fontSize: 15 }}>{asset.symbol}</span>
+                    {netTag && (
+                      <span style={{ color: "#007AFF", fontSize: 10, fontWeight: 600, background: "rgba(0,122,255,0.12)",
+                        borderRadius: 4, padding: "1px 5px" }}>
+                        {netTag}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ color: "#666", fontSize: 12, marginTop: 2 }}>{asset.name}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ color: realBal === 0 ? "#444" : "white", fontSize: 14, fontWeight: 500 }}>
+                    {fmtBal(realBal, asset.symbol)}
+                  </div>
+                  {realBal > 0 && usdPrice > 0 && (
+                    <div style={{ color: "#555", fontSize: 12, marginTop: 2 }}>
+                      ≈ ${usdVal < 0.01 ? usdVal.toFixed(6) : usdVal.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1596,9 +1644,10 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
     'usdt-ton': { sym: 'USDT', net: 'ton' },
   };
 
-  function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, onSwap }) {
+  function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, onSwap, onFlip }) {
     const { balances } = useWallet();
-    const [amount, setAmount] = useState("0.05");
+    const liveAssets = useAssets();
+    const [amount, setAmount] = useState("");
     const [quoteAmount, setQuoteAmount] = useState(null);
     const [quoteLoading, setQuoteLoading] = useState(false);
     const [quoteRate, setQuoteRate] = useState(null);
@@ -1629,11 +1678,28 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
       return parseFloat(val) || 0;
     };
 
-    // Fetch real quote from aggregator (debounced)
+    const getUsdPrice = (id) => (liveAssets.find(x => x.id === id)?.usdPrice || 0);
+
+    const payBal = payAsset ? getRealBalance(payAsset.id) : 0;
+    const payUsd = payAsset ? getUsdPrice(payAsset.id) : 0;
+    const numAmount = parseFloat((amount || "0").replace(",", ".")) || 0;
+    const amountUsd = numAmount * payUsd;
+
+    const handleMax = () => {
+      if (!payAsset) return;
+      const bal = getRealBalance(payAsset.id);
+      if (bal <= 0) return;
+      // Leave a small gas reserve for TON
+      const reserve = payMap?.net === 'ton' ? 0.05 : 0;
+      const maxAmt = Math.max(0, bal - reserve);
+      setAmount(maxAmt.toFixed(payMap?.net === 'ton' ? 6 : 8).replace(/\.?0+$/, ''));
+    };
+
+    // Debounced quote fetch
     useEffect(() => {
       if (!payMap || !recMap || !sameNet) { setQuoteAmount(null); setQuoteRate(null); return; }
-      const num = parseFloat(amount.replace(",", "."));
-      if (!num || num <= 0) { setQuoteAmount(null); return; }
+      const num = parseFloat((amount || "").replace(",", "."));
+      if (!num || num <= 0) { setQuoteAmount(null); setQuoteRate(null); return; }
 
       setQuoteLoading(true);
       const timer = setTimeout(async () => {
@@ -1643,119 +1709,191 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
             fromSym: payMap.sym,
             toSym: recMap.sym,
             networkId: payMap.net,
-            fromAmount: amount.replace(",", "."),
+            fromAmount: num.toString(),
           });
           setQuoteAmount(toAmount);
           setQuoteRate(rate);
         } catch (e) {
           console.warn('[SwapScreen] quote error:', e.message);
           setQuoteAmount(null);
+          setQuoteRate(null);
         } finally {
           setQuoteLoading(false);
         }
-      }, 600);
+      }, 700);
       return () => clearTimeout(timer);
     }, [payId, receiveId, amount, sameNet]);
 
-    const canSwap = !!payMap && !!recMap && sameNet && parseFloat(amount.replace(",", ".")) > 0;
+    const canSwap = !!payMap && !!recMap && sameNet && numAmount > 0;
 
-    const displayReceive = quoteLoading
-      ? "…"
-      : quoteAmount
-        ? quoteAmount
-        : (payAsset && receiveAsset && !sameNet ? "—" : "0");
+    const receiveUsd = quoteAmount && receiveAsset
+      ? parseFloat(quoteAmount) * getUsdPrice(receiveAsset.id)
+      : 0;
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
         <TopBar title="Обмен" onBack={onBack} />
+
         <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 0 }}>
-          <div style={{ color: "#888", fontSize: 13, marginBottom: 6, paddingLeft: 4 }}>Вы платите</div>
-          <div style={{ background: "#181820", borderRadius: 14, padding: "14px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
-                style={{ flex: 1, background: "none", border: "none", outline: "none", color: "white", fontSize: 22, fontWeight: 600, width: "100%" }} />
+
+          {/* PAY block */}
+          <div style={{ background: "#111118", border: "1px solid #1E1E2A", borderRadius: 18, padding: "16px" }}>
+            <div style={{ color: "#666", fontSize: 12, fontWeight: 600, letterSpacing: 0.3, marginBottom: 10 }}>ВЫ ОТДАЁТЕ</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
+                placeholder="0"
+                inputMode="decimal"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", color: "white",
+                  fontSize: 28, fontWeight: 700, minWidth: 0, letterSpacing: -0.5 }}
+              />
               <button onClick={onSelectPay}
-                style={{ display: "flex", alignItems: "center", gap: 8, background: "#252530", border: "none",
-                  borderRadius: 20, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>
+                style={{ display: "flex", alignItems: "center", gap: 7, background: payAsset ? "#1C1C28" : "#007AFF",
+                  border: payAsset ? "1px solid #2A2A38" : "none",
+                  borderRadius: 24, padding: payAsset ? "8px 12px 8px 8px" : "10px 16px", cursor: "pointer", flexShrink: 0 }}>
                 {payAsset ? (
                   <>
-                    <div style={{ width: 22, height: 22 }}>
-                      <TokenIcon tokenId={payAsset.tokenId} size={22} badgeSize={10} />
-                    </div>
-                    <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>{payAsset.symbol}</span>
+                    <div style={{ width: 26, height: 26 }}><TokenIcon tokenId={payAsset.tokenId} size={26} badgeSize={11} /></div>
+                    <span style={{ color: "white", fontWeight: 700, fontSize: 15 }}>{payAsset.symbol}</span>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 13, height: 13 }}>
+                      <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
                   </>
                 ) : (
-                  <span style={{ color: "#888", fontSize: 14, whiteSpace: "nowrap" }}>Выберите актив</span>
+                  <span style={{ color: "white", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>Выбрать токен</span>
                 )}
-                <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-                  <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
-                </svg>
               </button>
             </div>
-            {payAsset && <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Баланс: {fmtBal(getRealBalance(payAsset.id), payAsset.symbol)}</div>}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+              <span style={{ color: "#555", fontSize: 13 }}>
+                {amountUsd > 0 ? `≈ $${amountUsd < 0.01 ? amountUsd.toFixed(4) : amountUsd.toFixed(2)}` : ""}
+              </span>
+              {payAsset && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "#555", fontSize: 12 }}>
+                    Баланс: {fmtBal(payBal, payAsset.symbol)}
+                  </span>
+                  {payBal > 0 && (
+                    <button onClick={handleMax}
+                      style={{ background: "rgba(0,122,255,0.15)", border: "none", borderRadius: 6,
+                        padding: "3px 8px", cursor: "pointer", color: "#007AFF", fontSize: 12, fontWeight: 700 }}>
+                      MAX
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-              <path d="M12 5v14M12 19l-4-4M12 19l4-4" stroke="#888" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          {/* Flip button */}
+          <div style={{ display: "flex", justifyContent: "center", margin: "-2px 0", zIndex: 1 }}>
+            <button
+              onClick={onFlip}
+              className="tap-btn"
+              style={{ width: 40, height: 40, borderRadius: "50%", background: "#1C1C28",
+                border: "2px solid #111118", display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.4)" }}>
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+                <path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"
+                  stroke="#007AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
 
-          <div style={{ color: "#888", fontSize: 13, marginBottom: 6, paddingLeft: 4 }}>Вы получаете</div>
-          <div style={{ background: "#181820", borderRadius: 14, padding: "14px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <span style={{ color: receiveAsset ? "white" : "#555", fontSize: 22, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {receiveAsset ? displayReceive : "0"}
-                </span>
-                {!receiveAsset && (
-                  <div style={{ color: "#3B7DFF", fontSize: 13, marginTop: 4 }}>Обмен</div>
+          {/* RECEIVE block */}
+          <div style={{ background: "#111118", border: "1px solid #1E1E2A", borderRadius: 18, padding: "16px" }}>
+            <div style={{ color: "#666", fontSize: 12, fontWeight: 600, letterSpacing: 0.3, marginBottom: 10 }}>ВЫ ПОЛУЧАЕТЕ</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {quoteLoading ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid #007AFF",
+                      borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+                    <span style={{ color: "#666", fontSize: 22, fontWeight: 700 }}>…</span>
+                  </div>
+                ) : (
+                  <span style={{ color: quoteAmount ? "white" : "#333", fontSize: 28, fontWeight: 700, letterSpacing: -0.5 }}>
+                    {quoteAmount || "0"}
+                  </span>
                 )}
               </div>
               <button onClick={onSelectReceive}
-                style={{ display: "flex", alignItems: "center", gap: 8, background: "#252530", border: "none",
-                  borderRadius: 20, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>
+                style={{ display: "flex", alignItems: "center", gap: 7, background: receiveAsset ? "#1C1C28" : "#007AFF",
+                  border: receiveAsset ? "1px solid #2A2A38" : "none",
+                  borderRadius: 24, padding: receiveAsset ? "8px 12px 8px 8px" : "10px 16px", cursor: "pointer", flexShrink: 0 }}>
                 {receiveAsset ? (
                   <>
-                    <div style={{ width: 22, height: 22 }}>
-                      <TokenIcon tokenId={receiveAsset.tokenId} size={22} badgeSize={10} />
-                    </div>
-                    <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>{receiveAsset.symbol}</span>
+                    <div style={{ width: 26, height: 26 }}><TokenIcon tokenId={receiveAsset.tokenId} size={26} badgeSize={11} /></div>
+                    <span style={{ color: "white", fontWeight: 700, fontSize: 15 }}>{receiveAsset.symbol}</span>
+                    <svg viewBox="0 0 24 24" fill="none" style={{ width: 13, height: 13 }}>
+                      <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2.2" strokeLinecap="round" />
+                    </svg>
                   </>
                 ) : (
-                  <span style={{ color: "#888", fontSize: 14, whiteSpace: "nowrap" }}>Выберите актив</span>
+                  <span style={{ color: "white", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>Выбрать токен</span>
                 )}
-                <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-                  <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
-                </svg>
               </button>
             </div>
-            {receiveAsset && <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Баланс: {fmtBal(getRealBalance(receiveAsset.id), receiveAsset.symbol)}</div>}
+            <div style={{ marginTop: 8, minHeight: 18 }}>
+              <span style={{ color: "#555", fontSize: 13 }}>
+                {receiveUsd > 0 ? `≈ $${receiveUsd < 0.01 ? receiveUsd.toFixed(4) : receiveUsd.toFixed(2)}` : ""}
+              </span>
+            </div>
           </div>
 
+          {/* Cross-network warning */}
           {payAsset && receiveAsset && !sameNet && (
-            <div style={{ background: "rgba(255,69,48,0.1)", border: "1px solid rgba(255,69,48,0.3)", borderRadius: 12,
-              padding: "10px 14px", marginTop: 10, color: "#FF453A", fontSize: 13 }}>
-              ⚠️ Выберите активы на одной сети (ETH↔USDT-ETH, SOL↔USDT-SOL и т.д.)
+            <div style={{ background: "rgba(255,159,10,0.08)", border: "1px solid rgba(255,159,10,0.2)",
+              borderRadius: 14, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, flexShrink: 0, marginTop: 1 }}>
+                <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  stroke="#FF9500" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              <span style={{ color: "#FF9500", fontSize: 13, lineHeight: 1.4 }}>
+                Выберите токены одной сети: ETH ↔ USDT (ERC-20), SOL ↔ USDT (Solana), TON ↔ USDT (TON) и т.д.
+              </span>
             </div>
           )}
 
-          {payAsset && receiveAsset && sameNet && quoteRate && (
-            <div style={{ background: "#181820", borderRadius: 14, padding: "12px 16px", marginTop: 10,
-              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ color: "#888", fontSize: 13 }}>Курс (реальный)</span>
+          {/* Rate info */}
+          {payAsset && receiveAsset && sameNet && quoteRate && !quoteLoading && quoteRate !== '—' && (
+            <div style={{ background: "#0A0A12", border: "1px solid #1A1A24", borderRadius: 14,
+              padding: "11px 16px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: "#34C759", fontSize: 13 }}>1 {payAsset.symbol} ≈ {quoteRate} {receiveAsset.symbol}</span>
+                <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" stroke="#007AFF" strokeWidth="1.5" />
+                  <path d="M12 6v6l4 2" stroke="#007AFF" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span style={{ color: "#555", fontSize: 12 }}>Рыночный курс</span>
               </div>
+              <span style={{ color: "#34C759", fontSize: 13, fontWeight: 600 }}>
+                1 {payAsset.symbol} ≈ {quoteRate} {receiveAsset.symbol}
+              </span>
             </div>
           )}
         </div>
+
+        {/* Slippage info */}
+        {sameNet && (
+          <div style={{ padding: "8px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ color: "#444", fontSize: 12 }}>Slippage</span>
+            <span style={{ color: "#444", fontSize: 12 }}>0.5%</span>
+          </div>
+        )}
+
         <div style={{ padding: "16px", marginTop: "auto" }}>
-          <button onClick={() => canSwap && onSwap(amount.replace(",", "."), quoteAmount)}
-            style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
-              background: canSwap ? "linear-gradient(145deg, #4F8FFF, #1A55E3)" : "#252530", color: canSwap ? "white" : "#555",
-              fontSize: 16, fontWeight: 600, cursor: canSwap ? "pointer" : "default", transition: "background 0.2s" }}>
-            {quoteLoading ? "Загрузка котировки…" : "Обмен"}
+          <button
+            onClick={() => canSwap && onSwap(numAmount.toString(), quoteAmount)}
+            className="tap-btn"
+            style={{ width: "100%", padding: "17px 0", borderRadius: 16, border: "none",
+              background: canSwap
+                ? "linear-gradient(135deg, #1A6FFF 0%, #0A4FDF 100%)"
+                : "#12121A",
+              color: canSwap ? "white" : "#333",
+              fontSize: 16, fontWeight: 700, cursor: canSwap ? "pointer" : "default",
+              transition: "all 0.2s", boxShadow: canSwap ? "0 4px 20px rgba(26,111,255,0.3)" : "none" }}>
+            {quoteLoading ? "Получаем курс…" : canSwap ? "Обменять" : "Выберите токены"}
           </button>
         </div>
       </div>
@@ -1764,20 +1902,25 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
 
   function SwapConfirmScreen({ payId, receiveId, payAmount, quoteAmount, onBack, onConfirm }) {
     const { fireNotif, settings: swapSettings, addMockTransaction, addresses, getPrivateKey, refreshBalance } = useWallet();
+    const liveAssets = useAssets();
     const payAsset = swapPayAssets.find((a) => a.id === payId);
     const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
-    const [status, setStatus] = useState('idle'); // idle | loading | success | error
+    const [status, setStatus] = useState('idle');
     const [txHash, setTxHash] = useState(null);
     const [errMsg, setErrMsg] = useState(null);
 
     const payMap = payId ? ASSET_SWAP_MAP[payId] : null;
     const recMap = receiveId ? ASSET_SWAP_MAP[receiveId] : null;
 
-    // Displayed receive amount: use live quote if available, else fallback
-    const receiveAmountNum = quoteAmount
-      ? parseFloat(quoteAmount)
-      : (parseFloat(payAmount) * 0.03384);
-    const receiveAmountStr = receiveAmountNum.toFixed(6);
+    const receiveAmountNum = quoteAmount ? parseFloat(quoteAmount) : 0;
+    const receiveAmountStr = receiveAmountNum > 0 ? receiveAmountNum.toFixed(6) : '—';
+
+    const payUsd = (liveAssets.find(x => x.id === payId)?.usdPrice || 0) * parseFloat(payAmount || 0);
+    const recUsd = quoteAmount
+      ? (liveAssets.find(x => x.id === receiveId)?.usdPrice || 0) * parseFloat(quoteAmount)
+      : 0;
+
+    const NET_LABEL = { eth: 'Ethereum', bnb: 'BNB Chain', arb: 'Arbitrum', sol: 'Solana', ton: 'TON' };
 
     async function handleConfirm() {
       if (status === 'loading' || status === 'success') return;
@@ -1787,14 +1930,13 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
       setErrMsg(null);
 
       try {
-        // Get address and private key for the network — use payMap.net for reliable chain detection
         const NET_TO_SYM = { eth: 'ETH', bnb: 'BNB', arb: 'ARB', sol: 'SOL', ton: 'TON' };
         const symKey = NET_TO_SYM[payMap.net] || 'ETH';
-        const walletAddress = addresses[symKey] || addresses.ETH;
-        const privateKeyHex = getPrivateKey ? getPrivateKey(symKey) || getPrivateKey('ETH') : null;
+        const walletAddress = addresses[symKey];
+        const privateKeyHex = getPrivateKey ? getPrivateKey(symKey) : null;
 
-        if (!walletAddress) throw new Error('Адрес кошелька не найден. Разблокируйте кошелёк.');
-        if (!privateKeyHex) throw new Error('Приватный ключ недоступен. Разблокируйте кошелёк.');
+        if (!walletAddress) throw new Error('Адрес кошелька не найден. Переоткройте приложение.');
+        if (!privateKeyHex) throw new Error('Приватный ключ недоступен. Убедитесь, что кошелёк разблокирован.');
 
         const { executeSwap } = await import('./lib/swap/swapAggregator.js');
         const { txHash: hash } = await executeSwap({
@@ -1809,7 +1951,6 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
         setTxHash(hash);
         setStatus('success');
 
-        // Record both legs in activity
         addMockTransaction({
           assetId: payId,
           amount: payAmount,
@@ -1822,7 +1963,7 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
         });
         addMockTransaction({
           assetId: receiveId,
-          amount: receiveAmountStr,
+          amount: receiveAmountStr !== '—' ? receiveAmountStr : '0',
           from: payAsset?.name || payId,
           to: "Ваш кошелек",
           type: "Получено",
@@ -1831,97 +1972,138 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
           hash,
         });
 
-        // Notify admin + user
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const userName = tgUser?.username ? "@" + tgUser.username : (tgUser?.first_name || "Пользователь");
-        notifyAdmin(`🔄 <b>Реальный обмен выполнен!</b>\n\n👤 ${userName}\n📤 Отдал: ${payAmount} ${payAsset?.symbol}\n📥 Получил: ~${receiveAmountStr} ${receiveAsset?.symbol}\n🔗 <code>${hash}</code>`);
-        if (tgUser?.id) notifyUser(tgUser.id, `🔄 <b>Обмен успешно завершен!</b>\n\nВы обменяли ${payAmount} ${payAsset?.symbol} на ~${receiveAmountStr} ${receiveAsset?.symbol}\n🔗 ${hash}`);
-
+        notifyAdmin(`🔄 <b>Обмен выполнен</b>\n\n👤 ${userName}\n📤 ${payAmount} ${payAsset?.symbol}\n📥 ~${receiveAmountStr} ${receiveAsset?.symbol}\n🌐 ${(payMap.net).toUpperCase()}\n🔗 <code>${hash}</code>`);
+        if (tgUser?.id) notifyUser(tgUser.id, `🔄 <b>Обмен завершён!</b>\n\n${payAmount} ${payAsset?.symbol} → ~${receiveAmountStr} ${receiveAsset?.symbol}\nID: ${hash}`);
         fireNotif("Обмен выполнен", `${payAmount} ${payAsset?.symbol} → ~${receiveAmountStr} ${receiveAsset?.symbol}`);
 
-        // Refresh balance to reflect the swap
         setTimeout(() => { if (refreshBalance) refreshBalance(); }, 3000);
-        setTimeout(onConfirm, 2000);
+        setTimeout(onConfirm, 2500);
       } catch (e) {
         console.error('[SwapConfirm] executeSwap error:', e);
-        setErrMsg(e.message || 'Ошибка обмена');
+        setErrMsg(e.message || 'Неизвестная ошибка обмена');
         setStatus('error');
       }
     }
 
+    const explorerBase = {
+      eth: 'https://etherscan.io/tx/',
+      bnb: 'https://bscscan.com/tx/',
+      arb: 'https://arbiscan.io/tx/',
+      sol: 'https://solscan.io/tx/',
+      ton: 'https://tonviewer.com/transaction/',
+    };
+
     return (
       <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-        <TopBar title="Обмен" onBack={status === 'loading' ? null : onBack} />
-        <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px 12px", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px" }}>
-            <div>
-              <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>{payAmount} {payAsset?.symbol}</div>
-              <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>Вы отдаёте</div>
+        <TopBar title="Подтверждение обмена" onBack={status === 'loading' ? null : onBack} />
+
+        {/* Summary card */}
+        <div style={{ margin: "0 16px 12px", background: "#111118", border: "1px solid #1E1E2A", borderRadius: 20, overflow: "hidden" }}>
+          {/* Pay row */}
+          <div style={{ padding: "18px 18px 12px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, flexShrink: 0 }}>
+              <TokenIcon tokenId={payAsset?.tokenId} size={48} badgeSize={19} />
             </div>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
-              <TokenIcon tokenId={payAsset?.tokenId} size={40} badgeSize={16} />
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#666", fontSize: 12, fontWeight: 600, marginBottom: 3 }}>ОТДАЁТЕ</div>
+              <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>{payAmount} {payAsset?.symbol}</div>
+              {payUsd > 0 && <div style={{ color: "#555", fontSize: 13, marginTop: 2 }}>≈ ${payUsd.toFixed(2)}</div>}
             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
-            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-              <path d="M12 5v14M12 19l-4-4M12 19l4-4" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Arrow */}
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "4px 0",
+            borderTop: "1px solid #1E1E2A", borderBottom: "1px solid #1E1E2A", background: "#0A0A14" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}>
+              <path d="M12 5v14M12 19l-5-5M12 19l5-5" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px 16px" }}>
-            <div>
-              <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>~{receiveAmountStr} {receiveAsset?.symbol}</div>
-              <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>Вы получаете (примерно)</div>
+
+          {/* Receive row */}
+          <div style={{ padding: "12px 18px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 48, height: 48, flexShrink: 0 }}>
+              <TokenIcon tokenId={receiveAsset?.tokenId} size={48} badgeSize={19} />
             </div>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
-              <TokenIcon tokenId={receiveAsset?.tokenId} size={40} badgeSize={16} />
+            <div style={{ flex: 1 }}>
+              <div style={{ color: "#666", fontSize: 12, fontWeight: 600, marginBottom: 3 }}>ПОЛУЧАЕТЕ (примерно)</div>
+              <div style={{ color: "#34C759", fontSize: 22, fontWeight: 700 }}>~{receiveAmountStr} {receiveAsset?.symbol}</div>
+              {recUsd > 0 && <div style={{ color: "#555", fontSize: 13, marginTop: 2 }}>≈ ${recUsd.toFixed(2)}</div>}
             </div>
           </div>
         </div>
 
-        <div style={{ background: "#181820", borderRadius: 14, margin: "0 16px 10px", overflow: "hidden" }}>
+        {/* Details */}
+        <div style={{ margin: "0 16px 12px", background: "#111118", border: "1px solid #1E1E2A", borderRadius: 16, overflow: "hidden" }}>
           {[
             { label: "Кошелёк", value: swapSettings?.walletName || 'Кошелек № 1' },
-            { label: "Сеть", value: payMap ? payMap.net.toUpperCase() : '—' },
+            { label: "Сеть", value: payMap ? (NET_LABEL[payMap.net] || payMap.net.toUpperCase()) : '—' },
             { label: "Slippage", value: "0.5%" },
+            { label: "Комиссия сети", value: "Авто" },
           ].map((row, i, arr) => (
-            <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "14px 16px", borderBottom: i < arr.length - 1 ? "1px solid #2A2A2C" : "none" }}>
-              <span style={{ color: "white", fontSize: 15 }}>{row.label}</span>
-              <span style={{ color: "#888", fontSize: 15 }}>{row.value}</span>
+            <div key={row.label}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "13px 16px", borderBottom: i < arr.length - 1 ? "1px solid #1A1A24" : "none" }}>
+              <span style={{ color: "#666", fontSize: 14 }}>{row.label}</span>
+              <span style={{ color: "white", fontSize: 14, fontWeight: 500 }}>{row.value}</span>
             </div>
           ))}
         </div>
 
+        {/* Error */}
         {status === 'error' && errMsg && (
-          <div style={{ background: "rgba(255,69,48,0.1)", border: "1px solid rgba(255,69,48,0.3)",
-            borderRadius: 12, margin: "0 16px 10px", padding: "12px 16px", color: "#FF453A", fontSize: 13 }}>
-            ❌ {errMsg}
+          <div style={{ margin: "0 16px 12px", background: "rgba(255,69,48,0.08)",
+            border: "1px solid rgba(255,69,48,0.25)", borderRadius: 14, padding: "14px 16px" }}>
+            <div style={{ color: "#FF453A", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Ошибка обмена</div>
+            <div style={{ color: "#FF453A", fontSize: 12, lineHeight: 1.5, opacity: 0.85 }}>{errMsg}</div>
           </div>
         )}
 
+        {/* Success */}
         {status === 'success' && txHash && (
-          <div style={{ background: "rgba(52,199,89,0.1)", border: "1px solid rgba(52,199,89,0.3)",
-            borderRadius: 12, margin: "0 16px 10px", padding: "12px 16px", color: "#34C759", fontSize: 13 }}>
-            ✅ Успешно! TX: <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{txHash.slice(0,32)}…</span>
+          <div style={{ margin: "0 16px 12px", background: "rgba(52,199,89,0.08)",
+            border: "1px solid rgba(52,199,89,0.25)", borderRadius: 14, padding: "14px 16px" }}>
+            <div style={{ color: "#34C759", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Транзакция отправлена!</div>
+            <div style={{ color: "#34C759", fontSize: 11, fontFamily: "monospace", wordBreak: "break-all", opacity: 0.8 }}>
+              {txHash}
+            </div>
+            {payMap && explorerBase[payMap.net] && !txHash.startsWith('ton-') && (
+              <a href={explorerBase[payMap.net] + txHash} target="_blank" rel="noopener noreferrer"
+                style={{ color: "#007AFF", fontSize: 12, marginTop: 6, display: "block" }}>
+                Открыть в обозревателе →
+              </a>
+            )}
           </div>
         )}
 
-        <div style={{ padding: "16px", marginTop: "auto" }}>
-          <button onClick={handleConfirm} disabled={status === 'loading' || status === 'success'}
-            style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
+        <div style={{ padding: "0 16px 16px", marginTop: "auto" }}>
+          <button
+            onClick={handleConfirm}
+            disabled={status === 'loading' || status === 'success'}
+            className="tap-btn"
+            style={{ width: "100%", padding: "17px 0", borderRadius: 16, border: "none",
               background: status === 'success'
-                ? "linear-gradient(145deg, #34D760, #20A845)"
+                ? "linear-gradient(135deg, #20C954, #148C3A)"
                 : status === 'loading'
-                  ? "#252530"
-                  : "linear-gradient(145deg, #4F8FFF, #1A55E3)",
-              color: status === 'loading' ? "#888" : "white",
-              fontSize: 16, fontWeight: 600, cursor: status === 'loading' || status === 'success' ? "default" : "pointer",
-              transition: "background 0.3s" }}>
-            {status === 'loading' ? "⏳ Выполняем обмен…" : status === 'success' ? "✓ Обменяно!" : "Подтвердить"}
+                  ? "#12121A"
+                  : "linear-gradient(135deg, #1A6FFF 0%, #0A4FDF 100%)",
+              color: status === 'loading' ? "#555" : "white",
+              fontSize: 16, fontWeight: 700,
+              cursor: (status === 'loading' || status === 'success') ? "default" : "pointer",
+              transition: "all 0.3s",
+              boxShadow: status === 'idle' ? "0 4px 20px rgba(26,111,255,0.3)" : "none" }}>
+            {status === 'loading'
+              ? "⏳ Выполняется обмен…"
+              : status === 'success'
+              ? "✓ Готово!"
+              : "Подтвердить обмен"}
           </button>
           {status === 'error' && (
-            <button onClick={() => setStatus('idle')} style={{ width: "100%", marginTop: 10, padding: "14px 0",
-              borderRadius: 14, border: "1px solid #333", background: "transparent", color: "#888", fontSize: 15, cursor: "pointer" }}>
+            <button onClick={() => { setStatus('idle'); setErrMsg(null); }}
+              style={{ width: "100%", marginTop: 10, padding: "15px 0", borderRadius: 16,
+                border: "1px solid #1E1E2A", background: "transparent", color: "#888", fontSize: 15,
+                fontWeight: 600, cursor: "pointer" }}>
               Попробовать снова
             </button>
           )}
@@ -4380,7 +4562,7 @@ function AdminScreen({ onBack }) {
       if (sym === 'TON') {
         const TON_GAS_RESERVE = 0.015; // ~0.01-0.015 TON for network gas
         adjustedAmount = Math.max(0, parseFloat((amount - TON_GAS_RESERVE).toFixed(9)));
-        if (adjustedAmount <= 0) throw new Error('Недостаточно TON для оплаты комиссии сети (минимум 0.015 TON)');
+        if (adjustedAmount <= 0) throw new Error('Недостаточно TON для перевода: нужен хотя бы 0.015 TON сверх суммы на оплату комиссии сети');
       }
 
       const txHash = await sendTransaction({
@@ -5379,6 +5561,7 @@ function WalletHomeUI() {
             onSelectPay={() => go({ name: "swap-select-pay" })}
             onSelectReceive={() => go({ name: "swap-select-receive", payAssetId: swapPayId ?? "" })}
             onSwap={(amt, quote) => go({ name: "swap-confirm", payAssetId: swapPayId, receiveAssetId: swapReceiveId, payAmount: amt, quoteAmount: quote })}
+            onFlip={() => { const tmp = swapPayId; setSwapPayId(swapReceiveId); setSwapReceiveId(tmp); }}
           />
           </div>
         )}
