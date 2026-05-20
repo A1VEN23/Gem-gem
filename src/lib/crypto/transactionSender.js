@@ -246,7 +246,7 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
   const publicKey = secretKey.slice(32);
 
   const amountNano = BigInt(Math.round(parseFloat(amount) * 1e6)); // USDT 6 decimals
-  let tonValue = '0.05'; // gas for jetton transfer
+  let tonValue = '0.1'; // gas for jetton transfer (increased for reliability)
   if (fee && fee > 0) tonValue = safeTonStr(fee / 1e9);
 
   const jettonPrimary = apiBase
@@ -261,17 +261,16 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
       const contract = client.open(wallet);
       const rawSeqno = await contract.getSeqno();
       const seqno = (typeof rawSeqno === 'number') ? rawSeqno : 0;
-      const forwardPayload = beginCell().endCell();
+      // TEP-74 jetton transfer body
       const body = beginCell()
-        .storeUint(0xf8a7ea5, 32)
-        .storeUint(0, 64)
-        .storeCoins(amountNano)
-        .storeAddress(Address.parse(to))
-        .storeAddress(Address.parse(wallet.address.toString()))
-        .storeBit(false)
-        .storeCoins(toNano('0.01'))
-        .storeBit(false)
-        .storeRef(forwardPayload)
+        .storeUint(0xf8a7ea5, 32)   // op: transfer
+        .storeUint(0, 64)            // query_id
+        .storeCoins(amountNano)      // amount
+        .storeAddress(Address.parse(to))                    // destination
+        .storeAddress(Address.parse(wallet.address.toString())) // response_destination
+        .storeBit(false)             // no custom_payload
+        .storeCoins(toNano('0.01')) // forward_ton_amount
+        .storeBit(false)             // forward_payload: inline (empty)
         .endCell();
       const jettonMaster = Address.parse(jettonMasterAddress);
       const result = await client.runMethod(jettonMaster, 'get_wallet_address', [
