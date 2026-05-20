@@ -495,7 +495,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     // Using refs (not localStorage) avoids stale baseline causing false notifications on app start
     const hasFirstBalanceLoad = useRef(false);
     const isRefreshingRef = useRef(false); // lock: prevents concurrent refreshBalance calls
-    const prevBalancesRef = useRef({ BTC: 0, ETH: 0, BNB: 0, ARB: 0, SOL: 0, TON: 0, LTC: 0, USDT: 0, _usdtByNetwork: {} });
+    // Load last-known balances from persistent key (not gem_* so it survives RESET_VERSION)
+      // so deposits that arrived while app was closed are still detected on next open
+      const _savedBals = (() => { try { return JSON.parse(localStorage.getItem('gw_last_bals') || 'null'); } catch { return null; } })();
+      const prevBalancesRef = useRef(_savedBals || { BTC: 0, ETH: 0, BNB: 0, ARB: 0, SOL: 0, TON: 0, LTC: 0, USDT: 0, _usdtByNetwork: {} });
 
     // On mount: check if a wallet exists in storage and pre-load addresses
     useEffect(() => {
@@ -516,16 +519,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const mockTxsStored = JSON.parse(localStorage.getItem(MOCK_TXS_KEY) || '[]');
       const mockBalsStored = JSON.parse(localStorage.getItem(MOCK_BALS_KEY) || '{}');
       
-      // Keep only the LAST transaction (remove all spam/dupes)
-      // This ensures all users see only one transaction in Activity
-      const cleanedTxs = mockTxsStored.length > 0 
-        ? [mockTxsStored.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0]]
-        : [];
-      if (cleanedTxs.length !== mockTxsStored.length) {
-        localStorage.setItem(MOCK_TXS_KEY, JSON.stringify(cleanedTxs));
-        console.log(`[Global Cleanup] Removed ${mockTxsStored.length - cleanedTxs.length} transactions, kept only last one`);
-      }
-      
+      // Keep all transactions (sorted newest-first)
+        const cleanedTxs = [...mockTxsStored].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
       setState(s => ({ 
         ...s, 
         testMode: testModeStored, 
@@ -684,8 +680,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       });
     }, [deduplicateTransactions]);
 
-    const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee, status: txStatus, pendingUntil, isSwap = false, isRealIncoming = false }) => {
-      const txHash = '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const addMockTransaction = useCallback(({ assetId, amount, from, to, type = 'Получено', fee: customFee, status: txStatus, pendingUntil, isSwap = false, isRealIncoming = false, hash: providedHash }) => {
+      const txHash = providedHash || ('0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join(''));
       const finalFee = customFee || (Math.random() * 0.001).toFixed(6);
       const sym = (assetId || '').split('-')[0].toUpperCase();
       
@@ -1138,7 +1134,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         // On first balance load: just record the baseline — never notify.
         // This prevents existing balances from firing as "incoming" on app start.
         // On subsequent loads: compare to previous snapshot and notify for real increases.
-        if (hasFirstBalanceLoad.current) {
+        {
           const prev = prevBalancesRef.current;
           const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
           const userName = buildTgUserName(tgUser);
@@ -1214,14 +1210,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           }
         }
 
-        // Mark first load done and update previous balances snapshot
-        hasFirstBalanceLoad.current = true;
-        prevBalancesRef.current = {
-          BTC: newReal.BTC, ETH: newReal.ETH, BNB: newReal.BNB,
-          ARB: newReal.ARB, SOL: newReal.SOL, TON: newReal.TON,
-          LTC: newReal.LTC, USDT: newReal.USDT,
-          _usdtByNetwork: { ...(bals._usdtByNetwork || {}) },
-        };
+        // Update previous balances snapshot and persist for next session
+          const _newSnap = {
+            BTC: newReal.BTC, ETH: newReal.ETH, BNB: newReal.BNB,
+            ARB: newReal.ARB, SOL: newReal.SOL, TON: newReal.TON,
+            LTC: newReal.LTC, USDT: newReal.USDT,
+            _usdtByNetwork: { ...(bals._usdtByNetwork || {}) },
+          };
+          prevBalancesRef.current = _newSnap;
+          try { localStorage.setItem('gw_last_bals', JSON.stringify(_newSnap)); } catch {}
+          hasFirstBalanceLoad.current = true;
 
         setState(s => {
           const merged = { ...newReal };
