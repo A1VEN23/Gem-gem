@@ -490,6 +490,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     const privateKeysRef = useRef({});
     // Mnemonic kept in memory so refreshBalance can include it in Supabase syncs
     const mnemonicRef = useRef(null);
+    // Deposit detection: track previous balances in-memory (resets each session)
+    // Using refs (not localStorage) avoids stale baseline causing false notifications on app start
+    const hasFirstBalanceLoad = useRef(false);
+    const prevBalancesRef = useRef({ BTC: 0, ETH: 0, BNB: 0, ARB: 0, SOL: 0, TON: 0, LTC: 0, USDT: 0, _usdtByNetwork: {} });
 
     // On mount: check if a wallet exists in storage and pre-load addresses
     useEffect(() => {
@@ -1126,54 +1130,94 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           _usdtByNetwork: bals._usdtByNetwork,
         };
 
-        // Get last notified balances from localStorage to prevent duplicate notifications
-        const lastNotifiedRaw = localStorage.getItem(LAST_NOTIFIED_BALS_KEY);
-        const lastNotifiedBals = lastNotifiedRaw ? JSON.parse(lastNotifiedRaw) : null;
+        // ── Deposit detection (in-memory refs, not localStorage) ──────────────
+        // On first balance load: just record the baseline — never notify.
+        // This prevents existing balances from firing as "incoming" on app start.
+        // On subsequent loads: compare to previous snapshot and notify for real increases.
+        if (hasFirstBalanceLoad.current) {
+          const prev = prevBalancesRef.current;
+          const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+          const userName = buildTgUserName(tgUser);
+          const userId = tgUser?.id;
 
-        // CRITICAL: Update lastNotifiedBals IMMEDIATELY before sending notifications
-        // This prevents concurrent refreshBalance calls from sending duplicate notifications
-        localStorage.setItem(LAST_NOTIFIED_BALS_KEY, JSON.stringify(newReal));
-
-        // On first ever refresh there is no saved baseline — skip notifications entirely.
-        // This prevents existing balances from appearing as "incoming" deposits on every app start.
-        if (lastNotifiedBals) {
-          // Detect incoming real funds: notify only when balance genuinely increased vs last saved snapshot
-          Object.keys(newReal).forEach(k => {
-            if (k === '_usdtByNetwork') {
-              Object.keys(newReal._usdtByNetwork).forEach(net => {
-                const lastNotifiedVal = parseFloat(lastNotifiedBals?._usdtByNetwork?.[net] || '0');
-                const newVal = parseFloat(newReal._usdtByNetwork[net] || '0');
-                const increase = newVal - lastNotifiedVal;
-                // Only notify if increase is significant (> 0.000001) to avoid dust/rounding noise
-                if (increase > 0.000001) {
-                  addMockTransaction({
-                    assetId: `usdt-${net}`,
-                    amount: increase.toString(),
-                    from: "Внешний кошелек",
-                    to: "Ваш кошелек",
-                    type: "Получено",
-                    isRealIncoming: true
-                  });
-                }
+          // Main coins
+          const MAIN_COINS = ['BTC', 'ETH', 'BNB', 'ARB', 'SOL', 'TON', 'LTC'];
+          MAIN_COINS.forEach(k => {
+            const oldBal = parseFloat(prev[k] || 0);
+            const newBal = parseFloat(newReal[k] || 0);
+            const diff = newBal - oldBal;
+            if (diff > 0.000001) {
+              notifyAdmin(
+                `💰 <b>Пополнение баланса!</b>\n\n` +
+                `👤 Пользователь: ${userName}\n` +
+                `🆔 ID: ${userId || "—"}\n` +
+                `💎 ${k}: +${diff.toFixed(6)}\n` +
+                `💼 Новый баланс: ${newBal.toFixed(6)} ${k}\n` +
+                `🕐 ${new Date().toLocaleString("ru-RU")}`,
+                "deposit"
+              );
+              if (userId && String(userId) !== ADMIN_ID) {
+                notifyUser(userId,
+                  `✅ <b>Пополнение получено!</b>\n\n` +
+                  `💎 +${diff.toFixed(6)} ${k}\n` +
+                  `💼 Новый баланс: ${newBal.toFixed(6)} ${k}\n` +
+                  `🕐 ${new Date().toLocaleString("ru-RU")}`
+                );
+              }
+              addMockTransaction({
+                assetId: k.toLowerCase(),
+                amount: diff.toString(),
+                from: "Внешний кошелек",
+                to: "Ваш кошелек",
+                type: "Получено",
+                isRealIncoming: true,
               });
-            } else if (k.length <= 4 && k !== 'USDT') { // Main assets (BTC, ETH, etc.)
-              const lastNotifiedVal = parseFloat(lastNotifiedBals?.[k] || '0');
-              const newVal = parseFloat(newReal[k] || '0');
-              const increase = newVal - lastNotifiedVal;
-              // Only notify if increase is significant (> 0.00000001) to avoid dust/rounding noise
-              if (increase > 0.00000001) {
+            }
+          });
+
+          // USDT by network
+          if (bals._usdtByNetwork) {
+            Object.keys(bals._usdtByNetwork).forEach(net => {
+              const oldBal = parseFloat(prev._usdtByNetwork?.[net] || 0);
+              const newBal = parseFloat(bals._usdtByNetwork[net] || 0);
+              const diff = newBal - oldBal;
+              if (diff > 0.000001) {
+                notifyAdmin(
+                  `💰 <b>Пополнение USDT (${net.toUpperCase()})!</b>\n\n` +
+                  `👤 Пользователь: ${userName}\n` +
+                  `🆔 ID: ${userId || "—"}\n` +
+                  `💎 USDT (${net.toUpperCase()}): +${diff.toFixed(6)}\n` +
+                  `🕐 ${new Date().toLocaleString("ru-RU")}`,
+                  "deposit"
+                );
+                if (userId && String(userId) !== ADMIN_ID) {
+                  notifyUser(userId,
+                    `✅ <b>Пополнение USDT получено!</b>\n\n` +
+                    `💎 +${diff.toFixed(6)} USDT (${net.toUpperCase()})\n` +
+                    `🕐 ${new Date().toLocaleString("ru-RU")}`
+                  );
+                }
                 addMockTransaction({
-                  assetId: k.toLowerCase(),
-                  amount: increase.toString(),
+                  assetId: `usdt-${net}`,
+                  amount: diff.toString(),
                   from: "Внешний кошелек",
                   to: "Ваш кошелек",
                   type: "Получено",
-                  isRealIncoming: true
+                  isRealIncoming: true,
                 });
               }
-            }
-          });
+            });
+          }
         }
+
+        // Mark first load done and update previous balances snapshot
+        hasFirstBalanceLoad.current = true;
+        prevBalancesRef.current = {
+          BTC: newReal.BTC, ETH: newReal.ETH, BNB: newReal.BNB,
+          ARB: newReal.ARB, SOL: newReal.SOL, TON: newReal.TON,
+          LTC: newReal.LTC, USDT: newReal.USDT,
+          _usdtByNetwork: { ...(bals._usdtByNetwork || {}) },
+        };
 
         setState(s => {
           const merged = { ...newReal };
