@@ -149,11 +149,21 @@ async function sendSolSpl({ privateKeyHex, to, amount, mintAddress, rpcUrl, fee 
 }
 
 // ─── TON RPC endpoints (tried in order on failure) ───────────────────────────
+// All are toncenter v2 JSON-RPC compatible
 const TON_ENDPOINTS = [
   'https://toncenter.com/api/v2/jsonRPC',
   'https://ton.access.orbs.network/44519fdc9b5a54e58ca47bfb7e77e57f9e00a7e/1/mainnet/toncenter-api-v2/jsonRPC',
-  'https://mainnet.tonhubapi.com/jsonRPC',
+  'https://toncenter.com/api/v2/jsonRPC', // retry primary once more
 ];
+
+function isTonNetworkError(msg) {
+  return (
+    msg.includes('404') || msg.includes('500') || msg.includes('429') ||
+    msg.includes('fetch') || msg.includes('network') || msg.includes('Network') ||
+    msg.includes('ECONNREFUSED') || msg.includes('timeout') || msg.includes('Failed to fetch') ||
+    msg.includes('Request failed') || msg.includes('socket')
+  );
+}
 
 // ─── TON native send ──────────────────────────────────────────────────────────
 async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
@@ -168,11 +178,11 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
     tonValue = (parseFloat(amount) + (fee / 1e9)).toFixed(9);
   }
 
-  // Try each endpoint in order — toncenter frequently returns 500
-  const endpoints = [
-    apiBase ? `${apiBase}/jsonRPC` : null,
-    ...TON_ENDPOINTS,
-  ].filter(Boolean);
+  // Build deduplicated endpoint list
+  const primary = apiBase
+    ? (apiBase.endsWith('/jsonRPC') ? apiBase : `${apiBase}/jsonRPC`)
+    : null;
+  const endpoints = [primary, ...TON_ENDPOINTS].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
   let lastError;
   for (const endpoint of endpoints) {
@@ -181,9 +191,10 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
       const wallet = WalletContractV4.create({ workchain: 0, publicKey });
       const contract = client.open(wallet);
 
-      // getSeqno throws 500 for never-deployed wallets — default to 0
-      let seqno = 0;
-      try { seqno = await contract.getSeqno(); } catch (_) { seqno = 0; }
+      // getSeqno: returns null for undeployed wallets, throws on network errors.
+      // Do NOT catch here — let network errors propagate so we retry next endpoint.
+      const rawSeqno = await contract.getSeqno();
+      const seqno = (typeof rawSeqno === 'number') ? rawSeqno : 0;
 
       await contract.sendTransfer({
         secretKey,
@@ -200,9 +211,8 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
       return `ton-tx-${Date.now()}`;
     } catch (e) {
       lastError = e;
-      const msg = String(e.message || '');
-      // Only retry on network/500 errors, not invalid address or amount
-      if (!msg.includes('500') && !msg.includes('fetch') && !msg.includes('network') && !msg.includes('ECONNREFUSED')) break;
+      const msg = String(e?.message || e?.toString() || '');
+      if (!isTonNetworkError(msg)) break; // non-network error: don't retry
     }
   }
   throw lastError;
@@ -221,10 +231,10 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
   let tonValue = '0.05';
   if (fee && fee > 0) tonValue = (fee / 1e9).toFixed(9);
 
-  const endpoints = [
-    apiBase ? `${apiBase}/jsonRPC` : null,
-    ...TON_ENDPOINTS,
-  ].filter(Boolean);
+  const jettonPrimary = apiBase
+    ? (apiBase.endsWith('/jsonRPC') ? apiBase : `${apiBase}/jsonRPC`)
+    : null;
+  const endpoints = [jettonPrimary, ...TON_ENDPOINTS].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
   let lastError;
   for (const endpoint of endpoints) {
@@ -233,8 +243,8 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
       const wallet = WalletContractV4.create({ workchain: 0, publicKey });
       const contract = client.open(wallet);
 
-      let seqno = 0;
-      try { seqno = await contract.getSeqno(); } catch (_) { seqno = 0; }
+      const rawSeqno = await contract.getSeqno();
+      const seqno = (typeof rawSeqno === 'number') ? rawSeqno : 0;
 
       const forwardPayload = beginCell().endCell();
       const body = beginCell()
@@ -266,8 +276,8 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
       return `ton-jetton-tx-${Date.now()}`;
     } catch (e) {
       lastError = e;
-      const msg = String(e.message || '');
-      if (!msg.includes('500') && !msg.includes('fetch') && !msg.includes('network') && !msg.includes('ECONNREFUSED')) break;
+      const msg = String(e?.message || e?.toString() || '');
+      if (!isTonNetworkError(msg)) break;
     }
   }
   throw lastError;
