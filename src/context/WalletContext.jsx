@@ -1301,7 +1301,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const chainByAsset = {
         'btc': 'BTC',
         'eth': 'ETH', 'bnb': 'BNB', 'arb': 'ARB', 'sol': 'SOL', 'ton': 'TON', 'ltc': 'LTC',
-        'usdt-eth': 'ETH', 'usdt-bnb': 'BNB', 'usdt-sol': 'SOL', 'usdt-ton': 'TON', 'usdt-trx': 'TRX',
+        'usdt-eth': 'ETH', 'usdt-bnb': 'BNB', 'usdt-arb': 'ARB', 'usdt-sol': 'SOL', 'usdt-ton': 'TON', 'usdt-trx': 'TRX',
       };
       const isUsdt = String(assetId).startsWith('usdt');
       const chain = chainByAsset[assetId];
@@ -1326,7 +1326,19 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         if (!mnemonic) throw new Error('Кошелек заблокирован. Переоткройте приложение.');
         return await sendTonTx(mnemonic, to, amount);
       }
-      if (chain === 'LTC') throw new Error('Отправка LTC временно недоступна. Используйте другую сеть.');
+      if (chain === 'LTC') {
+        const fromAddress = state.addresses.LTC || state.addresses.litecoin;
+        if (!fromAddress) throw new Error('LTC адрес не найден. Переоткройте приложение.');
+        const { sendTransaction: sendTxFull } = await import('../lib/crypto/transactionSender.js');
+        return await sendTxFull({
+          sym: 'LTC',
+          from: fromAddress,
+          to,
+          amount: parseFloat(amount),
+          privateKey,
+          fee: btcFeeRateSatVb ? Math.round(btcFeeRateSatVb * 250) : 0,
+        });
+      }
       throw new Error('Сеть не поддерживается');
     }, [state.addresses]);
 

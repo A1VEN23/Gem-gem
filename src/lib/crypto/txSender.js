@@ -44,6 +44,8 @@ export async function sendEvmTx(privateKey, chainSymbol, to, amountStr, feeMulti
   };
 
   const txResponse = await wallet.sendTransaction(tx);
+  // Wait for 1 on-chain confirmation to catch reverts
+  await txResponse.wait(1);
   return txResponse.hash;
 }
 
@@ -62,6 +64,8 @@ export async function sendUsdtErc20Tx(privateKey, chainSymbol, to, amountStr, fe
   const gasPrice = BigInt(Math.floor(Number(feeData.gasPrice) * feeMultiplier));
 
   const txResponse = await contract.transfer(to, amount, { gasPrice });
+  // Wait for 1 on-chain confirmation to catch reverts
+  await txResponse.wait(1);
   return txResponse.hash;
 }
 

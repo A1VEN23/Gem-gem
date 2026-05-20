@@ -940,7 +940,7 @@ function SendFeeScreen({ assetId, onBack, onContinue }) {
   };
   const feeData = FEE_TABLE[evmSym] || FEE_TABLE.ETH;
 
-  const [selected, setSelected] = useState("normal");
+  const [selected, setSelected] = useState("slow");
   const [customVal, setCustomVal] = useState("");
   const handleSelectCustom = () => {
     setSelected("custom");
@@ -1787,9 +1787,9 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
       setErrMsg(null);
 
       try {
-        // Get address and private key for the network
-        const netSym = payMap.sym === 'USDT' ? recMap.sym : payMap.sym;
-        const symKey = { ETH: 'ETH', BNB: 'BNB', ARB: 'ARB', SOL: 'SOL', TON: 'TON' }[netSym] || 'ETH';
+        // Get address and private key for the network — use payMap.net for reliable chain detection
+        const NET_TO_SYM = { eth: 'ETH', bnb: 'BNB', arb: 'ARB', sol: 'SOL', ton: 'TON' };
+        const symKey = NET_TO_SYM[payMap.net] || 'ETH';
         const walletAddress = addresses[symKey] || addresses.ETH;
         const privateKeyHex = getPrivateKey ? getPrivateKey(symKey) || getPrivateKey('ETH') : null;
 
