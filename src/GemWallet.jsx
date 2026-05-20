@@ -1143,7 +1143,7 @@ const SendConfirmScreen = memo(({ assetId, recipient, amount, feeInfo, onBack, o
         fee: finalFeeStr,
         status: "Успешный",
         pendingUntil: null,
-        txHash,
+        hash: txHash,
       });
       setStatus("success");
       setTimeout(() => onConfirm(), 1500);
