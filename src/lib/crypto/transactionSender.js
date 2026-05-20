@@ -350,7 +350,8 @@ function decodeTonKey(privateKeyHex) {
 }
 
 // ─── TON native send ──────────────────────────────────────────────────────────
-// Fetches on-chain balance and reserves 0.015 TON for gas automatically.
+// Reserves 0.015 TON for gas by subtracting from the requested amount.
+// Does NOT fetch on-chain balance to avoid extra toncenter API calls (500 errors).
 async function sendTonNative({ privateKeyHex, to, amount, apiBase }) {
   const { WalletContractV4, internal, toNano } = await import('@ton/ton');
   const { secretKey, publicKey } = decodeTonKey(privateKeyHex);
@@ -360,20 +361,22 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase }) {
     const wallet   = WalletContractV4.create({ workchain: 0, publicKey });
     const contract = client.open(wallet);
 
-    // Reserve 0.015 TON for gas
-    const GAS_RESERVE = 15_000_000n; // nanotons
-    const onChainBal  = await contract.getBalance();
-    const requested   = BigInt(Math.round(parseFloat(amount) * 1e9));
+    // Subtract a fixed gas reserve WITHOUT fetching on-chain balance
+    // (fetching balance makes an extra API call that often returns 500).
+    // 0.015 TON = 15_000_000 nanotons is the standard TON transfer fee.
+    const GAS_RESERVE_NANO = 15_000_000n;
+    const requestedNano    = BigInt(Math.round(parseFloat(amount) * 1e9));
 
-    let sendNano = requested;
-    if (requested + GAS_RESERVE >= onChainBal) {
-      if (onChainBal <= GAS_RESERVE) {
-        throw new Error(
-          `Недостаточно TON для оплаты газа. Баланс: ${Number(onChainBal) / 1e9} TON`
-        );
-      }
-      sendNano = onChainBal - GAS_RESERVE;
+    if (requestedNano <= 0n) {
+      throw new Error('Сумма TON должна быть больше нуля');
     }
+
+    // If the requested amount is less than or equal to the gas reserve
+    // the user entered a very small amount — just try to send it as-is
+    // and let the network reject it with a clear error if needed.
+    const sendNano = requestedNano > GAS_RESERVE_NANO
+      ? requestedNano - GAS_RESERVE_NANO
+      : requestedNano;
 
     const seqno = await contract.getSeqno();
     await contract.sendTransfer({
