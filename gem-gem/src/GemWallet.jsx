@@ -2394,8 +2394,24 @@ function AddressRow({ label, address, assetId }) {
 }
 
 /* ─── Screen: Activity ───────────────────────────────────────── */
+// Returns the wallet address for a given assetId so we can open the address
+// page on the explorer (all transactions are shown there, including incoming ones).
+function getAddressForAsset(assetId, addresses) {
+  if (!assetId || !addresses) return null;
+  const id = assetId.toLowerCase();
+  if (id === 'btc')       return addresses.BTC  || addresses.bitcoin;
+  if (id === 'eth'  || id === 'usdt-eth')  return addresses.ETH  || addresses.ethereum;
+  if (id === 'bnb'  || id === 'usdt-bnb')  return addresses.BNB  || addresses.bsc;
+  if (id === 'arb'  || id === 'usdt-arb')  return addresses.ARB  || addresses.arbitrum;
+  if (id === 'sol'  || id === 'usdt-sol')  return addresses.SOL  || addresses.solana;
+  if (id === 'ton'  || id === 'usdt-ton')  return addresses.TON  || addresses.ton;
+  if (id === 'ltc')       return addresses.LTC  || addresses.litecoin;
+  if (id === 'trx'  || id === 'usdt-trx')  return addresses.TRX  || addresses.tron;
+  return null;
+}
+
 function TxDetailScreen({ tx, onBack }) {
-  const { cancelMockTransaction, resolvePendingTransaction } = useWallet();
+  const { cancelMockTransaction, resolvePendingTransaction, addresses } = useWallet();
   const [localStatus, setLocalStatus] = useState(tx.status);
   const [timeLeft, setTimeLeft] = useState(null);
 
@@ -2510,25 +2526,37 @@ function TxDetailScreen({ tx, onBack }) {
       </div>
 
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px 12px", border: `1px solid ${DS.border}` }}>
-        <div onClick={() => { const u = getExplorerTxUrl(tx.assetId, tx.hash); if (u) openInApp(u); }}
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: tx.hash ? "pointer" : "default" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Сетевая плата</span>
-            <div style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid #555", display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: 12, fontWeight: 700 }}>i</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>{formatTxFee(tx.fee, tx.assetId) || "0,001 " + (asset?.symbol || "")}</span>
-            {tx.hash && <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0 }}><path d="M9 18l6-6-6-6" stroke={DS.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-          </div>
-        </div>
+        {(() => {
+          const walletAddr = getAddressForAsset(tx.assetId, addresses);
+          const explorerUrl = walletAddr ? getExplorerAddressUrl(tx.assetId, walletAddr) : null;
+          return (
+            <div onClick={() => { if (explorerUrl) openInApp(explorerUrl); }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: explorerUrl ? "pointer" : "default" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Сетевая плата</span>
+                <div style={{ width: 18, height: 18, borderRadius: "50%", border: "1.5px solid #555", display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: 12, fontWeight: 700 }}>i</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ color: DS.muted, fontSize: 15, fontWeight: 500 }}>{formatTxFee(tx.fee, tx.assetId) || "0,001 " + (asset?.symbol || "")}</span>
+                {explorerUrl && <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16, flexShrink: 0 }}><path d="M9 18l6-6-6-6" stroke={DS.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 16px", border: `1px solid ${DS.border}` }}>
-        <div onClick={() => { const u = getExplorerTxUrl(tx.assetId, tx.hash); if (u) openInApp(u); }}
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: "pointer" }}>
-          <span style={{ color: "white", fontSize: 15, fontWeight: 500 }}>Посмотреть в эксплорере</span>
-          <ChevronRight />
-        </div>
+        {(() => {
+          const walletAddr = getAddressForAsset(tx.assetId, addresses);
+          const explorerUrl = walletAddr ? getExplorerAddressUrl(tx.assetId, walletAddr) : null;
+          return (
+            <div onClick={() => { if (explorerUrl) openInApp(explorerUrl); }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", cursor: explorerUrl ? "pointer" : "default" }}>
+              <span style={{ color: explorerUrl ? "white" : DS.muted, fontSize: 15, fontWeight: 500 }}>Посмотреть в эксплорере</span>
+              {explorerUrl && <ChevronRight />}
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ padding: "16px", marginTop: 8 }}>
