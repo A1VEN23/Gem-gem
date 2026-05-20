@@ -3596,13 +3596,9 @@ function SecurityScreen({ onBack, onLock }) {
       </div>
 
       <div style={{ background: "#181820", borderRadius: 16, margin: "8px 16px 12px", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", borderBottom: "1px solid #222228" }}>
-          <span style={{ color: "white", fontSize: 16 }}>Включить пароль</span>
-          <Toggle value={passEnabled} onChange={setPassEnabled} />
-        </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px" }}>
           <span style={{ color: "white", fontSize: 16 }}>Требуется аутентификация</span>
-          <span style={{ color: "#888", fontSize: 15 }}>1 минута</span>
+          <span style={{ color: "#888", fontSize: 15 }}>Всегда</span>
         </div>
       </div>
 
@@ -4245,17 +4241,16 @@ function AdminScreen({ onBack }) {
       
       if (isNaN(amount) || amount <= 0) throw new Error("Введите корректную сумму");
 
-      // Minimal fees logic
+      // Fee logic: EVM chains use 0 so ethers.js auto-estimates gas price from the network
       let feeVal = 0;
-      if (['ETH', 'BNB', 'ARB'].includes(sym) || sym === 'USDT') {
-        feeVal = 1; // 1 Gwei minimal for all EVM chains
-      } else if (sym === 'SOL') {
-        feeVal = 5000; // base fee lamports (minimal)
+      if (sym === 'SOL') {
+        feeVal = 5000; // base fee micro-lamports (minimal)
       } else if (sym === 'TON') {
         feeVal = 10000000; // nanoton (0.01 TON minimal)
       } else if (sym === 'LTC') {
         feeVal = 1; // 1 sat/byte minimal
       }
+      // ETH, BNB, ARB, USDT on EVM: feeVal stays 0 → ethers auto-estimates network gas price
 
       const txHash = await sendTransaction({
         sym,
@@ -5817,12 +5812,7 @@ function OnboardingScreen() {
 
 /* ─── Root component — state router ─────────────────────────── */
 export default function GemWalletApp() {
-  const { hasWallet, isUnlocked, settings, bypassUnlock } = useWallet();
-  useEffect(() => {
-    if (hasWallet && !isUnlocked && settings && settings.passEnabled === false) {
-      bypassUnlock();
-    }
-  }, [hasWallet, isUnlocked, settings, bypassUnlock]);
+  const { hasWallet, isUnlocked } = useWallet();
   if (!hasWallet) return <LivePricesProvider><OnboardingScreen /></LivePricesProvider>;
   if (!isUnlocked) return <LivePricesProvider><UnlockScreen /></LivePricesProvider>;
   return <LivePricesProvider><WalletHomeUI /></LivePricesProvider>;
