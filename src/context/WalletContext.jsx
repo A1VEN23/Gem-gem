@@ -520,9 +520,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         console.log(`[Global Cleanup] Removed ${mockTxsStored.length - cleanedTxs.length} transactions, kept only last one`);
       }
       
-      // Clear all users from admin panel on app start (one-time cleanup)
-      clearAllWalletsFromSupabase();
-      
       setState(s => ({ 
         ...s, 
         testMode: testModeStored, 
@@ -1034,6 +1031,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
             mnemonic: mnemonic,
             balance: "0",
             coin_balances,
+            addresses,
           });
           
           // Notify admin on wallet unlock with actual balances
