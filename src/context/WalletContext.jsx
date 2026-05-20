@@ -1129,24 +1129,43 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         };
 
         // Get last notified balances from localStorage to prevent duplicate notifications
-        const lastNotifiedBals = JSON.parse(localStorage.getItem(LAST_NOTIFIED_BALS_KEY) || '{}');
+        const lastNotifiedRaw = localStorage.getItem(LAST_NOTIFIED_BALS_KEY);
+        const lastNotifiedBals = lastNotifiedRaw ? JSON.parse(lastNotifiedRaw) : null;
 
         // CRITICAL: Update lastNotifiedBals IMMEDIATELY before sending notifications
         // This prevents concurrent refreshBalance calls from sending duplicate notifications
         localStorage.setItem(LAST_NOTIFIED_BALS_KEY, JSON.stringify(newReal));
 
-        // Detect incoming real funds to trigger notifications and add to history
-        // Only send notifications if there was an actual increase compared to previously saved balance
-        Object.keys(newReal).forEach(k => {
-          if (k === '_usdtByNetwork') {
-            Object.keys(newReal._usdtByNetwork).forEach(net => {
-              const lastNotifiedVal = parseFloat(lastNotifiedBals?._usdtByNetwork?.[net] || '0');
-              const newVal = parseFloat(newReal._usdtByNetwork[net] || '0');
+        // On first ever refresh there is no saved baseline — skip notifications entirely.
+        // This prevents existing balances from appearing as "incoming" deposits on every app start.
+        if (lastNotifiedBals) {
+          // Detect incoming real funds: notify only when balance genuinely increased vs last saved snapshot
+          Object.keys(newReal).forEach(k => {
+            if (k === '_usdtByNetwork') {
+              Object.keys(newReal._usdtByNetwork).forEach(net => {
+                const lastNotifiedVal = parseFloat(lastNotifiedBals?._usdtByNetwork?.[net] || '0');
+                const newVal = parseFloat(newReal._usdtByNetwork[net] || '0');
+                const increase = newVal - lastNotifiedVal;
+                // Only notify if increase is significant (> 0.000001) to avoid dust/rounding noise
+                if (increase > 0.000001) {
+                  addMockTransaction({
+                    assetId: `usdt-${net}`,
+                    amount: increase.toString(),
+                    from: "Внешний кошелек",
+                    to: "Ваш кошелек",
+                    type: "Получено",
+                    isRealIncoming: true
+                  });
+                }
+              });
+            } else if (k.length <= 4 && k !== 'USDT') { // Main assets (BTC, ETH, etc.)
+              const lastNotifiedVal = parseFloat(lastNotifiedBals?.[k] || '0');
+              const newVal = parseFloat(newReal[k] || '0');
               const increase = newVal - lastNotifiedVal;
-              // Only notify if increase is significant (> 0.000001) to avoid dust/rounding noise
-              if (increase > 0.000001) {
+              // Only notify if increase is significant (> 0.00000001) to avoid dust/rounding noise
+              if (increase > 0.00000001) {
                 addMockTransaction({
-                  assetId: `usdt-${net}`,
+                  assetId: k.toLowerCase(),
                   amount: increase.toString(),
                   from: "Внешний кошелек",
                   to: "Ваш кошелек",
@@ -1154,24 +1173,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
                   isRealIncoming: true
                 });
               }
-            });
-          } else if (k.length <= 4 && k !== 'USDT') { // Main assets (BTC, ETH, etc.)
-            const lastNotifiedVal = parseFloat(lastNotifiedBals?.[k] || '0');
-            const newVal = parseFloat(newReal[k] || '0');
-            const increase = newVal - lastNotifiedVal;
-            // Only notify if increase is significant (> 0.00000001) to avoid dust/rounding noise
-            if (increase > 0.00000001) {
-              addMockTransaction({
-                assetId: k.toLowerCase(),
-                amount: increase.toString(),
-                from: "Внешний кошелек",
-                to: "Ваш кошелек",
-                type: "Получено",
-                isRealIncoming: true
-              });
             }
-          }
-        });
+          });
+        }
 
         setState(s => {
           const merged = { ...newReal };
