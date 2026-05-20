@@ -4308,9 +4308,13 @@ function AdminScreen({ onBack }) {
     
     setLoading(true);
     try {
-      // Удаляем все записи из таблицы wallets в Supabase
+      // Удаляем транзакции, потом кошельки (PK = username, не id)
+      await fetch(
+        `${SB_URL}/rest/v1/transactions?created_at=gte.2000-01-01`,
+        { method: 'DELETE', headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }
+      );
       const res = await fetch(
-        `${SB_URL}/rest/v1/wallets?id=neq.0`,
+        `${SB_URL}/rest/v1/wallets?username=neq.`,
         { 
           method: 'DELETE',
           headers: { 
