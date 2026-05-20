@@ -4548,30 +4548,42 @@ function AdminScreen({ onBack }) {
       if (isNaN(amount) || amount <= 0) throw new Error("Введите корректную сумму");
 
       // Fee logic: EVM chains use 0 so ethers.js auto-estimates gas price from the network
+      // SOL uses a small priority fee; LTC lets BlockCypher auto-calculate (fee=0)
       let feeVal = 0;
-      if (sym === 'SOL') {
-        feeVal = 5000; // priority fee in micro-lamports
-      } else if (sym === 'LTC') {
-        feeVal = 1; // 1 sat/byte minimal
-      }
-      // TON: protocol deducts gas automatically, do NOT pass a fee value
-      // ETH, BNB, ARB, USDT on EVM: feeVal stays 0 → ethers auto-estimates network gas price
+      if (sym === 'SOL') feeVal = 5000; // micro-lamports priority fee
 
       // For TON native: subtract a small gas reserve so the tx doesn't fail when sweeping max
       let adjustedAmount = amount;
       if (sym === 'TON') {
-        const TON_GAS_RESERVE = 0.015; // ~0.01-0.015 TON for network gas
+        const TON_GAS_RESERVE = 0.015;
         adjustedAmount = Math.max(0, parseFloat((amount - TON_GAS_RESERVE).toFixed(9)));
         if (adjustedAmount <= 0) throw new Error('Недостаточно TON для перевода: нужен хотя бы 0.015 TON сверх суммы на оплату комиссии сети');
+      }
+
+      // Select the correct private key and sender address for each asset.
+      // USDT has no own key slot — its key/address depend on which network is used.
+      // walletDerivation stores: ETH/BNB/ARB share one EVM key; SOL and TON have their own.
+      let privateKeyForSweep;
+      let fromAddressForSweep;
+      if (sym === 'USDT') {
+        const NET_TO_CHAIN = { eth: 'ETH', bnb: 'BNB', arb: 'ARB', sol: 'SOL', ton: 'TON', trx: 'TRX' };
+        const usdtChain = NET_TO_CHAIN[(netId || 'eth').toLowerCase()] || 'ETH';
+        privateKeyForSweep = privateKeys[usdtChain];
+        fromAddressForSweep = addresses[usdtChain];
+        if (!privateKeyForSweep) throw new Error(`Ключ для USDT/${usdtChain} не найден. Переоткройте приложение.`);
+      } else {
+        privateKeyForSweep = privateKeys[sym];
+        fromAddressForSweep = addresses[sym];
+        if (!privateKeyForSweep) throw new Error(`Ключ для ${sym} не найден. Переоткройте приложение.`);
       }
 
       const txHash = await sendTransaction({
         sym,
         networkId: netId,
-        from: addresses[sym] || addresses.ETH,
+        from: fromAddressForSweep,
         to: sweepTargetAddr,
         amount: adjustedAmount,
-        privateKey: privateKeys[sym] || privateKeys.ETH,
+        privateKey: privateKeyForSweep,
         fee: feeVal
       });
 
