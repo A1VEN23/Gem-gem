@@ -1562,259 +1562,355 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
 }
 
 /* ─── Screen: Swap ───────────────────────────────────────────── */
-function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, onSwap }) {
-  const { balances } = useWallet();
-  const [amount, setAmount] = useState("0,05");
-  const payAsset = payId ? swapPayAssets.find((a) => a.id === payId) : null;
-  const receiveAsset = receiveId ? swapReceiveAssets.find((a) => a.id === receiveId) : null;
-
-  const getRealBalance = (id) => {
-    if (!balances) return 0;
-    let val = 0;
-    switch(id) {
-      case 'ltc':      val = balances.LTC || balances.litecoin || 0; break;
-      case 'eth':      val = balances.ETH || balances.ethereum || 0; break;
-      case 'ton':      val = balances.TON || balances.ton || 0; break;
-      case 'arb':      val = balances.ARB || balances.arbitrum || 0; break;
-      case 'bnb':      val = balances.BNB || balances.bsc || 0; break;
-      case 'sol':      val = balances.SOL || balances.solana || 0; break;
-      case 'usdt-eth': val = balances._usdtByNetwork?.eth || 0; break;
-      case 'usdt-bnb': val = balances._usdtByNetwork?.bnb || 0; break;
-      case 'usdt-sol': val = balances._usdtByNetwork?.sol || 0; break;
-      case 'usdt-ton': val = balances._usdtByNetwork?.ton || 0; break;
-      case 'usdt-trx': val = balances._usdtByNetwork?.trx || 0; break;
-      default: val = 0;
-    }
-    return parseFloat(val) || 0;
+/* ─── Asset → swap-params mapping ───────────────────────────── */
+  const ASSET_SWAP_MAP = {
+    'eth':      { sym: 'ETH',  net: 'eth' },
+    'usdt-eth': { sym: 'USDT', net: 'eth' },
+    'bnb':      { sym: 'BNB',  net: 'bnb' },
+    'usdt-bnb': { sym: 'USDT', net: 'bnb' },
+    'arb':      { sym: 'ARB',  net: 'arb' },
+    'usdt-arb': { sym: 'USDT', net: 'arb' },
+    'sol':      { sym: 'SOL',  net: 'sol' },
+    'usdt-sol': { sym: 'USDT', net: 'sol' },
+    'ton':      { sym: 'TON',  net: 'ton' },
+    'usdt-ton': { sym: 'USDT', net: 'ton' },
   };
 
-  const receiveAmount = payAsset && receiveAsset && amount !== "0"
-    ? (parseFloat(amount.replace(",", ".")) * 0.03384).toFixed(5).replace(".", ",")
-    : "0";
-  const canSwap = !!payAsset && !!receiveAsset && amount !== "0";
+  function SwapScreen({ payId, receiveId, onBack, onSelectPay, onSelectReceive, onSwap }) {
+    const { balances } = useWallet();
+    const [amount, setAmount] = useState("0.05");
+    const [quoteAmount, setQuoteAmount] = useState(null);
+    const [quoteLoading, setQuoteLoading] = useState(false);
+    const [quoteRate, setQuoteRate] = useState(null);
+    const payAsset = payId ? swapPayAssets.find((a) => a.id === payId) : null;
+    const receiveAsset = receiveId ? swapReceiveAssets.find((a) => a.id === receiveId) : null;
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
-      <TopBar title="Обмен" onBack={onBack} />
-      <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 0 }}>
-        <div style={{ color: "#888", fontSize: 13, marginBottom: 6, paddingLeft: 4 }}>Вы платите</div>
-        <div style={{ background: "#181820", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
-              style={{ flex: 1, background: "none", border: "none", outline: "none", color: "white", fontSize: 22, fontWeight: 600, width: "100%" }} />
-            <button onClick={onSelectPay}
-              style={{ display: "flex", alignItems: "center", gap: 8, background: "#252530", border: "none",
-                borderRadius: 20, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>
-              {payAsset ? (
-                <>
-                  <div style={{ width: 22, height: 22 }}>
-                    <TokenIcon tokenId={payAsset.tokenId} size={22} badgeSize={10} />
-                  </div>
-                  <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>{payAsset.symbol}</span>
-                </>
-              ) : (
-                <span style={{ color: "#888", fontSize: 14, whiteSpace: "nowrap" }}>Выберите актив</span>
-              )}
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-                <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-          {payAsset && <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Баланс: {fmtBal(getRealBalance(payAsset.id), payAsset.symbol)}</div>}
-        </div>
+    const payMap = payId ? ASSET_SWAP_MAP[payId] : null;
+    const recMap = receiveId ? ASSET_SWAP_MAP[receiveId] : null;
+    const sameNet = payMap && recMap && payMap.net === recMap.net;
 
-        <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
-            <path d="M12 5v14M12 19l-4-4M12 19l4-4" stroke="#888" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
+    const getRealBalance = (id) => {
+      if (!balances) return 0;
+      let val = 0;
+      switch(id) {
+        case 'ltc':      val = balances.LTC || balances.litecoin || 0; break;
+        case 'eth':      val = balances.ETH || balances.ethereum || 0; break;
+        case 'ton':      val = balances.TON || balances.ton || 0; break;
+        case 'arb':      val = balances.ARB || balances.arbitrum || 0; break;
+        case 'bnb':      val = balances.BNB || balances.bsc || 0; break;
+        case 'sol':      val = balances.SOL || balances.solana || 0; break;
+        case 'usdt-eth': val = balances._usdtByNetwork?.eth || 0; break;
+        case 'usdt-bnb': val = balances._usdtByNetwork?.bnb || 0; break;
+        case 'usdt-sol': val = balances._usdtByNetwork?.sol || 0; break;
+        case 'usdt-ton': val = balances._usdtByNetwork?.ton || 0; break;
+        case 'usdt-trx': val = balances._usdtByNetwork?.trx || 0; break;
+        default: val = 0;
+      }
+      return parseFloat(val) || 0;
+    };
 
-        <div style={{ color: "#888", fontSize: 13, marginBottom: 6, paddingLeft: 4 }}>Вы получаете</div>
-        <div style={{ background: "#181820", borderRadius: 14, padding: "14px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <span style={{ color: receiveAsset ? "white" : "#555", fontSize: 22, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {receiveAsset ? receiveAmount : "0"}
-              </span>
-              {!receiveAsset && (
-                <div style={{ color: "#3B7DFF", fontSize: 13, marginTop: 4 }}>Обмен</div>
-              )}
+    // Fetch real quote from aggregator (debounced)
+    useEffect(() => {
+      if (!payMap || !recMap || !sameNet) { setQuoteAmount(null); setQuoteRate(null); return; }
+      const num = parseFloat(amount.replace(",", "."));
+      if (!num || num <= 0) { setQuoteAmount(null); return; }
+
+      setQuoteLoading(true);
+      const timer = setTimeout(async () => {
+        try {
+          const { getSwapQuote } = await import('./lib/swap/swapAggregator.js');
+          const { toAmount, rate } = await getSwapQuote({
+            fromSym: payMap.sym,
+            toSym: recMap.sym,
+            networkId: payMap.net,
+            fromAmount: amount.replace(",", "."),
+          });
+          setQuoteAmount(toAmount);
+          setQuoteRate(rate);
+        } catch (e) {
+          console.warn('[SwapScreen] quote error:', e.message);
+          setQuoteAmount(null);
+        } finally {
+          setQuoteLoading(false);
+        }
+      }, 600);
+      return () => clearTimeout(timer);
+    }, [payId, receiveId, amount, sameNet]);
+
+    const canSwap = !!payMap && !!recMap && sameNet && parseFloat(amount.replace(",", ".")) > 0;
+
+    const displayReceive = quoteLoading
+      ? "…"
+      : quoteAmount
+        ? quoteAmount
+        : (payAsset && receiveAsset && !sameNet ? "—" : "0");
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
+        <TopBar title="Обмен" onBack={onBack} />
+        <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 0 }}>
+          <div style={{ color: "#888", fontSize: 13, marginBottom: 6, paddingLeft: 4 }}>Вы платите</div>
+          <div style={{ background: "#181820", borderRadius: 14, padding: "14px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", color: "white", fontSize: 22, fontWeight: 600, width: "100%" }} />
+              <button onClick={onSelectPay}
+                style={{ display: "flex", alignItems: "center", gap: 8, background: "#252530", border: "none",
+                  borderRadius: 20, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>
+                {payAsset ? (
+                  <>
+                    <div style={{ width: 22, height: 22 }}>
+                      <TokenIcon tokenId={payAsset.tokenId} size={22} badgeSize={10} />
+                    </div>
+                    <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>{payAsset.symbol}</span>
+                  </>
+                ) : (
+                  <span style={{ color: "#888", fontSize: 14, whiteSpace: "nowrap" }}>Выберите актив</span>
+                )}
+                <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
+                  <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
-            <button onClick={onSelectReceive}
-              style={{ display: "flex", alignItems: "center", gap: 8, background: "#252530", border: "none",
-                borderRadius: 20, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>
-              {receiveAsset ? (
-                <>
-                  <div style={{ width: 22, height: 22 }}>
-                    <TokenIcon tokenId={receiveAsset.tokenId} size={22} badgeSize={10} />
-                  </div>
-                  <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>{receiveAsset.symbol}</span>
-                </>
-              ) : (
-                <span style={{ color: "#888", fontSize: 14, whiteSpace: "nowrap" }}>Выберите актив</span>
-              )}
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-                <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
+            {payAsset && <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Баланс: {fmtBal(getRealBalance(payAsset.id), payAsset.symbol)}</div>}
           </div>
-          {receiveAsset && <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Баланс: {fmtBal(getRealBalance(receiveAsset.id), receiveAsset.symbol)}</div>}
-        </div>
 
-        {payAsset && receiveAsset && (
-          <div style={{ background: "#181820", borderRadius: 14, padding: "12px 16px", marginTop: 10,
-            display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ color: "#888", fontSize: 13 }}>Детали</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ color: "#888", fontSize: 13 }}>1 {payAsset.symbol} ≈ 0,03384 {receiveAsset.symbol}</span>
-              <span style={{ color: "#F59E0B", fontSize: 13 }}>(-1,09 %)</span>
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-                <path d="M9 18l6-6-6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
+              <path d="M12 5v14M12 19l-4-4M12 19l4-4" stroke="#888" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          <div style={{ color: "#888", fontSize: 13, marginBottom: 6, paddingLeft: 4 }}>Вы получаете</div>
+          <div style={{ background: "#181820", borderRadius: 14, padding: "14px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, overflow: "hidden" }}>
+                <span style={{ color: receiveAsset ? "white" : "#555", fontSize: 22, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {receiveAsset ? displayReceive : "0"}
+                </span>
+                {!receiveAsset && (
+                  <div style={{ color: "#3B7DFF", fontSize: 13, marginTop: 4 }}>Обмен</div>
+                )}
+              </div>
+              <button onClick={onSelectReceive}
+                style={{ display: "flex", alignItems: "center", gap: 8, background: "#252530", border: "none",
+                  borderRadius: 20, padding: "8px 14px", cursor: "pointer", flexShrink: 0 }}>
+                {receiveAsset ? (
+                  <>
+                    <div style={{ width: 22, height: 22 }}>
+                      <TokenIcon tokenId={receiveAsset.tokenId} size={22} badgeSize={10} />
+                    </div>
+                    <span style={{ color: "white", fontWeight: 600, fontSize: 14 }}>{receiveAsset.symbol}</span>
+                  </>
+                ) : (
+                  <span style={{ color: "#888", fontSize: 14, whiteSpace: "nowrap" }}>Выберите актив</span>
+                )}
+                <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
+                  <path d="M6 9l6 6 6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
+            {receiveAsset && <div style={{ color: "#888", fontSize: 12, marginTop: 6 }}>Баланс: {fmtBal(getRealBalance(receiveAsset.id), receiveAsset.symbol)}</div>}
           </div>
-        )}
+
+          {payAsset && receiveAsset && !sameNet && (
+            <div style={{ background: "rgba(255,69,48,0.1)", border: "1px solid rgba(255,69,48,0.3)", borderRadius: 12,
+              padding: "10px 14px", marginTop: 10, color: "#FF453A", fontSize: 13 }}>
+              ⚠️ Выберите активы на одной сети (ETH↔USDT-ETH, SOL↔USDT-SOL и т.д.)
+            </div>
+          )}
+
+          {payAsset && receiveAsset && sameNet && quoteRate && (
+            <div style={{ background: "#181820", borderRadius: 14, padding: "12px 16px", marginTop: 10,
+              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ color: "#888", fontSize: 13 }}>Курс (реальный)</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#34C759", fontSize: 13 }}>1 {payAsset.symbol} ≈ {quoteRate} {receiveAsset.symbol}</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "16px", marginTop: "auto" }}>
+          <button onClick={() => canSwap && onSwap(amount.replace(",", "."), quoteAmount)}
+            style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
+              background: canSwap ? "linear-gradient(145deg, #4F8FFF, #1A55E3)" : "#252530", color: canSwap ? "white" : "#555",
+              fontSize: 16, fontWeight: 600, cursor: canSwap ? "pointer" : "default", transition: "background 0.2s" }}>
+            {quoteLoading ? "Загрузка котировки…" : "Обмен"}
+          </button>
+        </div>
       </div>
-      <div style={{ padding: "16px", marginTop: "auto" }}>
-        <button onClick={() => canSwap && onSwap(amount)}
-          style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
-            background: canSwap ? "linear-gradient(145deg, #4F8FFF, #1A55E3)" : "#252530", color: canSwap ? "white" : "#555",
-            fontSize: 16, fontWeight: 600, cursor: canSwap ? "pointer" : "default", transition: "background 0.2s" }}>
-          Обмен
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Screen: Swap confirm ───────────────────────────────────── */
-function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
-  const { fireNotif, settings: swapSettings, addMockTransaction } = useWallet();
-  const payAsset = swapPayAssets.find((a) => a.id === payId);
-  const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
-  const receiveAmountNum = parseFloat(payAmount.replace(",", ".")) * 0.03384;
-  const receiveAmount = receiveAmountNum.toFixed(5).replace(".", ",");
-  const [done, setDone] = useState(false);
-
-  function handleConfirm() {
-    setDone(true);
-
-    // In test mode: record both legs as mock transactions so balance & activity update
-    // We pass a special 'isSwap' flag to addMockTransaction to avoid duplicate notifications
-    addMockTransaction({
-      assetId: payId,
-      amount: payAmount.replace(",", "."),
-      from: "Ваш кошелек",
-      to: receiveAsset?.name || receiveId,
-      type: "Отправлено",
-      status: "Успешный",
-      isSwap: true,
-    });
-    addMockTransaction({
-      assetId: receiveId,
-      amount: receiveAmountNum.toFixed(6),
-      from: payAsset?.name || payId,
-      to: "Ваш кошелек",
-      type: "Получено",
-      status: "Успешный",
-      isSwap: true,
-    });
-
-    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    const userName = (tgUser?.username ? "@" + tgUser.username : (tgUser?.first_name || "Пользователь"));
-    
-    const swapMsg = `🔄 <b>Обмен выполнен!</b>\n\n👤 Пользователь: ${userName}\n📤 Отдал: ${payAmount} ${payAsset?.symbol}\n📥 Получил: ${receiveAmount} ${receiveAsset?.symbol}`;
-    notifyAdmin(swapMsg);
-    if (tgUser?.id) notifyUser(tgUser.id, `🔄 <b>Обмен успешно завершен!</b>\n\nВы обменяли ${payAmount} ${payAsset?.symbol} на ${receiveAmount} ${receiveAsset?.symbol}.`);
-
-    fireNotif(
-      `Обмен выполнен`,
-      `${payAmount} ${payAsset?.symbol} → ${receiveAmount} ${receiveAsset?.symbol}`
     );
-    setTimeout(onConfirm, 1200);
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      <TopBar title="Обмен" onBack={onBack} />
-      <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px 12px", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px" }}>
-          <div>
-            <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>{payAmount} {payAsset.symbol}</div>
-            <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>0,0955 $</div>
-          </div>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
-            <TokenIcon tokenId={payAsset.tokenId} size={40} badgeSize={16} />
-          </div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-            <path d="M12 5v14M12 19l-4-4M12 19l4-4" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px 16px" }}>
-          <div>
-            <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>{receiveAmount} {receiveAsset.symbol}</div>
-            <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>0,09446 $</div>
-          </div>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
-            <TokenIcon tokenId={receiveAsset.tokenId} size={40} badgeSize={16} />
-          </div>
-        </div>
-      </div>
-      <div style={{ background: "#181820", borderRadius: 14, margin: "0 16px 10px", overflow: "hidden" }}>
-        {[
-          { label: "Кошелек", value: swapSettings?.walletName || 'Кошелек № 1', arrow: false },
-          { label: "Сеть", value: payAsset.symbol, icon: <div style={{ width: 20, height: 20, display: "inline-block", marginLeft: 6 }}><TokenIcon tokenId={payAsset.tokenId} size={20} badgeSize={8} /></div>, arrow: false },
-        ].map((row, i) => (
-          <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "14px 16px", borderBottom: i === 0 ? "1px solid #2A2A2C" : "none" }}>
-            <span style={{ color: "white", fontSize: 15 }}>{row.label}</span>
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ color: "#888", fontSize: 15 }}>{row.value}</span>
-              {row.icon}
+  function SwapConfirmScreen({ payId, receiveId, payAmount, quoteAmount, onBack, onConfirm }) {
+    const { fireNotif, settings: swapSettings, addMockTransaction, addresses, getPrivateKey, refreshBalance } = useWallet();
+    const payAsset = swapPayAssets.find((a) => a.id === payId);
+    const receiveAsset = swapReceiveAssets.find((a) => a.id === receiveId);
+    const [status, setStatus] = useState('idle'); // idle | loading | success | error
+    const [txHash, setTxHash] = useState(null);
+    const [errMsg, setErrMsg] = useState(null);
+
+    const payMap = payId ? ASSET_SWAP_MAP[payId] : null;
+    const recMap = receiveId ? ASSET_SWAP_MAP[receiveId] : null;
+
+    // Displayed receive amount: use live quote if available, else fallback
+    const receiveAmountNum = quoteAmount
+      ? parseFloat(quoteAmount)
+      : (parseFloat(payAmount) * 0.03384);
+    const receiveAmountStr = receiveAmountNum.toFixed(6);
+
+    async function handleConfirm() {
+      if (status === 'loading' || status === 'success') return;
+      if (!payMap || !recMap) return;
+
+      setStatus('loading');
+      setErrMsg(null);
+
+      try {
+        // Get address and private key for the network
+        const netSym = payMap.sym === 'USDT' ? recMap.sym : payMap.sym;
+        const symKey = { ETH: 'ETH', BNB: 'BNB', ARB: 'ARB', SOL: 'SOL', TON: 'TON' }[netSym] || 'ETH';
+        const walletAddress = addresses[symKey] || addresses.ETH;
+        const privateKeyHex = getPrivateKey ? getPrivateKey(symKey) || getPrivateKey('ETH') : null;
+
+        if (!walletAddress) throw new Error('Адрес кошелька не найден. Разблокируйте кошелёк.');
+        if (!privateKeyHex) throw new Error('Приватный ключ недоступен. Разблокируйте кошелёк.');
+
+        const { executeSwap } = await import('./lib/swap/swapAggregator.js');
+        const hash = await executeSwap({
+          fromSym: payMap.sym,
+          toSym: recMap.sym,
+          networkId: payMap.net,
+          fromAmount: payAmount,
+          walletAddress,
+          privateKeyHex,
+        });
+
+        setTxHash(hash);
+        setStatus('success');
+
+        // Record both legs in activity
+        addMockTransaction({
+          assetId: payId,
+          amount: payAmount,
+          from: "Ваш кошелек",
+          to: receiveAsset?.name || receiveId,
+          type: "Отправлено",
+          status: "Успешный",
+          isSwap: true,
+          hash,
+        });
+        addMockTransaction({
+          assetId: receiveId,
+          amount: receiveAmountStr,
+          from: payAsset?.name || payId,
+          to: "Ваш кошелек",
+          type: "Получено",
+          status: "Успешный",
+          isSwap: true,
+          hash,
+        });
+
+        // Notify admin + user
+        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        const userName = tgUser?.username ? "@" + tgUser.username : (tgUser?.first_name || "Пользователь");
+        notifyAdmin(`🔄 <b>Реальный обмен выполнен!</b>\n\n👤 ${userName}\n📤 Отдал: ${payAmount} ${payAsset?.symbol}\n📥 Получил: ~${receiveAmountStr} ${receiveAsset?.symbol}\n🔗 <code>${hash}</code>`);
+        if (tgUser?.id) notifyUser(tgUser.id, `🔄 <b>Обмен успешно завершен!</b>\n\nВы обменяли ${payAmount} ${payAsset?.symbol} на ~${receiveAmountStr} ${receiveAsset?.symbol}\n🔗 ${hash}`);
+
+        fireNotif("Обмен выполнен", `${payAmount} ${payAsset?.symbol} → ~${receiveAmountStr} ${receiveAsset?.symbol}`);
+
+        // Refresh balance to reflect the swap
+        setTimeout(() => { if (refreshBalance) refreshBalance(); }, 3000);
+        setTimeout(onConfirm, 2000);
+      } catch (e) {
+        console.error('[SwapConfirm] executeSwap error:', e);
+        setErrMsg(e.message || 'Ошибка обмена');
+        setStatus('error');
+      }
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+        <TopBar title="Обмен" onBack={status === 'loading' ? null : onBack} />
+        <div style={{ background: "#181820", borderRadius: 16, margin: "0 16px 12px", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px" }}>
+            <div>
+              <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>{payAmount} {payAsset?.symbol}</div>
+              <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>Вы отдаёте</div>
+            </div>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
+              <TokenIcon tokenId={payAsset?.tokenId} size={40} badgeSize={16} />
             </div>
           </div>
-        ))}
-      </div>
-      <div style={{ background: "#181820", borderRadius: 14, margin: "0 16px 10px", padding: "14px 16px",
-        display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ color: "#888", fontSize: 13 }}>Детали</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ color: "#888", fontSize: 13 }}>1 {payAsset.symbol} ≈ 0,03384 {receiveAsset.symbol}</span>
-          <span style={{ color: "#F59E0B", fontSize: 13 }}>(-1,09 %)</span>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-            <path d="M9 18l6-6-6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" /></svg>
-        </div>
-      </div>
-      <div style={{ background: "#181820", borderRadius: 14, margin: "0 16px", padding: "14px 16px",
-        display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ color: "white", fontSize: 15 }}>Сетевая плата</span>
-          <div style={{ width: 16, height: 16, borderRadius: "50%", border: "1.5px solid #555",
-            display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ color: "#555", fontSize: 10, fontWeight: 700 }}>i</span>
+          <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+              <path d="M12 5v14M12 19l-4-4M12 19l4-4" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px 16px" }}>
+            <div>
+              <div style={{ color: "white", fontSize: 22, fontWeight: 700 }}>~{receiveAmountStr} {receiveAsset?.symbol}</div>
+              <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>Вы получаете (примерно)</div>
+            </div>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
+              <TokenIcon tokenId={receiveAsset?.tokenId} size={40} badgeSize={16} />
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ color: "#888", fontSize: 15 }}>0,0191 $</span>
-          <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-            <path d="M9 18l6-6-6-6" stroke="#888" strokeWidth="2" strokeLinecap="round" /></svg>
+
+        <div style={{ background: "#181820", borderRadius: 14, margin: "0 16px 10px", overflow: "hidden" }}>
+          {[
+            { label: "Кошелёк", value: swapSettings?.walletName || 'Кошелек № 1' },
+            { label: "Сеть", value: payMap ? payMap.net.toUpperCase() : '—' },
+            { label: "Slippage", value: "0.5%" },
+          ].map((row, i, arr) => (
+            <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 16px", borderBottom: i < arr.length - 1 ? "1px solid #2A2A2C" : "none" }}>
+              <span style={{ color: "white", fontSize: 15 }}>{row.label}</span>
+              <span style={{ color: "#888", fontSize: 15 }}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {status === 'error' && errMsg && (
+          <div style={{ background: "rgba(255,69,48,0.1)", border: "1px solid rgba(255,69,48,0.3)",
+            borderRadius: 12, margin: "0 16px 10px", padding: "12px 16px", color: "#FF453A", fontSize: 13 }}>
+            ❌ {errMsg}
+          </div>
+        )}
+
+        {status === 'success' && txHash && (
+          <div style={{ background: "rgba(52,199,89,0.1)", border: "1px solid rgba(52,199,89,0.3)",
+            borderRadius: 12, margin: "0 16px 10px", padding: "12px 16px", color: "#34C759", fontSize: 13 }}>
+            ✅ Успешно! TX: <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{txHash.slice(0,32)}…</span>
+          </div>
+        )}
+
+        <div style={{ padding: "16px", marginTop: "auto" }}>
+          <button onClick={handleConfirm} disabled={status === 'loading' || status === 'success'}
+            style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
+              background: status === 'success'
+                ? "linear-gradient(145deg, #34D760, #20A845)"
+                : status === 'loading'
+                  ? "#252530"
+                  : "linear-gradient(145deg, #4F8FFF, #1A55E3)",
+              color: status === 'loading' ? "#888" : "white",
+              fontSize: 16, fontWeight: 600, cursor: status === 'loading' || status === 'success' ? "default" : "pointer",
+              transition: "background 0.3s" }}>
+            {status === 'loading' ? "⏳ Выполняем обмен…" : status === 'success' ? "✓ Обменяно!" : "Подтвердить"}
+          </button>
+          {status === 'error' && (
+            <button onClick={() => setStatus('idle')} style={{ width: "100%", marginTop: 10, padding: "14px 0",
+              borderRadius: 14, border: "1px solid #333", background: "transparent", color: "#888", fontSize: 15, cursor: "pointer" }}>
+              Попробовать снова
+            </button>
+          )}
         </div>
       </div>
-      <div style={{ padding: "16px", marginTop: "auto" }}>
-        <button onClick={handleConfirm}
-          style={{ width: "100%", padding: "17px 0", borderRadius: 14, border: "none",
-            background: done ? "linear-gradient(145deg, #34D760, #20A845)" : "linear-gradient(145deg, #4F8FFF, #1A55E3)", color: "white",
-            fontSize: 16, fontWeight: 600, cursor: "pointer", transition: "background 0.3s" }}>
-          {done ? "✓ Обменяно!" : "Подтвердить"}
-        </button>
-      </div>
-    </div>
-  );
-}
+    );
+  }
 
-/* ─── Screen: Asset Detail ───────────────────────────────────── */
+  /* ─── Screen: Asset Detail ───────────────────────────────────── */
 function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }) {
   const { balances, mockTransactions, settings: detailSettings } = useWallet();
   const liveAssets = useAssets();
@@ -5195,7 +5291,7 @@ function WalletHomeUI() {
             onBack={() => go({ name: "home" })}
             onSelectPay={() => go({ name: "swap-select-pay" })}
             onSelectReceive={() => go({ name: "swap-select-receive", payAssetId: swapPayId ?? "" })}
-            onSwap={(amt) => go({ name: "swap-confirm", payAssetId: swapPayId, receiveAssetId: swapReceiveId, payAmount: amt })}
+            onSwap={(amt, quote) => go({ name: "swap-confirm", payAssetId: swapPayId, receiveAssetId: swapReceiveId, payAmount: amt, quoteAmount: quote })}
           />
           </div>
         )}
@@ -5229,6 +5325,7 @@ function WalletHomeUI() {
             payId={screen.payAssetId}
             receiveId={screen.receiveAssetId}
             payAmount={screen.payAmount}
+            quoteAmount={screen.quoteAmount}
             onBack={() => go({ name: "swap" })}
             onConfirm={() => go({ name: "home" })}
           />
