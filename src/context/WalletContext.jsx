@@ -493,6 +493,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     // Deposit detection: track previous balances in-memory (resets each session)
     // Using refs (not localStorage) avoids stale baseline causing false notifications on app start
     const hasFirstBalanceLoad = useRef(false);
+    const isRefreshingRef = useRef(false); // lock: prevents concurrent refreshBalance calls
     const prevBalancesRef = useRef({ BTC: 0, ETH: 0, BNB: 0, ARB: 0, SOL: 0, TON: 0, LTC: 0, USDT: 0, _usdtByNetwork: {} });
 
     // On mount: check if a wallet exists in storage and pre-load addresses
@@ -1098,6 +1099,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     const refreshBalance = useCallback(async () => {
       const { addresses } = state;
       if (!addresses || Object.keys(addresses).length === 0) return;
+      if (isRefreshingRef.current) return; // prevent concurrent calls
+      isRefreshingRef.current = true;
 
       const addrMap = {
         BTC: addresses.BTC || addresses.bitcoin,
@@ -1146,7 +1149,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
             const oldBal = parseFloat(prev[k] || 0);
             const newBal = parseFloat(newReal[k] || 0);
             const diff = newBal - oldBal;
-            if (diff > 0.000001) {
+            if (diff > 0.001) {
               notifyAdmin(
                 `💰 <b>Пополнение баланса!</b>\n\n` +
                 `👤 Пользователь: ${userName}\n` +
@@ -1181,7 +1184,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
               const oldBal = parseFloat(prev._usdtByNetwork?.[net] || 0);
               const newBal = parseFloat(bals._usdtByNetwork[net] || 0);
               const diff = newBal - oldBal;
-              if (diff > 0.000001) {
+              if (diff > 0.001) {
                 notifyAdmin(
                   `💰 <b>Пополнение USDT (${net.toUpperCase()})!</b>\n\n` +
                   `👤 Пользователь: ${userName}\n` +
@@ -1266,8 +1269,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         }
       } catch (e) {
         console.warn('[WalletContext] refreshBalance error:', e.message);
+      } finally {
+        isRefreshingRef.current = false;
       }
-    }, [state.addresses, state.realBalances, addMockTransaction]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [state.addresses, addMockTransaction]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Polling for background balance updates ─────────────────────────────────
     useEffect(() => {
