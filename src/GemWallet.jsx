@@ -1244,16 +1244,33 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
   const recentIds = ["btc", "ton", "eth"];
   const recentItems = BASE_ASSETS.filter((a) => recentIds.includes(a.id));
 
-  const CopyIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-      <rect x="8" y="2" width="13" height="17" rx="2" stroke={DS.muted} strokeWidth="1.7" />
-      <path d="M3 6v13a2 2 0 0 0 2 2h10" stroke={DS.muted} strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
+  const [copiedId, setCopiedId] = useState(null);
+
+  const CopyIcon = ({ assetId }) => {
+    const isCopied = copiedId === assetId;
+    return isCopied ? (
+      <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+        <path d="M5 13l4 4L19 7" stroke={DS.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ) : (
+      <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+        <rect x="8" y="2" width="13" height="17" rx="2" stroke={DS.muted} strokeWidth="1.7" />
+        <path d="M3 6v13a2 2 0 0 0 2 2h10" stroke={DS.muted} strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    );
+  };
+
+  const handleCopyIcon = (e, assetId) => {
+    e.stopPropagation();
+    const addr = getAddressForAsset(assetId, addresses);
+    if (addr) {
+      copyToClipboard(addr);
+      setCopiedId(assetId);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
 
   const handleSelect = (assetId) => {
-    const addr = getAddressForAsset(assetId, addresses);
-    if (addr) copyToClipboard(addr);
     onSelect(assetId);
   };
 
@@ -1319,7 +1336,12 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
               <span style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{asset.name}</span>
               <span style={{ color: DS.muted, fontSize: 14, marginLeft: 8 }}>{asset.symbol}</span>
             </div>
-            <CopyIcon />
+            <button
+              onClick={(e) => handleCopyIcon(e, asset.id)}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <CopyIcon assetId={asset.id} />
+            </button>
           </div>
         ))}
       </div>
