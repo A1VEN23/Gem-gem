@@ -4254,10 +4254,18 @@ function AdminScreen({ onBack }) {
   const [sweepWallet, setSweepWallet] = useState(null);
   const [sweepLoading, setSweepLoading] = useState(false);
   const [sweepResult, setSweepResult] = useState(null);
-  const [sweepStep, setSweepStep] = useState('coin'); // coin | amount | address | confirm | result
+  const [sweepStep, setSweepStep] = useState('coin'); // coin | network | amount | address | confirm | result
   const [sweepCoin, setSweepCoin] = useState(null);
   const [sweepTargetAddr, setSweepTargetAddr] = useState("");
   const [sweepAmount, setSweepAmount] = useState("");
+
+  const USDT_NETWORKS = [
+    { id: 'eth', label: 'Ethereum', tag: 'ERC-20', color: '#627EEA' },
+    { id: 'bnb', label: 'BNB Smart Chain', tag: 'BEP-20', color: '#F3BA2F' },
+    { id: 'arb', label: 'Arbitrum One', tag: 'ARB', color: '#28A0F0' },
+    { id: 'sol', label: 'Solana', tag: 'SPL', color: '#9945FF' },
+    { id: 'ton', label: 'TON', tag: 'Jetton', color: '#0088CC' },
+  ];
 
   const COINS = ['ETH', 'TON', 'BNB', 'LTC', 'ARB', 'SOL', 'USDT'];
 
@@ -4669,6 +4677,7 @@ function AdminScreen({ onBack }) {
                       setSweepStep('coin');
                       setSweepCoin(null);
                       setSweepTargetAddr("");
+                      setSweepAmount("");
                     }}
                     style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none",
                       background: "linear-gradient(135deg, #3B7DFF, #6B21A8)",
@@ -4699,7 +4708,8 @@ function AdminScreen({ onBack }) {
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {sweepStep !== 'coin' && sweepStep !== 'result' && (
                   <button onClick={() => {
-                    if (sweepStep === 'amount') setSweepStep('coin');
+                    if (sweepStep === 'network') setSweepStep('coin');
+                    else if (sweepStep === 'amount') setSweepStep(sweepCoin?.sym === 'USDT' ? 'network' : 'coin');
                     else if (sweepStep === 'address') setSweepStep('amount');
                     else if (sweepStep === 'confirm') setSweepStep('address');
                   }} style={{ background: "rgba(255,255,255,0.05)", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -4724,13 +4734,54 @@ function AdminScreen({ onBack }) {
                     return (
                       <button key={sym} 
                         disabled={isZero}
-                        onClick={() => { setSweepCoin({ sym, netId }); setSweepAmount(String(balance)); setSweepStep('amount'); }}
+                        onClick={() => {
+                          if (sym === 'USDT') {
+                            setSweepCoin({ sym, netId: null });
+                            setSweepAmount(String(balance));
+                            setSweepStep('network');
+                          } else {
+                            setSweepCoin({ sym, netId });
+                            setSweepAmount(String(balance));
+                            setSweepStep('amount');
+                          }
+                        }}
                         style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "16px", textAlign: "left", opacity: isZero ? 0.3 : 1 }}>
                         <div style={{ color: "#3B7DFF", fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{sym}</div>
                         <div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{parseFloat(balance).toFixed(4)}</div>
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 1b: Select USDT Network */}
+            {sweepStep === 'network' && (
+              <div style={{ animation: "fadeIn 0.3s ease" }}>
+                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 8, fontWeight: 600 }}>SELECT USDT NETWORK</div>
+                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, marginBottom: 20 }}>
+                  Balance: <span style={{ color: "#fff", fontWeight: 700 }}>{parseFloat(sweepAmount || 0).toFixed(4)} USDT</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {USDT_NETWORKS.map(net => (
+                    <button key={net.id}
+                      onClick={() => {
+                        setSweepCoin({ sym: 'USDT', netId: net.id });
+                        setSweepStep('amount');
+                      }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "16px 20px", textAlign: "left" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                        <div style={{ width: 42, height: 42, borderRadius: "50%", background: `${net.color}22`, border: `2px solid ${net.color}55`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ color: net.color, fontWeight: 900, fontSize: 11 }}>USDT</span>
+                        </div>
+                        <div>
+                          <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>{net.label}</div>
+                          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 2 }}>{net.tag}</div>
+                        </div>
+                      </div>
+                      <svg viewBox="0 0 24 24" fill="none" style={{ width: 16, height: 16 }}><path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -4793,6 +4844,15 @@ function AdminScreen({ onBack }) {
                     <div>
                       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>WITHDRAWING</div>
                       <div style={{ color: "#fff", fontSize: 20, fontWeight: 800 }}>{sweepAmount} {sweepCoin.sym}</div>
+                      {sweepCoin.sym === 'USDT' && sweepCoin.netId && (
+                        <div style={{ marginTop: 4 }}>
+                          <span style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "rgba(255,255,255,0.55)", fontWeight: 700 }}>
+                            {(USDT_NETWORKS.find(n => n.id === sweepCoin.netId) || {}).tag || sweepCoin.netId.toUpperCase()}
+                            {' · '}
+                            {(USDT_NETWORKS.find(n => n.id === sweepCoin.netId) || {}).label || sweepCoin.netId}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NETWORK FEE</div>
