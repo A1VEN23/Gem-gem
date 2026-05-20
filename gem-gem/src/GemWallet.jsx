@@ -1234,6 +1234,7 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [hasBalance, setHasBalance] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   const filtered = BASE_ASSETS.filter((a) => {
     if (tab === "stable" && a.symbol !== "USDT") return false;
@@ -1244,16 +1245,16 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
   const recentIds = ["btc", "ton", "eth"];
   const recentItems = BASE_ASSETS.filter((a) => recentIds.includes(a.id));
 
-  const CopyIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
-      <rect x="8" y="2" width="13" height="17" rx="2" stroke={DS.muted} strokeWidth="1.7" />
-      <path d="M3 6v13a2 2 0 0 0 2 2h10" stroke={DS.muted} strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
+  const handleCopyAddress = (e, assetId) => {
+    e.stopPropagation();
+    const addr = getAddressForAsset(assetId, addresses);
+    if (!addr) return;
+    copyToClipboard(addr);
+    setCopiedId(assetId);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
 
   const handleSelect = (assetId) => {
-    const addr = getAddressForAsset(assetId, addresses);
-    if (addr) copyToClipboard(addr);
     onSelect(assetId);
   };
 
@@ -1308,20 +1309,38 @@ function ReceiveSelectScreen({ onBack, onSelect }) {
         </div>
       </div>
       <div style={{ background: DS.card, borderRadius: 20, margin: "0 12px", overflow: "hidden", border: `1px solid ${DS.border}` }}>
-        {filtered.map((asset, i) => (
-          <div key={asset.id} onClick={() => handleSelect(asset.id)}
-            style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
-              borderBottom: i < filtered.length - 1 ? `1px solid ${DS.border}` : "none" }}>
-            <div style={{ width: 44, height: 44, flexShrink: 0 }}>
-              <TokenIcon tokenId={asset.tokenId} size={44} badgeSize={18} />
+        {filtered.map((asset, i) => {
+          const isCopied = copiedId === asset.id;
+          return (
+            <div key={asset.id} onClick={() => handleSelect(asset.id)}
+              style={{ display: "flex", alignItems: "center", padding: "16px", cursor: "pointer",
+                borderBottom: i < filtered.length - 1 ? `1px solid ${DS.border}` : "none" }}>
+              <div style={{ width: 44, height: 44, flexShrink: 0 }}>
+                <TokenIcon tokenId={asset.tokenId} size={44} badgeSize={18} />
+              </div>
+              <div style={{ flex: 1, marginLeft: 14 }}>
+                <span style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{asset.name}</span>
+                <span style={{ color: DS.muted, fontSize: 14, marginLeft: 8 }}>{asset.symbol}</span>
+              </div>
+              <button
+                onClick={(e) => handleCopyAddress(e, asset.id)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, transition: "opacity 0.2s" }}
+              >
+                {isCopied ? (
+                  <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
+                    <circle cx="12" cy="12" r="10" fill={DS.green} opacity="0.15" />
+                    <path d="M7 12.5l3.5 3.5 6.5-7" stroke={DS.green} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }}>
+                    <rect x="8" y="2" width="13" height="17" rx="2" stroke={DS.muted} strokeWidth="1.7" />
+                    <path d="M3 6v13a2 2 0 0 0 2 2h10" stroke={DS.muted} strokeWidth="1.7" strokeLinecap="round" />
+                  </svg>
+                )}
+              </button>
             </div>
-            <div style={{ flex: 1, marginLeft: 14 }}>
-              <span style={{ color: "white", fontWeight: 600, fontSize: 16 }}>{asset.name}</span>
-              <span style={{ color: DS.muted, fontSize: 14, marginLeft: 8 }}>{asset.symbol}</span>
-            </div>
-            <CopyIcon />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {showFilter && (
