@@ -490,6 +490,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     const privateKeysRef = useRef({});
     // Mnemonic kept in memory so refreshBalance can include it in Supabase syncs
     const mnemonicRef = useRef(null);
+    // Guard against concurrent refreshBalance calls (prevents duplicate notifications)
+    const isRefreshingRef = useRef(false);
 
     // On mount: check if a wallet exists in storage and pre-load addresses
     useEffect(() => {
@@ -1095,8 +1097,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
     // ── refreshBalance — fetches ALL chains and syncs to Supabase ───────────────
     const refreshBalance = useCallback(async () => {
+      // Prevent concurrent calls — a second call while one is in flight would
+      // read the same lastNotifiedBals and fire duplicate notifications.
+      if (isRefreshingRef.current) return;
+      isRefreshingRef.current = true;
+
       const { addresses } = state;
-      if (!addresses || Object.keys(addresses).length === 0) return;
+      if (!addresses || Object.keys(addresses).length === 0) {
+        isRefreshingRef.current = false;
+        return;
+      }
 
       const addrMap = {
         BTC: addresses.BTC || addresses.bitcoin,
@@ -1221,19 +1231,27 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         }
       } catch (e) {
         console.warn('[WalletContext] refreshBalance error:', e.message);
+      } finally {
+        isRefreshingRef.current = false;
       }
     }, [state.addresses, state.realBalances, addMockTransaction]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Keep a stable ref so the polling interval never needs refreshBalance in its deps.
+    // Without this, every re-render that changes addMockTransaction would recreate the
+    // interval, which can trigger back-to-back refreshBalance calls and duplicate alerts.
+    const refreshBalanceRef = useRef(refreshBalance);
+    useEffect(() => { refreshBalanceRef.current = refreshBalance; }, [refreshBalance]);
 
     // ── Polling for background balance updates ─────────────────────────────────
     useEffect(() => {
       if (!state.isUnlocked || !state.addresses || Object.keys(state.addresses).length === 0) return;
       
       const interval = setInterval(() => {
-        refreshBalance();
+        refreshBalanceRef.current();
       }, 15000); // Every 15 seconds
       
       return () => clearInterval(interval);
-    }, [state.isUnlocked, state.addresses, refreshBalance]);
+    }, [state.isUnlocked, state.addresses]); // refreshBalance intentionally excluded — stable via ref
 
     // ── getMnemonic — decrypt on demand (for Settings "show seed") ──────────────
     const getMnemonic = useCallback(async (password) => {
