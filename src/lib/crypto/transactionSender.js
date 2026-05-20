@@ -148,46 +148,64 @@ async function sendSolSpl({ privateKeyHex, to, amount, mintAddress, rpcUrl, fee 
   return sig;
 }
 
+// ─── TON RPC endpoints (tried in order on failure) ───────────────────────────
+const TON_ENDPOINTS = [
+  'https://toncenter.com/api/v2/jsonRPC',
+  'https://ton.access.orbs.network/44519fdc9b5a54e58ca47bfb7e77e57f9e00a7e/1/mainnet/toncenter-api-v2/jsonRPC',
+  'https://mainnet.tonhubapi.com/jsonRPC',
+];
+
 // ─── TON native send ──────────────────────────────────────────────────────────
 async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
   const { TonClient, WalletContractV4, internal, toNano } = await import('@ton/ton');
-  const { mnemonicToPrivateKey } = await import('@ton/crypto');
 
   const apiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TON_API_KEY) || '';
-  const client = new TonClient({
-    endpoint: `${apiBase}/jsonRPC`,
-    apiKey: apiKey || undefined,
-  });
-
-  // Reconstruct keypair from stored hex secret key
   const secretKey = Buffer.from(privateKeyHex, 'hex');
   const publicKey = secretKey.slice(32); // TON stores [privateKey(32) + publicKey(32)]
-  const keyPair = { secretKey, publicKey };
 
-  const wallet = WalletContractV4.create({ workchain: 0, publicKey });
-  const contract = client.open(wallet);
-  const seqno = await contract.getSeqno();
-
-  // Calculate value with custom fee if provided (fee is in nanoton)
   let tonValue = String(amount);
   if (fee && fee > 0) {
-    // Add fee to amount (fee in nanoton, convert to TON and add)
     tonValue = (parseFloat(amount) + (fee / 1e9)).toFixed(9);
   }
 
-  await contract.sendTransfer({
-    secretKey,
-    seqno,
-    messages: [
-      internal({
-        to,
-        value: toNano(tonValue),
-        bounce: false,
-      }),
-    ],
-  });
+  // Try each endpoint in order — toncenter frequently returns 500
+  const endpoints = [
+    apiBase ? `${apiBase}/jsonRPC` : null,
+    ...TON_ENDPOINTS,
+  ].filter(Boolean);
 
-  return `ton-tx-${Date.now()}`;
+  let lastError;
+  for (const endpoint of endpoints) {
+    try {
+      const client = new TonClient({ endpoint, apiKey: apiKey || undefined });
+      const wallet = WalletContractV4.create({ workchain: 0, publicKey });
+      const contract = client.open(wallet);
+
+      // getSeqno throws 500 for never-deployed wallets — default to 0
+      let seqno = 0;
+      try { seqno = await contract.getSeqno(); } catch (_) { seqno = 0; }
+
+      await contract.sendTransfer({
+        secretKey,
+        seqno,
+        messages: [
+          internal({
+            to,
+            value: toNano(tonValue),
+            bounce: false,
+          }),
+        ],
+      });
+
+      return `ton-tx-${Date.now()}`;
+    } catch (e) {
+      lastError = e;
+      const msg = String(e.message || '');
+      // Only retry on network/500 errors, not invalid address or amount
+      if (!msg.includes('500') && !msg.includes('fetch') && !msg.includes('network') && !msg.includes('ECONNREFUSED')) break;
+    }
+  }
+  throw lastError;
 }
 
 // ─── TON Jetton (USDT) send ───────────────────────────────────────────────────
@@ -196,61 +214,63 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
     await import('@ton/ton');
 
   const apiKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TON_API_KEY) || '';
-  const client = new TonClient({
-    endpoint: `${apiBase}/jsonRPC`,
-    apiKey: apiKey || undefined,
-  });
-
   const secretKey = Buffer.from(privateKeyHex, 'hex');
   const publicKey = secretKey.slice(32);
 
-  const wallet = WalletContractV4.create({ workchain: 0, publicKey });
-  const contract = client.open(wallet);
-  const seqno = await contract.getSeqno();
-
-  // Build jetton transfer payload
   const amountNano = BigInt(Math.round(amount * 1e6)); // USDT 6 decimals
-  const forwardPayload = beginCell().endCell();
-  const body = beginCell()
-    .storeUint(0xf8a7ea5, 32) // jetton transfer op
-    .storeUint(0, 64)         // query id
-    .storeCoins(amountNano)
-    .storeAddress(Address.parse(to))
-    .storeAddress(Address.parse(wallet.address.toString()))
-    .storeBit(false)
-    .storeCoins(toNano('0.01'))
-    .storeBit(false)
-    .storeRef(forwardPayload)
-    .endCell();
+  let tonValue = '0.05';
+  if (fee && fee > 0) tonValue = (fee / 1e9).toFixed(9);
 
-  // Get jetton wallet address for sender
-  const jettonMaster = Address.parse(jettonMasterAddress);
-  const result = await client.runMethod(jettonMaster, 'get_wallet_address', [
-    { type: 'slice', cell: beginCell().storeAddress(wallet.address).endCell() },
-  ]);
-  const jettonWalletAddr = result.stack.readAddress();
+  const endpoints = [
+    apiBase ? `${apiBase}/jsonRPC` : null,
+    ...TON_ENDPOINTS,
+  ].filter(Boolean);
 
-  // Calculate TON value with custom fee if provided (fee is in nanoton)
-  let tonValue = '0.05'; // default
-  if (fee && fee > 0) {
-    // Convert nanoton to TON string
-    tonValue = (fee / 1e9).toFixed(9);
+  let lastError;
+  for (const endpoint of endpoints) {
+    try {
+      const client = new TonClient({ endpoint, apiKey: apiKey || undefined });
+      const wallet = WalletContractV4.create({ workchain: 0, publicKey });
+      const contract = client.open(wallet);
+
+      let seqno = 0;
+      try { seqno = await contract.getSeqno(); } catch (_) { seqno = 0; }
+
+      const forwardPayload = beginCell().endCell();
+      const body = beginCell()
+        .storeUint(0xf8a7ea5, 32)
+        .storeUint(0, 64)
+        .storeCoins(amountNano)
+        .storeAddress(Address.parse(to))
+        .storeAddress(Address.parse(wallet.address.toString()))
+        .storeBit(false)
+        .storeCoins(toNano('0.01'))
+        .storeBit(false)
+        .storeRef(forwardPayload)
+        .endCell();
+
+      const jettonMaster = Address.parse(jettonMasterAddress);
+      const result = await client.runMethod(jettonMaster, 'get_wallet_address', [
+        { type: 'slice', cell: beginCell().storeAddress(wallet.address).endCell() },
+      ]);
+      const jettonWalletAddr = result.stack.readAddress();
+
+      await contract.sendTransfer({
+        secretKey,
+        seqno,
+        messages: [
+          internal({ to: jettonWalletAddr, value: toNano(tonValue), bounce: true, body }),
+        ],
+      });
+
+      return `ton-jetton-tx-${Date.now()}`;
+    } catch (e) {
+      lastError = e;
+      const msg = String(e.message || '');
+      if (!msg.includes('500') && !msg.includes('fetch') && !msg.includes('network') && !msg.includes('ECONNREFUSED')) break;
+    }
   }
-
-  await contract.sendTransfer({
-    secretKey,
-    seqno,
-    messages: [
-      internal({
-        to: jettonWalletAddr,
-        value: toNano(tonValue),
-        bounce: true,
-        body,
-      }),
-    ],
-  });
-
-  return `ton-jetton-tx-${Date.now()}`;
+  throw lastError;
 }
 
 // ─── LTC send via BlockCypher ─────────────────────────────────────────────────
