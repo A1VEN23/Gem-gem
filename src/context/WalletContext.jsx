@@ -695,8 +695,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
       const userName = buildTgUserName(tgUser);
       const userId = tgUser?.id;
 
-      // Bot Notifications (only if not a swap, swap has its own notification)
-      if (!isSwap) {
+      // Bot Notifications (only if not a swap and not an auto-detected incoming from balance polling)
+      if (!isSwap && !isRealIncoming) {
         if (type === 'Получено') {
           const msg = `💰 <b>Пополнение баланса!</b>\n\n` +
                       `👤 Пользователь: ${userName}\n` +
