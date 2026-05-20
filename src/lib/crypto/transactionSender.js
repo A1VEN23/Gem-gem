@@ -168,12 +168,9 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
   const contract = client.open(wallet);
   const seqno = await contract.getSeqno();
 
-  // Calculate value with custom fee if provided (fee is in nanoton)
-  let tonValue = String(amount);
-  if (fee && fee > 0) {
-    // Add fee to amount (fee in nanoton, convert to TON and add)
-    tonValue = (parseFloat(amount) + (fee / 1e9)).toFixed(9);
-  }
+  // Send the exact amount - TON protocol automatically deducts gas from wallet balance
+  // Do NOT add fee to message value: that would cause tx failure when sweeping max balance
+  const tonValue = parseFloat(amount).toFixed(9);
 
   await contract.sendTransfer({
     secretKey,
@@ -187,7 +184,9 @@ async function sendTonNative({ privateKeyHex, to, amount, apiBase, fee }) {
     ],
   });
 
-  return `ton-tx-${Date.now()}`;
+  // Wait briefly to allow the TON node to process the transaction
+  await new Promise(resolve => setTimeout(resolve, 4000));
+  return `ton-tx-${seqno}-${Date.now()}`;
 }
 
 // ─── TON Jetton (USDT) send ───────────────────────────────────────────────────
@@ -230,12 +229,9 @@ async function sendTonJetton({ privateKeyHex, to, amount, jettonMasterAddress, a
   ]);
   const jettonWalletAddr = result.stack.readAddress();
 
-  // Calculate TON value with custom fee if provided (fee is in nanoton)
-  let tonValue = '0.05'; // default
-  if (fee && fee > 0) {
-    // Convert nanoton to TON string
-    tonValue = (fee / 1e9).toFixed(9);
-  }
+  // TON value is the gas attached to the jetton transfer message (not the USDT amount)
+  // Minimum 0.05 TON required for jetton transfers to succeed
+  const tonValue = '0.05';
 
   await contract.sendTransfer({
     secretKey,
