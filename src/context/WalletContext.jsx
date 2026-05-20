@@ -65,6 +65,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
     try {
       const tgUser = window?.Telegram?.WebApp?.initDataUnsafe?.user;
       const payload = {
+        id: tx.id,
         tx_id: tx.id,
         telegram_id: tgUser?.id ? String(tgUser.id) : null,
         username: username || "Anonymous",
