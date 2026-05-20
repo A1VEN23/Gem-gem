@@ -1816,8 +1816,59 @@ function SwapConfirmScreen({ payId, receiveId, payAmount, onBack, onConfirm }) {
 
 /* ─── Screen: Asset Detail ───────────────────────────────────── */
 function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }) {
-  const { balances, mockTransactions, settings: detailSettings } = useWallet();
+  const { balances, mockTransactions, settings: detailSettings, refreshBalance } = useWallet();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const pullIndicatorRef = useRef(null);
+  const touchStartY = useRef(0);
+  const touchStarted = useRef(false);
   const liveAssets = useAssets();
+
+  const doRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try { await refreshBalance(); setLastUpdated(new Date()); } catch(_) {}
+    setIsRefreshing(false);
+  };
+
+  function handleTouchStart(e) {
+    const el = e.currentTarget;
+    if (el.scrollTop === 0) { touchStartY.current = e.touches[0].clientY; touchStarted.current = true; }
+  }
+  function handleTouchMove(e) {
+    if (!touchStarted.current) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0 && pullIndicatorRef.current) {
+      const progress = Math.min(delta / 90, 1);
+      pullIndicatorRef.current.style.opacity = String(progress);
+      pullIndicatorRef.current.style.transform = `translateX(-50%) translateY(${Math.min(delta * 0.5, 40)}px) scale(${0.7 + progress * 0.3}) rotate(${delta * 2.5}deg)`;
+      pullIndicatorRef.current.style.filter = delta > 90 && delta < 100 ? "brightness(1.3)" : "none";
+    }
+  }
+  async function handleTouchEnd(e) {
+    if (!touchStarted.current) return;
+    touchStarted.current = false;
+    const delta = e.changedTouches[0].clientY - touchStartY.current;
+    if (delta > 90 && !isRefreshing) {
+      setIsRefreshing(true);
+      if (pullIndicatorRef.current) { pullIndicatorRef.current.style.opacity = "1"; pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(40px) scale(1)"; }
+      try {
+        await refreshBalance(); setLastUpdated(new Date());
+        if (pullIndicatorRef.current) pullIndicatorRef.current.style.background = DS.green;
+      } catch(_) {}
+      setTimeout(() => {
+        setIsRefreshing(false);
+        if (pullIndicatorRef.current) {
+          pullIndicatorRef.current.style.opacity = "0";
+          pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(0) scale(0.6)";
+          setTimeout(() => { if (pullIndicatorRef.current) pullIndicatorRef.current.style.background = DS.card; }, 300);
+        }
+      }, 800);
+    } else if (pullIndicatorRef.current) {
+      pullIndicatorRef.current.style.opacity = "0";
+      pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(0) scale(0.6)";
+    }
+  }
   const asset = liveAssets.find((a) => a.id === assetId);
 
   // Build real balance for this asset
@@ -1892,8 +1943,30 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-      {/* TopBar — только стрелка назад и название, без правых кнопок */}
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
+      {/* Pull-to-refresh indicator */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, overflow: "visible", zIndex: 100, pointerEvents: "none" }}>
+        <div ref={pullIndicatorRef} style={{ position: "absolute", top: -40, left: "50%", transform: "translateX(-50%) scale(0.6)", opacity: 0, transition: "opacity 0.15s, background 0.3s", display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", background: DS.card, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", border: `1px solid ${DS.border}` }}>
+          {isRefreshing ? (
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }}>
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+              <path d="M12 17V7M7 12l5 5 5-5" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+      </div>
+
+      {/* Scrollable content with pull-to-refresh */}
+      <div style={{ overflowY: "auto", flex: 1, paddingBottom: 20 }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+      {/* TopBar */}
       <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", gap: 12 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22 }}>
@@ -1901,11 +1974,16 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
           </svg>
         </button>
         <span style={{ flex: 1, color: "white", fontWeight: 600, fontSize: 17, textAlign: "center" }}>{asset.name}</span>
-        <div style={{ width: 30 }} />
+        <button onClick={doRefresh} style={{ background: "none", border: "none", cursor: isRefreshing ? "default" : "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20, animation: isRefreshing ? "spin 0.7s linear infinite" : "none" }}>
+            <path d="M21 12a9 9 0 1 1-9-9c2.39 0 4.68.94 6.36 2.64L21 8" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M21 3v5h-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
       </div>
 
       {/* Icon + balance */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0 24px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0 8px" }}>
         <div style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden" }}>
           <TokenIcon tokenId={asset.tokenId} size={64} badgeSize={24} />
         </div>
@@ -1915,6 +1993,11 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
         <div style={{ color: "#888", fontSize: 15, marginTop: 4 }}>
           {detailSettings?.hideBalance ? "•••••" : usdVal}
         </div>
+        {lastUpdated && (
+          <div style={{ color: "#444", fontSize: 11, marginTop: 6 }}>
+            Обновлено в {lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </div>
+        )}
       </div>
 
       {/* Action buttons — те же что на главном */}
@@ -2017,6 +2100,7 @@ function AssetDetailScreen({ assetId, onBack, onSend, onReceive, onBuy, onSwap }
           </div>
         </>
       )}
+      </div>{/* end scrollable */}
     </div>
   );
 }
@@ -2508,8 +2592,10 @@ function TxDetailScreen({ tx, onBack }) {
             valueColor={localStatus === 'Ошибка' ? DS.danger : localStatus === 'В процессе' ? '#FF9F0A' : localStatus === 'Отменена' ? DS.muted : DS.green}
             extra={<InfoIcon />} />
         <AddressRow
-          label={tx.type === "Получено" ? "Отправитель" : "Получатель"}
-          address={(tx.type === "Получено" ? tx.from : tx.to) || "—"}
+          label={tx.type === "Получено" ? "Получатель" : "Получатель"}
+          address={tx.type === "Получено"
+            ? (getAddressForAsset(tx.assetId, addresses) || tx.from || "—")
+            : (tx.to || "—")}
           assetId={tx.assetId}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px" }}>
@@ -3977,11 +4063,68 @@ function fmtBal(num, sym) {
 const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWalletsClick }) => {
   const { balances, addresses, refreshBalance, settings, updateSetting, wallets, activeWalletId } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const pullIndicatorRef = useRef(null);
+  const touchStartY = useRef(0);
+  const touchStarted = useRef(false);
   const assets = useAssets();
   const livePriceMap = useLivePriceMap();
 
   const activeWallet = (wallets || []).find(w => String(w.id) === String(activeWalletId));
   const walletName = activeWallet?.name || settings?.walletName || 'Кошелек № 1';
+
+  const doRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try { await refreshBalance(); setLastUpdated(new Date()); } catch(_) {}
+    setIsRefreshing(false);
+  };
+
+  function handleTouchStart(e) {
+    const el = e.currentTarget;
+    if (el.scrollTop === 0) {
+      touchStartY.current = e.touches[0].clientY;
+      touchStarted.current = true;
+    }
+  }
+  function handleTouchMove(e) {
+    if (!touchStarted.current) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0 && pullIndicatorRef.current) {
+      const progress = Math.min(delta / 90, 1);
+      pullIndicatorRef.current.style.opacity = String(progress);
+      pullIndicatorRef.current.style.transform = `translateX(-50%) translateY(${Math.min(delta * 0.5, 40)}px) scale(${0.7 + progress * 0.3}) rotate(${delta * 2.5}deg)`;
+      pullIndicatorRef.current.style.filter = delta > 90 && delta < 100 ? "brightness(1.3)" : "none";
+    }
+  }
+  async function handleTouchEnd(e) {
+    if (!touchStarted.current) return;
+    touchStarted.current = false;
+    const delta = e.changedTouches[0].clientY - touchStartY.current;
+    if (delta > 90 && !isRefreshing) {
+      setIsRefreshing(true);
+      if (pullIndicatorRef.current) {
+        pullIndicatorRef.current.style.opacity = "1";
+        pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(40px) scale(1)";
+      }
+      try {
+        await refreshBalance();
+        setLastUpdated(new Date());
+        if (pullIndicatorRef.current) pullIndicatorRef.current.style.background = DS.green;
+      } catch(_) {}
+      setTimeout(() => {
+        setIsRefreshing(false);
+        if (pullIndicatorRef.current) {
+          pullIndicatorRef.current.style.opacity = "0";
+          pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(0) scale(0.6)";
+          setTimeout(() => { if (pullIndicatorRef.current) pullIndicatorRef.current.style.background = DS.card; }, 300);
+        }
+      }, 800);
+    } else if (pullIndicatorRef.current) {
+      pullIndicatorRef.current.style.opacity = "0";
+      pullIndicatorRef.current.style.transform = "translateX(-50%) translateY(0) scale(0.6)";
+    }
+  }
 
   // Build real balances mapped to asset ids
   const getRealBalance = (assetId) => {
@@ -4029,7 +4172,27 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
   }, [addresses, refreshBalance]);
   
   return (
-    <div style={{ animation: "fadeIn 0.22s ease both", paddingBottom: 80 }}>
+    <div style={{ position: "relative", animation: "fadeIn 0.22s ease both", paddingBottom: 80, overflowY: "auto", height: "100%" }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, overflow: "visible", zIndex: 100, pointerEvents: "none" }}>
+        <div ref={pullIndicatorRef} style={{ position: "absolute", top: -40, left: "50%", transform: "translateX(-50%) scale(0.6)", opacity: 0, transition: "opacity 0.15s, background 0.3s", display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: "50%", background: DS.card, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", border: `1px solid ${DS.border}` }}>
+          {isRefreshing ? (
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18, animation: "spin 1s linear infinite" }}>
+              <path d="M23 4v6h-6M1 20v-6h6" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
+              <path d="M12 17V7M7 12l5 5 5-5" stroke="#3B7DFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px" }}>
         <div style={{ width: 36, height: 36 }} />
         <div onClick={onWalletsClick} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -4041,16 +4204,8 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
             <path d="M6 9l6 6 6-6" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </div>
-        <button onClick={async () => {
-          if (isRefreshing) return;
-          setIsRefreshing(true);
-          try { await refreshBalance(); } catch(e) {}
-          setIsRefreshing(false);
-        }} style={{ width: 36, height: 36, borderRadius: "50%", background: "transparent", border: "none", cursor: isRefreshing ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <svg viewBox="0 0 24 24" fill="none" style={{
-            width: 22, height: 22,
-            animation: isRefreshing ? "spin 0.7s linear infinite" : "none"
-          }}>
+        <button onClick={doRefresh} style={{ width: 36, height: 36, borderRadius: "50%", background: "transparent", border: "none", cursor: isRefreshing ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 22, height: 22, animation: isRefreshing ? "spin 0.7s linear infinite" : "none" }}>
             <path d="M21 12a9 9 0 1 1-9-9c2.39 0 4.68.94 6.36 2.64L21 8" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M21 3v5h-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -4059,7 +4214,7 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
 
       <div
         onClick={() => updateSetting('hideBalance', !settings?.hideBalance)}
-        style={{ textAlign: "center", padding: "12px 20px 20px", animation: "fadeSlideUp 0.3s ease both", cursor: "pointer", userSelect: "none" }}
+        style={{ textAlign: "center", padding: "12px 20px 4px", animation: "fadeSlideUp 0.3s ease both", cursor: "pointer", userSelect: "none" }}
       >
         <div style={{ color: "white", fontSize: 42, fontWeight: 700, letterSpacing: -1.5, fontFamily: DS.font }}>
           {settings?.hideBalance
@@ -4074,7 +4229,16 @@ const HomeScreen = memo(({ onSend, onReceive, onBuy, onSwap, onAssetClick, onWal
               : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="#888" strokeWidth="1.8"/><circle cx="12" cy="12" r="3" stroke="#888" strokeWidth="1.8"/></>}
           </svg>
         </div>
+        {lastUpdated && (
+          <div style={{ color: "#555", fontSize: 11, marginTop: 6, letterSpacing: 0.2 }}>
+            Обновлено в {lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </div>
+        )}
+        {isRefreshing && !lastUpdated && (
+          <div style={{ color: "#555", fontSize: 11, marginTop: 6 }}>Обновление...</div>
+        )}
       </div>
+      <div style={{ marginBottom: 16 }} />
 
       <div style={{ display: "flex", justifyContent: "space-around", padding: "0 20px 24px" }}>
         {(() => {
