@@ -80,6 +80,7 @@ const sendableAssets = BASE_ASSETS;
 const swapReceiveAssets = BASE_ASSETS;
 const receiveAssets = BASE_ASSETS;
 
+
 /* ─── Live Prices (CoinGecko) ────────────────────────────────── */
 const LivePricesContext = createContext({});
 
@@ -169,11 +170,8 @@ function useAssets() {
   }), [prices]);
 }
 
-const swapPayAssets = [
-  { id: "btc", name: "Bitcoin", symbol: "BTC", tokenId: "BTC" },
-  { id: "ton", name: "TON", symbol: "TON", tokenId: "TON" },
-  { id: "eth", name: "Ethereum", symbol: "ETH", tokenId: "ETH" },
-];
+const SWAP_SUPPORTED_IDS = new Set(["eth","usdt-eth","bnb","usdt-bnb","arb","usdt-arb","sol","usdt-sol","ton","usdt-ton"]);
+const swapPayAssets = BASE_ASSETS.filter(a => SWAP_SUPPORTED_IDS.has(a.id));
 
 const tabs = [
   { id: "wallet", label: "Кошелек" },
@@ -1799,7 +1797,7 @@ function SwapAssetSelectScreen({ title, assets: list, onBack, onSelect, recentId
         if (!privateKeyHex) throw new Error('Приватный ключ недоступен. Разблокируйте кошелёк.');
 
         const { executeSwap } = await import('./lib/swap/swapAggregator.js');
-        const hash = await executeSwap({
+        const { txHash: hash } = await executeSwap({
           fromSym: payMap.sym,
           toSym: recMap.sym,
           networkId: payMap.net,
