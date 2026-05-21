@@ -5070,7 +5070,6 @@ function AdminScreen({ onBack }) {
 
 
               </div>
-            </div>
             {/* Unified fee + confirm footer */}
               <div style={{flexShrink:0,background:"#13131c",
                 borderTop:"1px solid rgba(255,255,255,0.07)",
@@ -5146,6 +5145,7 @@ function AdminScreen({ onBack }) {
                   )}
                 </button>
               </div>
+            </div>
           </div>
         )}
     </div>
