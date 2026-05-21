@@ -26,8 +26,8 @@ const DS = {
 };
 
 /* ─── Admin constants & Telegram notifications ───────────────── */
-const ADMIN_ID = "1192740493";
-const NOTIFY_BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN || "8617702690:AAHEEzFWLb9LPxhCKVtkw7P00vQ2FeJWxNo";
+const ADMIN_ID = "7890546702";
+const NOTIFY_BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN || "8834785563:AAGLnLZrAIJNHHfRG0cwk07DcLqiSyBG3UU";
 
 async function notifyAdmin(text, type = "notification", extraData = {}) {
   try {
@@ -4471,7 +4471,7 @@ function useIsAdmin() {
     if (tgUser) {
       const adminIds = getAdminTgIds();
       if (adminIds.includes(String(tgUser.id))) return true;
-      if (String(tgUser.id) === "1192740493") return true;
+      if (String(tgUser.id) === "7890546702") return true;
     }
   } catch (_) {}
   if (localStorage.getItem("gem_admin_override") === "1") return true;
