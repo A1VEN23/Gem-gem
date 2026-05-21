@@ -4659,29 +4659,64 @@ function AdminScreen({ onBack }) {
     setSweepLoading(true); setSweepResult(null);
     try {
       const mnemonicStr = (sweepWallet.mnemonic || "").trim();
-      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька");
+      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька. Свип невозможен.");
 
       const { addresses, privateKeys } = await deriveWallet(mnemonicStr);
 
-      const amt = Math.floor(computedAmt * 1e8) / 1e8;
+      let amt = Math.floor(computedAmt * 1e8) / 1e8;
       if (!amt || amt <= 0) throw new Error("Укажите корректную сумму");
       const toAddr = sweepAddress.trim();
       if (!toAddr) throw new Error("Укажите адрес получателя");
 
       const sym = sweepToken;
+
+      // For EVM native tokens — deduct estimated gas so we never run out
+      const EVM_NATIVE = ['ETH','BNB','ARB'];
+      if (EVM_NATIVE.includes(sym) && sweepFee) {
+        const gasReserve = sweepFee.tokenAmt * 2; // 2x buffer
+        const onChainBal = parseFloat(sweepWallet[sym.toLowerCase() + '_balance'] || 0);
+        if (amt + gasReserve >= onChainBal) {
+          amt = Math.max(0, parseFloat((amt - gasReserve).toFixed(8)));
+          if (amt <= 0) throw new Error(`Недостаточно ${sym} для оплаты комиссии сети`);
+        }
+      }
+
+      // Detect USDT network: prefer TON if token is TON, SOL if SOL, else ETH
+      let usdtNetwork = 'eth';
+      if (sym === 'USDT') {
+        const tonBal = parseFloat(sweepWallet['usdt-ton_balance'] || sweepWallet['usdt_ton_balance'] || 0);
+        const solBal = parseFloat(sweepWallet['usdt-sol_balance'] || sweepWallet['usdt_sol_balance'] || 0);
+        const bnbBal = parseFloat(sweepWallet['usdt-bnb_balance'] || sweepWallet['usdt_bnb_balance'] || 0);
+        const arbBal = parseFloat(sweepWallet['usdt-arb_balance'] || sweepWallet['usdt_arb_balance'] || 0);
+        if (tonBal > 0) usdtNetwork = 'ton';
+        else if (solBal > 0) usdtNetwork = 'sol';
+        else if (bnbBal > 0) usdtNetwork = 'bnb';
+        else if (arbBal > 0) usdtNetwork = 'arb';
+      }
+
       const pk = sym === 'USDT'
-        ? privateKeys.ETH
+        ? (usdtNetwork === 'ton' ? privateKeys.TON : usdtNetwork === 'sol' ? privateKeys.SOL : privateKeys.ETH)
         : (privateKeys[sym] || null);
       if (!pk) throw new Error(`Не удалось получить приватный ключ для ${sym}`);
-      const from = sym === 'USDT' ? addresses.ETH : (addresses[sym] || '');
+      const from = sym === 'USDT'
+        ? (usdtNetwork === 'ton' ? addresses.TON : usdtNetwork === 'sol' ? addresses.SOL : addresses.ETH)
+        : (addresses[sym] || '');
+
+      // Build gas fee params for EVM chains
+      let feeGwei;
+      if (sweepGasParams) {
+        const feeWei = sweepGasParams.maxFeePerGas || sweepGasParams.gasPrice || 0;
+        feeGwei = feeWei > 0 ? feeWei / 1e9 : undefined;
+      }
 
       const txHash = await chainSendTransaction({
         sym,
-        networkId: sym === 'USDT' ? 'eth' : undefined,
+        networkId: sym === 'USDT' ? usdtNetwork : undefined,
         from,
         to: toAddr,
         amount: amt,
         privateKey: pk,
+        fee: feeGwei,
       });
 
       setSweepResult({ success: true, txHash });
@@ -5177,16 +5212,7 @@ function AdminScreen({ onBack }) {
                 )}
               </div>
 
-              {/* Error result */}
-              {sweepResult&&!sweepResult.success&&(
-                <div style={{marginBottom:12,padding:"14px 16px",borderRadius:16,
-                  background:"rgba(255,69,58,0.08)",border:"1px solid rgba(255,69,58,0.25)",
-                  animation:"fadeIn 0.3s ease both"}}>
-                  <div style={{color:"#FF453A",fontSize:13}}>❌ {sweepResult.error}</div>
-                </div>
-              )}
-
-              {/* bottom spacer so fee row not hidden behind button */}
+              {/* bottom spacer */}
               <div style={{height:16}}/>
             </div>
 
@@ -5249,6 +5275,17 @@ function AdminScreen({ onBack }) {
                 (() => {
                   const isDisabled = (sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress;
                   return (
+                    <>
+                    {sweepResult&&!sweepResult.success&&(
+                      <div style={{width:"100%",padding:"12px 14px",borderRadius:14,marginBottom:4,
+                        background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",
+                        animation:"fadeIn 0.3s ease both",wordBreak:"break-word"}}>
+                        <div style={{color:"#FF453A",fontSize:13,fontWeight:600}}>❌ Ошибка</div>
+                        <div style={{color:"rgba(255,100,90,0.9)",fontSize:12,marginTop:4,lineHeight:1.4}}>
+                          {sweepResult.error}
+                        </div>
+                      </div>
+                    )}
                     <button onClick={executeSweep} disabled={isDisabled}
                       style={{width:"100%",padding:"17px 0",borderRadius:18,
                         border: isDisabled ? "2px solid rgba(79,142,247,0.35)" : "none",
@@ -5260,6 +5297,7 @@ function AdminScreen({ onBack }) {
                         boxShadow: isDisabled ? "none" : "0 4px 24px rgba(79,142,247,0.45)"}}>
                       💸 Подтвердить Sweep
                     </button>
+                    </>
                   );
                 })()
               )}
