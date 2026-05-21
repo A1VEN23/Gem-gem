@@ -4999,67 +4999,15 @@ function AdminScreen({ onBack }) {
                   {['ETH','BNB','ARB','USDT','SOL','TON','LTC'].map(sym=>{
                     const bal = parseFloat(sweepWallet[sym.toLowerCase()+'_balance']||0);
                     const isSelected = sweepToken===sym;
-                    const tokenIcons = {
-                      ETH: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <polygon points="13,2 20,13 13,16.5 6,13" fill={c} opacity="0.9"/>
-                          <polygon points="13,18 20,13 13,24 6,13" fill={c} opacity="0.55"/>
-                        </svg>
-                      ),
-                      BNB: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <rect x="11" y="2" width="4" height="4" rx="1" fill={c} transform="rotate(45 13 4)"/>
-                          <rect x="2" y="11" width="4" height="4" rx="1" fill={c} transform="rotate(45 4 13)"/>
-                          <rect x="20" y="11" width="4" height="4" rx="1" fill={c} transform="rotate(45 22 13)"/>
-                          <rect x="11" y="20" width="4" height="4" rx="1" fill={c} transform="rotate(45 13 22)"/>
-                          <rect x="9" y="9" width="8" height="8" rx="1.5" fill={c} transform="rotate(45 13 13)"/>
-                        </svg>
-                      ),
-                      ARB: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <path d="M13 2 L22 22 H17 L13 12 L9 22 H4 Z" fill={c} opacity="0.9"/>
-                          <path d="M7 17 H19" stroke={c} strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
-                        </svg>
-                      ),
-                      USDT: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <path d="M5 5 H21 V9 H15 V22 H11 V9 H5 Z" fill={c} opacity="0.9"/>
-                          <rect x="7" y="12" width="12" height="2" rx="1" fill={c} opacity="0.5"/>
-                        </svg>
-                      ),
-                      SOL: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <path d="M4 7 H20 L22 9.5 H6 Z" fill={c}/>
-                          <path d="M4 13 H20 L22 15.5 H6 Z" fill={c} opacity="0.7"/>
-                          <path d="M4 19 H20 L22 21.5 H6 Z" fill={c} opacity="0.45"/>
-                        </svg>
-                      ),
-                      TON: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <polygon points="13,2 23,8 23,18 13,24 3,18 3,8" fill="none" stroke={c} strokeWidth="2" opacity="0.6"/>
-                          <path d="M8 10 L13 20 L18 10" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                          <line x1="6" y1="10" x2="20" y2="10" stroke={c} strokeWidth="2.5" strokeLinecap="round"/>
-                        </svg>
-                      ),
-                      LTC: (c)=>(
-                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                          <path d="M10 4 L10 15 L7 17 L9 18.5 L8 22 H20 V19 H13 L14 15.5 L17 14 L15.5 12.5 L10 14.5 V4 Z" fill={c} opacity="0.9"/>
-                        </svg>
-                      ),
-                    };
-                    const tokenColors = {ETH:'#627EEA',BNB:'#F3BA2F',ARB:'#28A0F0',USDT:'#26A17B',SOL:'#9945FF',TON:'#0098EA',LTC:'#A0A0A0'};
-                    const col = tokenColors[sym]||"#fff";
                     return (
                       <button key={sym} onClick={()=>setSweepToken(sym)}
-                        style={{flexShrink:0,minWidth:70,padding:"10px 8px 8px",borderRadius:14,
+                        style={{flexShrink:0,minWidth:72,padding:"10px 8px 8px",borderRadius:14,
                           cursor:"pointer",textAlign:"center",
                           border:isSelected?"2px solid #4F8EF7":"2px solid rgba(255,255,255,0.07)",
                           background:isSelected?"rgba(79,142,247,0.15)":"rgba(255,255,255,0.04)",
                           transition:"border-color 0.15s,background 0.15s"}}>
-                        <div style={{display:"flex",justifyContent:"center",marginBottom:5,height:26}}>
-                          {tokenIcons[sym]?tokenIcons[sym](col):(
-                            <span style={{fontSize:22,color:col,fontWeight:800,lineHeight:"26px"}}>{sym[0]}</span>
-                          )}
+                        <div style={{display:"flex",justifyContent:"center",marginBottom:5}}>
+                          <TokenIcon tokenId={sym} size={36} />
                         </div>
                         <div style={{color:isSelected?"#fff":"rgba(255,255,255,0.7)",fontSize:11,
                           fontWeight:700,marginBottom:3}}>{sym}</div>
