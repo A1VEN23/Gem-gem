@@ -5039,7 +5039,6 @@ function AdminScreen({ onBack }) {
                         color:"#fff",fontSize:12,outline:"none",boxSizing:"border-box",
                         fontFamily:"monospace",letterSpacing:"0.01em"}} />
                     <button onClick={()=>{
-                    <button onClick={()=>{
                         const doPaste = (val) => { if(val) setSweepAddress(val.trim()); };
                         if(window.Telegram?.WebApp?.readTextFromClipboard){
                           window.Telegram.WebApp.readTextFromClipboard(t=>{
@@ -5050,7 +5049,7 @@ function AdminScreen({ onBack }) {
                           const v=window.prompt('Адрес получателя:',''); doPaste(v);
                         }
                       }}
-                        padding:"5px 10px",borderRadius:8,border:"none",
+                        style={{padding:"5px 10px",borderRadius:8,border:"none",
                         background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.5)",
                         fontSize:13,cursor:"pointer"}}>📋</button>
                   </div>
