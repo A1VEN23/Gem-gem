@@ -328,7 +328,7 @@ const ANIM_STYLE = `
   }
   @keyframes slideInRight {
     from { opacity: 0; transform: translate3d(20px, 0, 0); }
-    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+    to   { opacity: 1; transform: none; }
   }
   @keyframes pulse {
     0%, 100% { transform: scale3d(1, 1, 1); }
@@ -345,9 +345,7 @@ const ANIM_STYLE = `
   }
   .anim-page    { 
     animation: slideInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) both; 
-    will-change: transform, opacity; 
-    backface-visibility: hidden;
-    transform: translate3d(0,0,0);
+    will-change: opacity; 
   }
   .anim-list > * { 
     animation: fadeSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) both; 
@@ -5179,7 +5177,7 @@ function AdminScreen({ onBack }) {
             </div>
 
             {/* ── STICKY BOTTOM BUTTON ── always visible ── */}
-            <div style={{flexShrink:0,padding:"12px 16px 32px",
+            <div style={{flexShrink:0,padding:"12px 16px",paddingBottom:"max(28px, calc(env(safe-area-inset-bottom) + 16px))",
               background:"#16213E",borderTop:"1px solid rgba(255,255,255,0.07)",
               display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
 
