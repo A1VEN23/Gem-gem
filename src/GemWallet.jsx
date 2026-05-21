@@ -5105,24 +5105,53 @@ function AdminScreen({ onBack }) {
               </div>
             </div>
             {/* Sticky confirm footer */}
-            <div style={{padding:"12px 16px 28px",flexShrink:0,
-              borderTop:"1px solid rgba(255,255,255,0.07)",
-              background:"#0f0f16"}}>
-              <button onClick={executeSweep}
-                disabled={!((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
-                style={{width:"100%",padding:"17px 0",borderRadius:16,border:"none",
-                  background:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                    ?"linear-gradient(135deg,#7c3aed,#4f46e5)":"rgba(255,255,255,0.08)",
-                  color:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                    ?"#fff":"rgba(255,255,255,0.3)",
-                  fontSize:15,fontWeight:700,letterSpacing:"0.02em",transition:"all 0.2s",
-                  cursor:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                    ?"pointer":"not-allowed",
-                  boxShadow:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                    ?"0 8px 24px rgba(124,58,237,0.45)":"none"}}>
-                {sweepLoading ? "⏳ Отправка…" : "💸  Подтвердить Sweep"}
-              </button>
-            </div>
+              <div style={{padding:"16px 16px 36px",flexShrink:0,
+                borderTop:"1px solid rgba(255,255,255,0.07)",
+                background:"linear-gradient(to top,#0a0a12 80%,rgba(10,10,18,0) 100%)"}}>
+                {/* Amount summary */}
+                {((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress)&&(
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                    marginBottom:12,padding:"10px 14px",borderRadius:12,
+                    background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.2)"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:13}}>📤</span>
+                      <span style={{color:"rgba(255,255,255,0.5)",fontSize:12}}>Отправка</span>
+                    </div>
+                    <span style={{color:"#fff",fontWeight:700,fontSize:13}}>
+                      {sweepInputMode==="token"
+                        ? `${sweepAmount} ${sweepToken}`
+                        : `${sweepUsdInput} USD → ${sweepToken}`}
+                    </span>
+                  </div>
+                )}
+                <button onClick={executeSweep}
+                  disabled={!((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
+                  style={{width:"100%",padding:"18px 0",borderRadius:18,border:"none",
+                    position:"relative",overflow:"hidden",
+                    background:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                      ?"linear-gradient(135deg,#7c3aed 0%,#4f46e5 50%,#6d28d9 100%)":"rgba(255,255,255,0.06)",
+                    color:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                      ?"#fff":"rgba(255,255,255,0.25)",
+                    fontSize:16,fontWeight:800,letterSpacing:"0.04em",transition:"all 0.25s",
+                    cursor:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                      ?"pointer":"not-allowed",
+                    boxShadow:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                      ?"0 4px 32px rgba(124,58,237,0.55),0 0 0 1px rgba(124,58,237,0.3)":"none"}}>
+                  {sweepLoading
+                    ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                        <span style={{display:"inline-block",width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",
+                          borderTopColor:"#fff",borderRadius:"50%",
+                          animation:"spin 0.8s linear infinite"}} />
+                        Отправка…
+                      </span>
+                    : <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+                        <span style={{fontSize:20}}>💸</span>
+                        Подтвердить Sweep
+                        <span style={{fontSize:16,opacity:0.7}}>→</span>
+                      </span>
+                  }
+                </button>
+              </div>
           </div>
         )}
     </div>
