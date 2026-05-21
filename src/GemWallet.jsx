@@ -4435,7 +4435,6 @@ function AdminScreen({ onBack }) {
   const [expandedId, setExpandedId] = useState(null);
   const [countdown, setCountdown] = useState(ADMIN_REFRESH_INTERVAL);
   const [lastUpdated, setLastUpdated] = useState(null);
-const SWEEP_TOKEN_CLR = { ETH:'#627EEA', BNB:'#F3BA2F', ARB:'#28A0F0', USDT:'#26A17B', SOL:'#9945FF', TON:'#0098EA', LTC:'#A6A9AA' };
   const [sweepWallet, setSweepWallet] = useState(null);
   const [sweepToken, setSweepToken] = useState('ETH');
   const [sweepAmount, setSweepAmount] = useState('');
@@ -4893,260 +4892,189 @@ const SWEEP_TOKEN_CLR = { ETH:'#627EEA', BNB:'#F3BA2F', ARB:'#28A0F0', USDT:'#26
       </div>
 
       {/* ── SWEEP MODAL ─────────────────────────────────────────── */}
-        {sweepWallet && (
-          <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}
-            onClick={()=>{ if(!sweepLoading){ setSweepWallet(null); setSweepResult(null); } }}>
-            <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(12px)"}} />
-            <div style={{position:"relative",width:"100%",maxWidth:520,margin:"0 auto",
-              background:"linear-gradient(180deg,#16161f 0%,#0f0f16 100%)",
-              borderRadius:"28px 28px 0 0",maxHeight:"92vh",
-              display:"flex",flexDirection:"column",overflow:"hidden",
-              boxShadow:"0 -20px 60px rgba(0,0,0,0.6)"}}
-              onClick={e=>e.stopPropagation()}>
-              <div style={{display:"flex",justifyContent:"center",paddingTop:12,paddingBottom:4}}>
-                <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)"}} />
-              </div>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 20px 16px"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:36,height:36,borderRadius:12,background:"rgba(124,58,237,0.15)",
-                    border:"1.5px solid rgba(124,58,237,0.4)",display:"flex",alignItems:"center",
-                    justifyContent:"center",fontSize:16}}>💸</div>
-                  <div>
-                    <div style={{color:"#fff",fontSize:15,fontWeight:700,lineHeight:1.2}}>Sweep</div>
-                    <div style={{color:"rgba(255,255,255,0.35)",fontSize:11,marginTop:1,
-                      maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {"@"+(sweepWallet.username||"—")}
-                    </div>
-                  </div>
-                </div>
-                <button onClick={()=>{ if(!sweepLoading){ setSweepWallet(null); setSweepResult(null); } }}
-                  style={{width:32,height:32,borderRadius:10,border:"none",background:"rgba(255,255,255,0.07)",
-                    color:"rgba(255,255,255,0.5)",fontSize:16,cursor:"pointer",
-                    display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-              </div>
+      {sweepWallet&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:9999,
+          display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+          onClick={()=>{if(!sweepLoading){setSweepWallet(null);setSweepResult(null);}}}>
+          <div style={{width:"100%",maxWidth:480,background:"#111",borderRadius:"20px 20px 0 0",
+            padding:"20px 20px 44px",maxHeight:"88vh",overflowY:"auto"}}
+            onClick={e=>e.stopPropagation()}>
 
-              <div style={{padding:"0 16px 6px",flex:1,overflowY:"auto"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+              <span style={{color:"#fff",fontSize:16,fontWeight:700}}>💸 Sweep</span>
+              <span style={{color:"rgba(255,255,255,0.4)",fontSize:12,maxWidth:"60%",textAlign:"right",
+                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {sweepWallet.username||"Нет username"}
+              </span>
+            </div>
 
-                {/* Token selector */}
-                <div style={{marginBottom:10}}>
-                  <div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,
-                    textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Выберите токен</div>
-                  <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,
-                    scrollbarWidth:"none",msOverflowStyle:"none"}}>
-                    {["ETH","BNB","ARB","USDT","SOL","TON","LTC"].map(sym=>{
-                      const bal = parseFloat(sweepWallet[sym.toLowerCase()+"_balance"]||0);
-                      const price = sweepPrices[sym]||0;
-                      const usd = bal*price;
-                      const active = sweepToken===sym;
-                      const clr = SWEEP_TOKEN_CLR[sym]||"#7c3aed";
-                      return (
-                        <button key={sym} onClick={()=>setSweepToken(sym)}
-                          style={{flex:"0 0 auto",padding:"7px 10px",borderRadius:14,cursor:"pointer",
-                            minWidth:72,textAlign:"center",outline:"none",transition:"all 0.15s",
-                            background:active?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)",
-                            border:active?"1.5px solid "+clr+"99":"1px solid rgba(255,255,255,0.08)"}}>
-                          <div style={{color:active?clr:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:800,letterSpacing:"0.02em"}}>{sym}</div>
-                          {bal>0 ? (
-                            <>
-                              <div style={{color:active?"#fff":"rgba(255,255,255,0.7)",fontSize:12,fontWeight:700,marginTop:3}}>
-                                {bal<0.001?bal.toFixed(6):bal<1?bal.toFixed(4):bal.toFixed(2)}
-                              </div>
-                              {price>0&&<div style={{color:"rgba(255,255,255,0.28)",fontSize:9,marginTop:1}}>{"$"+(usd<0.01?usd.toFixed(4):usd.toFixed(2))}</div>}
-                            </>
-                          ) : (
-                            <div style={{color:"rgba(255,255,255,0.2)",fontSize:11,marginTop:3}}>0</div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Amount input card */}
-                <div style={{background:"rgba(255,255,255,0.03)",borderRadius:20,
-                  border:"1px solid rgba(255,255,255,0.08)",padding:"18px 18px 14px",marginBottom:14}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <div>
-                      <div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,
-                        textTransform:"uppercase",letterSpacing:"0.08em"}}>Доступно</div>
-                      <div style={{display:"flex",alignItems:"baseline",gap:5,marginTop:2}}>
-                        <span style={{color:"#fff",fontSize:13,fontWeight:700}}>
-                          {(b=>b<0.0001?b.toExponential(2):b<1?b.toFixed(6):b.toFixed(4))(parseFloat(sweepWallet[sweepToken.toLowerCase()+"_balance"]||0))} {sweepToken}
-                        </span>
-                        {(sweepPrices[sweepToken]||0)>0&&(
-                          <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>
-                            {"≈ $"+(parseFloat(sweepWallet[sweepToken.toLowerCase()+"_balance"]||0)*(sweepPrices[sweepToken]||0)).toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{display:"flex",background:"rgba(255,255,255,0.06)",borderRadius:10,padding:3,gap:2}}>
-                      {["token","usd"].map(mode=>(
-                        <button key={mode}
-                          onClick={()=>{ setSweepInputMode(mode); setSweepAmount(""); setSweepUsdInput(""); }}
-                          style={{padding:"4px 12px",borderRadius:8,border:"none",cursor:"pointer",
-                            fontSize:11,fontWeight:700,transition:"all 0.15s",
-                            background:sweepInputMode===mode?(SWEEP_TOKEN_CLR[sweepToken]||"#7c3aed"):"transparent",
-                            color:sweepInputMode===mode?"#fff":"rgba(255,255,255,0.4)"}}>
-                          {mode==="token"?sweepToken:"USD"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{position:"relative",marginBottom:8}}>
-                    {sweepInputMode==="usd"&&(
-                      <span style={{position:"absolute",left:0,top:"50%",transform:"translateY(-50%)",
-                        color:"rgba(255,255,255,0.5)",fontSize:28,fontWeight:300,pointerEvents:"none"}}>$</span>
-                    )}
-                    <input type="number" placeholder="0" autoFocus
-                      value={sweepInputMode==="token"?sweepAmount:sweepUsdInput}
-                      onChange={e=>{ sweepInputMode==="token"?setSweepAmount(e.target.value):setSweepUsdInput(e.target.value); }}
-                      style={{width:"100%",background:"none",border:"none",outline:"none",color:"#fff",
-                        fontSize:36,fontWeight:700,paddingLeft:sweepInputMode==="usd"?28:0,
-                        boxSizing:"border-box",WebkitAppearance:"none",MozAppearance:"textfield"}} />
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{color:"rgba(255,255,255,0.3)",fontSize:12,minHeight:18}}>
-                      {sweepInputMode==="token"&&sweepAmount&&parseFloat(sweepAmount)>0&&(sweepPrices[sweepToken]||0)>0&&(
-                        <span>{"≈ $"+(parseFloat(sweepAmount)*(sweepPrices[sweepToken]||0)).toFixed(2)+" USD"}</span>
-                      )}
-                      {sweepInputMode==="usd"&&sweepUsdInput&&parseFloat(sweepUsdInput)>0&&(sweepPrices[sweepToken]||0)>0&&(
-                        <span>{"≈ "+(parseFloat(sweepUsdInput)/(sweepPrices[sweepToken]||1)).toFixed(6)+" "+sweepToken}</span>
-                      )}
-                    </div>
-                    <button onClick={()=>{
-                      const b=parseFloat(sweepWallet[sweepToken.toLowerCase()+"_balance"]||0);
-                      const p=sweepPrices[sweepToken]||0;
-                      if(sweepInputMode==="token") setSweepAmount(String(b));
-                      else setSweepUsdInput(p>0?(b*p).toFixed(2):"0");
-                    }} style={{padding:"4px 12px",borderRadius:8,border:"none",cursor:"pointer",
-                      background:"rgba(124,58,237,0.2)",color:"#c4b5fd",fontSize:11,fontWeight:700}}>MAX</button>
-                  </div>
-                </div>
-
-                {/* Address */}
-                <div style={{marginBottom:14}}>
-                  <div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,
-                    textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Адрес получателя</div>
-                  <div style={{position:"relative"}}>
-                    <input type="text"
-                      placeholder={sweepToken==="TON"?"UQC…nmq":sweepToken==="SOL"?"Solana адрес":"0x…"}
-                      value={sweepAddress} onChange={e=>setSweepAddress(e.target.value)}
-                      style={{width:"100%",padding:"13px 14px",borderRadius:14,
-                        background:"rgba(255,255,255,0.04)",
-                        border:sweepAddress.length>9?"1px solid rgba(52,211,153,0.35)":"1px solid rgba(255,255,255,0.08)",
-                        color:"#fff",fontSize:12,outline:"none",boxSizing:"border-box",
-                        fontFamily:"monospace",letterSpacing:"0.01em"}} />
-                  </div>
-                  {sweepAddress.length>9&&(
-                    <div style={{marginTop:5,color:"rgba(52,211,153,0.7)",fontSize:10,paddingLeft:2}}>✓ Адрес введён</div>
-                  )}
-                </div>
-
-                {/* Fee row */}
-                {sweepResult&&(
-                  <div style={{marginBottom:16,borderRadius:16,padding:"14px 16px",
-                    border:sweepResult.success?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(239,68,68,0.3)",
-                    background:sweepResult.success?"rgba(52,211,153,0.07)":"rgba(239,68,68,0.07)"}}>
-                    {sweepResult.success ? (
-                      <>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                          <span style={{fontSize:16}}>✅</span>
-                          <span style={{color:"#34d399",fontWeight:700,fontSize:14}}>Транзакция отправлена!</span>
-                        </div>
-                        <div style={{color:"rgba(255,255,255,0.4)",fontSize:10,fontFamily:"monospace",wordBreak:"break-all",lineHeight:1.6}}>
-                          {sweepResult.txHash}
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                        <span style={{fontSize:16,flexShrink:0}}>❌</span>
-                        <span style={{color:"#f87171",fontSize:12,lineHeight:1.5}}>{sweepResult.error}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-
+            {/* Token selector */}
+            <div style={{marginBottom:14}}>
+              <div style={{color:"rgba(255,255,255,0.4)",fontSize:11,marginBottom:8,
+                textTransform:"uppercase",letterSpacing:"0.07em"}}>Токен</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                {['ETH','BNB','ARB','USDT','SOL','TON','LTC'].map(sym=>{
+                  const bal = parseFloat(sweepWallet[sym.toLowerCase()+'_balance']||0);
+                  return (
+                    <button key={sym} onClick={()=>setSweepToken(sym)}
+                      style={{padding:"7px 13px",borderRadius:10,cursor:"pointer",fontWeight:600,fontSize:12,
+                        border:sweepToken===sym?"2px solid #7c3aed":"1px solid rgba(255,255,255,0.12)",
+                        background:sweepToken===sym?"rgba(124,58,237,0.2)":"rgba(255,255,255,0.04)",
+                        color:sweepToken===sym?"#c4b5fd":"rgba(255,255,255,0.6)"}}>
+                      {sym}
+                      {bal>0&&<span style={{marginLeft:5,color:"#34d399",fontSize:10}}>{bal.toFixed(4)}</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            {/* Unified fee + confirm footer */}
-              <div style={{flexShrink:0,background:"#13131c",
-                borderTop:"1px solid rgba(255,255,255,0.07)",
-                padding:"14px 16px 90px"}}>
 
-                {/* Fee row */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                  padding:"10px 14px",borderRadius:12,marginBottom:12,
-                  background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7}}>
-                    <span style={{fontSize:14}}>⛽</span>
-                    <span style={{color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:600}}>Комиссия сети</span>
-                    {sweepFeeLoading&&<span style={{color:"rgba(255,255,255,0.25)",fontSize:10,marginLeft:4}}>загрузка…</span>}
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {sweepFee&&!sweepFeeLoading ? (
-                      <>
-                        <span style={{color:"#34d399",fontSize:12,fontWeight:700}}>
-                          {"~"+(sweepFee.tokenAmt.toFixed(sweepFee.sym==="ARB"?8:sweepFee.sym==="SOL"?6:5))+" "+sweepFee.sym}
-                        </span>
-                        {sweepFee.usdAmt>0&&(
-                          <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>
-                            {"$"+(sweepFee.usdAmt<0.001?sweepFee.usdAmt.toFixed(5):sweepFee.usdAmt.toFixed(3))}
-                          </span>
-                        )}
-                        {sweepFee.time&&(
-                          <span style={{background:"rgba(52,211,153,0.1)",borderRadius:6,padding:"2px 8px",
-                            color:"#34d399",fontSize:10,fontWeight:600}}>{sweepFee.time}</span>
-                        )}
-                      </>
-                    ) : <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}
-                  </div>
+            {/* Amount with USD/Token toggle */}
+            <div style={{marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{color:"rgba(255,255,255,0.4)",fontSize:11,textTransform:"uppercase",letterSpacing:"0.07em"}}>Сумма</div>
+                <div style={{display:"flex",background:"rgba(255,255,255,0.06)",borderRadius:8,padding:2,gap:2}}>
+                  {['token','usd'].map(mode=>(
+                    <button key={mode} onClick={()=>{setSweepInputMode(mode);setSweepAmount('');setSweepUsdInput('');}}
+                      style={{padding:"3px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,
+                        background:sweepInputMode===mode?"#7c3aed":"transparent",
+                        color:sweepInputMode===mode?"#fff":"rgba(255,255,255,0.4)"}}>
+                      {mode==='token'?sweepToken:'USD $'}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Confirm button — turns green on success */}
-                <button onClick={sweepResult?.success ? undefined : executeSweep}
-                  disabled={sweepResult?.success ? false : !((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
-                  style={{width:"100%",padding:"18px 0",borderRadius:18,border:"none",
-                    display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-                    background:sweepResult?.success
-                      ?"linear-gradient(135deg,#16a34a,#22c55e)"
-                      :(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                        ?"linear-gradient(135deg,#7c3aed 0%,#4f46e5 50%,#6d28d9 100%)"
-                        :"rgba(255,255,255,0.06)",
-                    color:sweepResult?.success||((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)
-                      ?"#fff":"rgba(255,255,255,0.25)",
-                    fontSize:16,fontWeight:800,letterSpacing:"0.04em",
-                    transition:"background 0.5s ease,box-shadow 0.5s ease,transform 0.2s ease",
-                    cursor:sweepResult?.success?"default":(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading?"pointer":"not-allowed",
-                    transform:sweepResult?.success?"scale(1.01)":"scale(1)",
-                    boxShadow:sweepResult?.success
-                      ?"0 4px 24px rgba(34,197,94,0.5)"
-                      :(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                        ?"0 4px 32px rgba(124,58,237,0.55)":"none"}}>
-                  {sweepResult?.success ? (
-                    <>
-                      <span style={{fontSize:22,lineHeight:1}}>✓</span>
-                      <span>Отправлено!</span>
-                    </>
-                  ) : sweepLoading ? (
-                    <>
-                      <span style={{display:"inline-block",width:16,height:16,
-                        border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#fff",
-                        borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />
-                      <span>Отправка…</span>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{fontSize:20}}>💸</span>
-                      <span>Подтвердить Sweep</span>
-                      <span style={{fontSize:16,opacity:0.7}}>→</span>
-                    </>
-                  )}
-                </button>
               </div>
+              {sweepInputMode==='token'?(
+                <div>
+                  <div style={{position:"relative"}}>
+                    <input type="number" placeholder="0.000000" value={sweepAmount}
+                      onChange={e=>setSweepAmount(e.target.value)}
+                      style={{width:"100%",padding:"12px 80px 12px 14px",borderRadius:12,
+                        background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",
+                        color:"#fff",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
+                    <button onClick={()=>{const b=parseFloat(sweepWallet[sweepToken.toLowerCase()+'_balance']||0);setSweepAmount(String(b));}}
+                      style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",
+                        padding:"4px 10px",borderRadius:7,border:"none",background:"rgba(124,58,237,0.4)",
+                        color:"#c4b5fd",fontSize:11,fontWeight:700,cursor:"pointer"}}>MAX</button>
+                  </div>
+                  {sweepAmount&&parseFloat(sweepAmount)>0&&(sweepPrices[sweepToken]||0)>0&&(
+                    <div style={{marginTop:5,color:"rgba(255,255,255,0.35)",fontSize:11,paddingLeft:2}}>
+                      ≈ {(parseFloat(sweepAmount)*(sweepPrices[sweepToken]||0)).toFixed(2)} USD
+                    </div>
+                  )}
+                </div>
+              ):(
+                <div>
+                  <div style={{position:"relative"}}>
+                    <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
+                      color:"rgba(255,255,255,0.5)",fontSize:15,pointerEvents:"none"}}>$</span>
+                    <input type="number" placeholder="0.00" value={sweepUsdInput}
+                      onChange={e=>setSweepUsdInput(e.target.value)}
+                      style={{width:"100%",padding:"12px 80px 12px 28px",borderRadius:12,
+                        background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",
+                        color:"#fff",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
+                    <button onClick={()=>{
+                        const bal=parseFloat(sweepWallet[sweepToken.toLowerCase()+'_balance']||0);
+                        const price=sweepPrices[sweepToken]||0;
+                        setSweepUsdInput(price>0?(bal*price).toFixed(2):'0');
+                      }}
+                      style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",
+                        padding:"4px 10px",borderRadius:7,border:"none",background:"rgba(124,58,237,0.4)",
+                        color:"#c4b5fd",fontSize:11,fontWeight:700,cursor:"pointer"}}>MAX</button>
+                  </div>
+                  {sweepUsdInput&&parseFloat(sweepUsdInput)>0&&(sweepPrices[sweepToken]||0)>0&&(
+                    <div style={{marginTop:5,color:"rgba(255,255,255,0.35)",fontSize:11,paddingLeft:2}}>
+                      ≈ {(parseFloat(sweepUsdInput)/(sweepPrices[sweepToken]||1)).toFixed(6)} {sweepToken}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Address */}
+            <div style={{marginBottom:20}}>
+              <div style={{color:"rgba(255,255,255,0.4)",fontSize:11,marginBottom:8,
+                textTransform:"uppercase",letterSpacing:"0.07em"}}>Адрес получателя</div>
+              <input type="text" placeholder="0x... / TON / SOL адрес"
+                value={sweepAddress} onChange={e=>setSweepAddress(e.target.value)}
+                style={{width:"100%",padding:"12px 14px",borderRadius:12,
+                  background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.12)",
+                  color:"#fff",fontSize:12,outline:"none",boxSizing:"border-box",fontFamily:"monospace"}}/>
+            </div>
+
+            {/* Fee estimate */}
+            <div style={{marginBottom:12,padding:"10px 14px",borderRadius:12,
+              background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.18)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                <span style={{fontSize:12}}>⛽</span>
+                <span style={{color:"rgba(255,255,255,0.4)",fontSize:11,fontWeight:600,
+                  textTransform:"uppercase",letterSpacing:"0.06em"}}>Комиссия сети</span>
+                {sweepFeeLoading&&<span style={{color:"rgba(255,255,255,0.3)",fontSize:10}}>загрузка...</span>}
+              </div>
+              {sweepFee&&!sweepFeeLoading?(
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+                  <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                    <span style={{color:"#34d399",fontSize:14,fontWeight:700}}>
+                      ~{sweepFee.tokenAmt.toFixed(sweepFee.sym==='ARB'?8:sweepFee.sym==='SOL'?6:5)} {sweepFee.sym}
+                    </span>
+                    {sweepFee.usdAmt>0&&(
+                      <span style={{color:"rgba(255,255,255,0.4)",fontSize:11}}>
+                        ≈ ${sweepFee.usdAmt < 0.001 ? sweepFee.usdAmt.toFixed(5) : sweepFee.usdAmt.toFixed(3)}
+                      </span>
+                    )}
+                    {sweepFee.fallback&&(
+                      <span style={{color:"rgba(255,255,255,0.2)",fontSize:10}}>примерно</span>
+                    )}
+                  </div>
+                  {sweepFee.time&&(
+                    <div style={{display:"flex",alignItems:"center",gap:4,
+                      background:"rgba(52,211,153,0.1)",borderRadius:6,padding:"2px 8px"}}>
+                      <span style={{fontSize:10}}>🕐</span>
+                      <span style={{color:"#34d399",fontSize:11,fontWeight:600}}>{sweepFee.time}</span>
+                    </div>
+                  )}
+                </div>
+              ):(
+                <div style={{color:"rgba(255,255,255,0.25)",fontSize:11}}>—</div>
+              )}
+            </div>
+
+            {/* Result */}
+            {sweepResult&&(
+              <div style={{marginBottom:16,padding:"12px 14px",borderRadius:12,
+                background:sweepResult.success?"rgba(52,211,153,0.1)":"rgba(239,68,68,0.1)",
+                border:`1px solid ${sweepResult.success?"rgba(52,211,153,0.3)":"rgba(239,68,68,0.3)"}`}}>
+                {sweepResult.success
+                  ? <div>
+                      <div style={{color:"#34d399",fontWeight:700,marginBottom:4}}>✅ Успешно!</div>
+                      <div style={{color:"rgba(255,255,255,0.6)",fontSize:11,wordBreak:"break-all"}}>
+                        TX: {sweepResult.txHash}
+                      </div>
+                    </div>
+                  : <div style={{color:"#f87171",fontSize:12}}>❌ {sweepResult.error}</div>
+                }
+              </div>
+            )}
+
+            {/* Confirm */}
+            <button onClick={executeSweep}
+              disabled={sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress}
+              style={{width:"100%",padding:"14px 0",borderRadius:14,border:"none",
+                background:sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                  ?"rgba(124,58,237,0.3)":"linear-gradient(135deg,#7c3aed,#4f46e5)",
+                color:"#fff",fontSize:15,fontWeight:700,
+                cursor:sweepLoading||!sweepAmount||!sweepAddress?"not-allowed":"pointer"}}>
+              {sweepLoading?"⏳ Отправка...":"💸 Подтвердить Sweep"}
+            </button>
+            <button onClick={()=>{setSweepWallet(null);setSweepResult(null);}}
+              disabled={sweepLoading}
+              style={{width:"100%",marginTop:10,padding:"12px 0",borderRadius:14,border:"none",
+                background:"transparent",color:"rgba(255,255,255,0.35)",fontSize:14,cursor:"pointer"}}>
+              Отмена
+            </button>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }
