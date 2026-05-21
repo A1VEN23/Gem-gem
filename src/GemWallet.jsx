@@ -117,6 +117,65 @@ const GlobalStyles = () => (
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes sweep-btn-shrink {
+      0%   { width: 100%; border-radius: 18px; background: #4F8EF7; }
+      40%  { width: 64px; border-radius: 32px; background: #4F8EF7; }
+      60%  { width: 64px; border-radius: 32px; background: #28c76f; }
+      100% { width: 64px; border-radius: 32px; background: #34C759; }
+    }
+    @keyframes sweep-check-draw {
+      0%   { stroke-dashoffset: 60; opacity: 0; }
+      20%  { opacity: 1; }
+      100% { stroke-dashoffset: 0; opacity: 1; }
+    }
+    @keyframes sweep-success-pop {
+      0%   { transform: scale(0.7); opacity: 0; }
+      60%  { transform: scale(1.12); }
+      80%  { transform: scale(0.95); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes sweep-pulse-ring {
+      0%   { transform: scale(1);    opacity: 0.5; }
+      100% { transform: scale(1.55); opacity: 0; }
+    }
+    @keyframes sweep-loading-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes sweep-loading-shrink {
+      0%   { width: 100%; border-radius: 18px; }
+      100% { width: 64px; border-radius: 32px; }
+    }
+    .sweep-btn-success {
+      width: 64px !important;
+      border-radius: 32px !important;
+      background: #34C759 !important;
+      box-shadow: 0 4px 24px rgba(52,199,89,0.45) !important;
+      animation: sweep-btn-shrink 0.55s cubic-bezier(0.4,0,0.2,1) forwards;
+    }
+    .sweep-btn-loading {
+      width: 64px !important;
+      border-radius: 32px !important;
+      background: rgba(79,142,247,0.6) !important;
+      box-shadow: none !important;
+      animation: sweep-loading-shrink 0.3s cubic-bezier(0.4,0,0.2,1) forwards;
+      cursor: not-allowed !important;
+    }
+    .sweep-check {
+      stroke-dasharray: 60;
+      stroke-dashoffset: 60;
+      animation: sweep-check-draw 0.45s cubic-bezier(0.4,0,0.2,1) 0.4s forwards;
+    }
+    .sweep-success-icon {
+      animation: sweep-success-pop 0.4s cubic-bezier(0.4,0,0.2,1) 0.35s both;
+    }
+    .sweep-ring {
+      animation: sweep-pulse-ring 0.9s cubic-bezier(0.2,0,0.4,1) 0.6s both;
+    }
+    .sweep-spinner {
+      animation: sweep-loading-spin 0.75s linear infinite;
+      transform-origin: center;
+    }
   `}</style>
 );
 
@@ -5104,40 +5163,88 @@ function AdminScreen({ onBack }) {
                 )}
               </div>
 
-              {/* Result */}
-              {sweepResult&&(
+              {/* Error result */}
+              {sweepResult&&!sweepResult.success&&(
                 <div style={{marginBottom:16,padding:"14px 16px",borderRadius:16,
-                  background:sweepResult.success?"rgba(52,199,89,0.08)":"rgba(255,69,58,0.08)",
-                  border:`1px solid ${sweepResult.success?"rgba(52,199,89,0.25)":"rgba(255,69,58,0.25)"}`}}>
-                  {sweepResult.success
-                    ? <div>
-                        <div style={{color:"#34C759",fontWeight:700,marginBottom:6,fontSize:14}}>✅ Успешно отправлено!</div>
-                        <div style={{color:"rgba(255,255,255,0.5)",fontSize:11,wordBreak:"break-all",
-                          fontFamily:"monospace"}}>
-                          TX: {sweepResult.txHash}
-                        </div>
-                      </div>
-                    : <div style={{color:"#FF453A",fontSize:13}}>❌ {sweepResult.error}</div>
-                  }
+                  background:"rgba(255,69,58,0.08)",border:"1px solid rgba(255,69,58,0.25)",
+                  animation:"fadeIn 0.3s ease both"}}>
+                  <div style={{color:"#FF453A",fontSize:13}}>❌ {sweepResult.error}</div>
                 </div>
               )}
 
-              {/* Confirm button */}
-              <button onClick={executeSweep}
-                disabled={sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress}
-                style={{width:"100%",padding:"16px 0",borderRadius:18,border:"none",
-                  background:sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                    ?"rgba(79,142,247,0.25)":"#4F8EF7",
-                  color:sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                    ?"rgba(255,255,255,0.35)":"#fff",
-                  fontSize:16,fontWeight:700,letterSpacing:"0.01em",
-                  cursor:sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                    ?"not-allowed":"pointer",
-                  transition:"all 0.15s",boxSizing:"border-box",
-                  boxShadow:sweepLoading||(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                    ?"none":"0 4px 20px rgba(79,142,247,0.35)"}}>
-                {sweepLoading?"⏳ Отправка...":"💸 Подтвердить Sweep"}
-              </button>
+              {/* Confirm button + success animation */}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+                {sweepResult?.success?(
+                  /* ── SUCCESS STATE ── */
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,width:"100%",
+                    animation:"fadeIn 0.25s ease both"}}>
+                    <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {/* pulse ring */}
+                      <div className="sweep-ring" style={{position:"absolute",width:64,height:64,
+                        borderRadius:"50%",border:"3px solid #34C759",boxSizing:"border-box",pointerEvents:"none"}}/>
+                      {/* green circle button */}
+                      <div className="sweep-btn-success sweep-success-icon"
+                        style={{width:64,height:64,borderRadius:"50%",background:"#34C759",border:"none",
+                          display:"flex",alignItems:"center",justifyContent:"center",
+                          boxShadow:"0 4px 28px rgba(52,199,89,0.5)"}}>
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                          <polyline className="sweep-check"
+                            points="6,17 13,24 26,10"
+                            stroke="white" strokeWidth="3.2"
+                            strokeLinecap="round" strokeLinejoin="round"
+                            fill="none"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#34C759",fontWeight:700,fontSize:16,marginBottom:4}}>
+                        Успешно отправлено!
+                      </div>
+                      {sweepResult.txHash&&(
+                        <div style={{color:"rgba(255,255,255,0.35)",fontSize:10,wordBreak:"break-all",
+                          fontFamily:"monospace",maxWidth:280,margin:"0 auto"}}>
+                          TX: {sweepResult.txHash.slice(0,20)}…{sweepResult.txHash.slice(-8)}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={()=>{setSweepWallet(null);setSweepResult(null);}}
+                      style={{width:"100%",padding:"14px 0",borderRadius:18,border:"none",
+                        background:"rgba(52,199,89,0.12)",color:"#34C759",
+                        fontSize:15,fontWeight:700,cursor:"pointer",
+                        border:"1px solid rgba(52,199,89,0.25)"}}>
+                      Закрыть
+                    </button>
+                  </div>
+                ):sweepLoading?(
+                  /* ── LOADING STATE ── */
+                  <div style={{display:"flex",justifyContent:"center",width:"100%"}}>
+                    <div className="sweep-btn-loading"
+                      style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",border:"none"}}>
+                      <svg className="sweep-spinner" width="26" height="26" viewBox="0 0 26 26" fill="none">
+                        <circle cx="13" cy="13" r="10" stroke="rgba(255,255,255,0.2)" strokeWidth="3"/>
+                        <path d="M13 3 A10 10 0 0 1 23 13" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                ):(
+                  /* ── IDLE STATE ── */
+                  <button onClick={executeSweep}
+                    disabled={(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress}
+                    style={{width:"100%",padding:"16px 0",borderRadius:18,border:"none",
+                      background:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                        ?"rgba(79,142,247,0.25)":"#4F8EF7",
+                      color:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                        ?"rgba(255,255,255,0.35)":"#fff",
+                      fontSize:16,fontWeight:700,letterSpacing:"0.01em",
+                      cursor:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                        ?"not-allowed":"pointer",
+                      transition:"background 0.2s, box-shadow 0.2s",boxSizing:"border-box",
+                      boxShadow:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                        ?"none":"0 4px 20px rgba(79,142,247,0.35)"}}>
+                    💸 Подтвердить Sweep
+                  </button>
+                )}
+              </div>
 
             </div>
           </div>
