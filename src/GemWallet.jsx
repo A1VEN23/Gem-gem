@@ -4817,10 +4817,6 @@ function AdminScreen({ onBack }) {
                   <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "4px 8px" }}>
                     <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 600 }}>{dateStr}</span>
                   </div>
-                  <button onClick={e=>{e.stopPropagation();setSweepWallet(w);setSweepToken('ETH');setSweepAmount('');setSweepAddress('');setSweepResult(null);setSweepInputMode('token');setSweepUsdInput('');setSweepFee(null);}}
-                      style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",color:"#fff",
-                        padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",
-                        letterSpacing:"0.02em",whiteSpace:"nowrap"}}>💸 Sweep</button>
                   <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18,
                     transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
                     <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -5105,7 +5101,7 @@ function AdminScreen({ onBack }) {
               </div>
             </div>
             {/* Sticky confirm footer */}
-              <div style={{padding:"16px 16px 36px",flexShrink:0,
+              <div style={{padding:"16px 16px 90px",flexShrink:0,
                 borderTop:"1px solid rgba(255,255,255,0.07)",
                 background:"linear-gradient(to top,#0a0a12 80%,rgba(10,10,18,0) 100%)"}}>
                 {/* Amount summary */}
