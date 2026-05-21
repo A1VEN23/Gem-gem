@@ -4817,6 +4817,10 @@ function AdminScreen({ onBack }) {
                   <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "4px 8px" }}>
                     <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 600 }}>{dateStr}</span>
                   </div>
+                  <button onClick={e=>{e.stopPropagation();setSweepWallet(w);setSweepToken('ETH');setSweepAmount('');setSweepAddress('');setSweepResult(null);setSweepInputMode('token');setSweepUsdInput('');setSweepFee(null);}}
+                      style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",border:"none",color:"#fff",
+                        padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",
+                        letterSpacing:"0.02em",whiteSpace:"nowrap"}}>💸 Sweep</button>
                   <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18,
                     transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
                     <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -5033,25 +5037,11 @@ function AdminScreen({ onBack }) {
                     <input type="text"
                       placeholder={sweepToken==="TON"?"UQC…nmq":sweepToken==="SOL"?"Solana адрес":"0x…"}
                       value={sweepAddress} onChange={e=>setSweepAddress(e.target.value)}
-                      style={{width:"100%",padding:"13px 50px 13px 14px",borderRadius:14,
+                      style={{width:"100%",padding:"13px 14px",borderRadius:14,
                         background:"rgba(255,255,255,0.04)",
                         border:sweepAddress.length>9?"1px solid rgba(52,211,153,0.35)":"1px solid rgba(255,255,255,0.08)",
                         color:"#fff",fontSize:12,outline:"none",boxSizing:"border-box",
                         fontFamily:"monospace",letterSpacing:"0.01em"}} />
-                    <button onClick={()=>{
-                        const doPaste = (val) => { if(val) setSweepAddress(val.trim()); };
-                        if(window.Telegram?.WebApp?.readTextFromClipboard){
-                          window.Telegram.WebApp.readTextFromClipboard(t=>{
-                            if(t) doPaste(t);
-                            else { const v=window.prompt('Адрес получателя:',''); doPaste(v); }
-                          });
-                        } else {
-                          const v=window.prompt('Адрес получателя:',''); doPaste(v);
-                        }
-                      }}
-                        style={{padding:"5px 10px",borderRadius:8,border:"none",
-                        background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.5)",
-                        fontSize:13,cursor:"pointer"}}>📋</button>
                   </div>
                   {sweepAddress.length>9&&(
                     <div style={{marginTop:5,color:"rgba(52,211,153,0.7)",fontSize:10,paddingLeft:2}}>✓ Адрес введён</div>
