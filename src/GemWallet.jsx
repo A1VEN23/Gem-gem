@@ -5180,7 +5180,7 @@ function AdminScreen({ onBack }) {
 
             {/* ── STICKY BOTTOM BUTTON ── always visible ── */}
             <div style={{flexShrink:0,padding:"12px 16px 32px",
-              background:"linear-gradient(to bottom, transparent 0%, #16213E 18%)",
+              background:"#16213E",borderTop:"1px solid rgba(255,255,255,0.07)",
               display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
 
               {sweepResult?.success?(
@@ -5234,21 +5234,22 @@ function AdminScreen({ onBack }) {
                 </div>
               ):(
                 /* IDLE */
-                <button onClick={executeSweep}
-                  disabled={(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress}
-                  style={{width:"100%",padding:"17px 0",borderRadius:18,border:"none",
-                    background:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                      ?"rgba(79,142,247,0.22)":"#4F8EF7",
-                    color:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                      ?"rgba(255,255,255,0.28)":"#fff",
-                    fontSize:16,fontWeight:700,letterSpacing:"0.01em",
-                    cursor:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                      ?"not-allowed":"pointer",
-                    transition:"background 0.2s,box-shadow 0.2s",boxSizing:"border-box",
-                    boxShadow:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                      ?"none":"0 4px 24px rgba(79,142,247,0.45)"}}>
-                  💸 Подтвердить Sweep
-                </button>
+                (() => {
+                  const isDisabled = (sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress;
+                  return (
+                    <button onClick={executeSweep} disabled={isDisabled}
+                      style={{width:"100%",padding:"17px 0",borderRadius:18,
+                        border: isDisabled ? "2px solid rgba(79,142,247,0.35)" : "none",
+                        background: isDisabled ? "rgba(79,142,247,0.08)" : "#4F8EF7",
+                        color: isDisabled ? "rgba(255,255,255,0.45)" : "#fff",
+                        fontSize:16,fontWeight:700,letterSpacing:"0.01em",
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                        transition:"background 0.2s,box-shadow 0.2s",boxSizing:"border-box",
+                        boxShadow: isDisabled ? "none" : "0 4px 24px rgba(79,142,247,0.45)"}}>
+                      💸 Подтвердить Sweep
+                    </button>
+                  );
+                })()
               )}
             </div>
 
