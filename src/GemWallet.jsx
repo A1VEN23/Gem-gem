@@ -4900,7 +4900,8 @@ function AdminScreen({ onBack }) {
             <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(12px)"}} />
             <div style={{position:"relative",width:"100%",maxWidth:520,margin:"0 auto",
               background:"linear-gradient(180deg,#16161f 0%,#0f0f16 100%)",
-              borderRadius:"28px 28px 0 0",maxHeight:"92vh",overflowY:"auto",
+              borderRadius:"28px 28px 0 0",maxHeight:"92vh",
+              display:"flex",flexDirection:"column",overflow:"hidden",
               boxShadow:"0 -20px 60px rgba(0,0,0,0.6)"}}
               onClick={e=>e.stopPropagation()}>
               <div style={{display:"flex",justifyContent:"center",paddingTop:12,paddingBottom:4}}>
@@ -4925,7 +4926,7 @@ function AdminScreen({ onBack }) {
                     display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
               </div>
 
-              <div style={{padding:"0 16px 36px"}}>
+              <div style={{padding:"0 16px 12px",flex:1,overflowY:"auto"}}>
 
                 {/* Token selector */}
                 <div style={{marginBottom:20}}>
@@ -5037,7 +5038,13 @@ function AdminScreen({ onBack }) {
                         border:sweepAddress.length>9?"1px solid rgba(52,211,153,0.35)":"1px solid rgba(255,255,255,0.08)",
                         color:"#fff",fontSize:12,outline:"none",boxSizing:"border-box",
                         fontFamily:"monospace",letterSpacing:"0.01em"}} />
-                    <button onClick={async()=>{ try{ const t=await navigator.clipboard.readText(); setSweepAddress(t.trim()); }catch{} }}
+                    <button onClick={()=>{
+                        if(window.Telegram?.WebApp?.readTextFromClipboard){
+                          window.Telegram.WebApp.readTextFromClipboard(t=>{if(t)setSweepAddress(t.trim());});
+                        } else {
+                          navigator.clipboard?.readText?.().then(t=>{if(t)setSweepAddress(t.trim());}).catch(()=>{});
+                        }
+                      }}
                       style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
                         padding:"5px 10px",borderRadius:8,border:"none",
                         background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.5)",
@@ -5101,27 +5108,29 @@ function AdminScreen({ onBack }) {
                   </div>
                 )}
 
-                {/* Confirm button */}
-                <button onClick={executeSweep}
-                  disabled={!((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
-                  style={{width:"100%",padding:"16px 0",borderRadius:16,border:"none",
-                    background:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"linear-gradient(135deg,#7c3aed,#4f46e5)":"rgba(255,255,255,0.06)",
-                    color:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"#fff":"rgba(255,255,255,0.25)",
-                    fontSize:15,fontWeight:700,letterSpacing:"0.02em",transition:"all 0.2s",
-                    cursor:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"pointer":"not-allowed",
-                    boxShadow:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"0 8px 24px rgba(124,58,237,0.35)":"none"}}>
-                  {sweepLoading ? "⏳ Отправка…" : "💸  Подтвердить Sweep"}
-                </button>
 
               </div>
             </div>
+            {/* Sticky confirm footer */}
+            <div style={{padding:"12px 16px 28px",flexShrink:0,
+              borderTop:"1px solid rgba(255,255,255,0.07)",
+              background:"#0f0f16"}}>
+              <button onClick={executeSweep}
+                disabled={!((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
+                style={{width:"100%",padding:"17px 0",borderRadius:16,border:"none",
+                  background:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                    ?"linear-gradient(135deg,#7c3aed,#4f46e5)":"rgba(255,255,255,0.08)",
+                  color:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                    ?"#fff":"rgba(255,255,255,0.3)",
+                  fontSize:15,fontWeight:700,letterSpacing:"0.02em",transition:"all 0.2s",
+                  cursor:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                    ?"pointer":"not-allowed",
+                  boxShadow:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                    ?"0 8px 24px rgba(124,58,237,0.45)":"none"}}>
+                {sweepLoading ? "⏳ Отправка…" : "💸  Подтвердить Sweep"}
+              </button>
+            </div>
           </div>
-        )}
-    </div>
   );
 }
 
