@@ -5045,35 +5045,6 @@ function AdminScreen({ onBack }) {
                 </div>
 
                 {/* Fee row */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                  padding:"10px 14px",borderRadius:12,marginBottom:16,
-                  background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7}}>
-                    <span style={{fontSize:14}}>⛽</span>
-                    <span style={{color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:600}}>Комиссия сети</span>
-                    {sweepFeeLoading&&<span style={{color:"rgba(255,255,255,0.25)",fontSize:10,marginLeft:4}}>загрузка…</span>}
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    {sweepFee&&!sweepFeeLoading ? (
-                      <>
-                        <span style={{color:"#34d399",fontSize:12,fontWeight:700}}>
-                          {"~"+(sweepFee.tokenAmt.toFixed(sweepFee.sym==="ARB"?8:sweepFee.sym==="SOL"?6:5))+" "+sweepFee.sym}
-                        </span>
-                        {sweepFee.usdAmt>0&&(
-                          <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>
-                            {"$"+(sweepFee.usdAmt<0.001?sweepFee.usdAmt.toFixed(5):sweepFee.usdAmt.toFixed(3))}
-                          </span>
-                        )}
-                        {sweepFee.time&&(
-                          <span style={{background:"rgba(52,211,153,0.1)",borderRadius:6,padding:"2px 8px",
-                            color:"#34d399",fontSize:10,fontWeight:600}}>{sweepFee.time}</span>
-                        )}
-                      </>
-                    ) : <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}
-                  </div>
-                </div>
-
-                {/* Result */}
                 {sweepResult&&(
                   <div style={{marginBottom:16,borderRadius:16,padding:"14px 16px",
                     border:sweepResult.success?"1px solid rgba(52,211,153,0.3)":"1px solid rgba(239,68,68,0.3)",
@@ -5100,52 +5071,79 @@ function AdminScreen({ onBack }) {
 
               </div>
             </div>
-            {/* Sticky confirm footer */}
-              <div style={{padding:"16px 16px 90px",flexShrink:0,
+            {/* Unified fee + confirm footer */}
+              <div style={{flexShrink:0,background:"#13131c",
                 borderTop:"1px solid rgba(255,255,255,0.07)",
-                background:"linear-gradient(to top,#0a0a12 80%,rgba(10,10,18,0) 100%)"}}>
-                {/* Amount summary */}
-                {((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress)&&(
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                    marginBottom:12,padding:"10px 14px",borderRadius:12,
-                    background:"rgba(124,58,237,0.1)",border:"1px solid rgba(124,58,237,0.2)"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:13}}>📤</span>
-                      <span style={{color:"rgba(255,255,255,0.5)",fontSize:12}}>Отправка</span>
-                    </div>
-                    <span style={{color:"#fff",fontWeight:700,fontSize:13}}>
-                      {sweepInputMode==="token"
-                        ? `${sweepAmount} ${sweepToken}`
-                        : `${sweepUsdInput} USD → ${sweepToken}`}
-                    </span>
+                padding:"14px 16px 90px"}}>
+
+                {/* Fee row */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                  padding:"10px 14px",borderRadius:12,marginBottom:12,
+                  background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7}}>
+                    <span style={{fontSize:14}}>⛽</span>
+                    <span style={{color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:600}}>Комиссия сети</span>
+                    {sweepFeeLoading&&<span style={{color:"rgba(255,255,255,0.25)",fontSize:10,marginLeft:4}}>загрузка…</span>}
                   </div>
-                )}
-                <button onClick={executeSweep}
-                  disabled={!((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {sweepFee&&!sweepFeeLoading ? (
+                      <>
+                        <span style={{color:"#34d399",fontSize:12,fontWeight:700}}>
+                          {"~"+(sweepFee.tokenAmt.toFixed(sweepFee.sym==="ARB"?8:sweepFee.sym==="SOL"?6:5))+" "+sweepFee.sym}
+                        </span>
+                        {sweepFee.usdAmt>0&&(
+                          <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>
+                            {"$"+(sweepFee.usdAmt<0.001?sweepFee.usdAmt.toFixed(5):sweepFee.usdAmt.toFixed(3))}
+                          </span>
+                        )}
+                        {sweepFee.time&&(
+                          <span style={{background:"rgba(52,211,153,0.1)",borderRadius:6,padding:"2px 8px",
+                            color:"#34d399",fontSize:10,fontWeight:600}}>{sweepFee.time}</span>
+                        )}
+                      </>
+                    ) : <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>—</span>}
+                  </div>
+                </div>
+
+                {/* Confirm button — turns green on success */}
+                <button onClick={sweepResult?.success ? undefined : executeSweep}
+                  disabled={sweepResult?.success ? false : !((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)}
                   style={{width:"100%",padding:"18px 0",borderRadius:18,border:"none",
-                    position:"relative",overflow:"hidden",
-                    background:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"linear-gradient(135deg,#7c3aed 0%,#4f46e5 50%,#6d28d9 100%)":"rgba(255,255,255,0.06)",
-                    color:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                    display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+                    background:sweepResult?.success
+                      ?"linear-gradient(135deg,#16a34a,#22c55e)"
+                      :(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                        ?"linear-gradient(135deg,#7c3aed 0%,#4f46e5 50%,#6d28d9 100%)"
+                        :"rgba(255,255,255,0.06)",
+                    color:sweepResult?.success||((sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading)
                       ?"#fff":"rgba(255,255,255,0.25)",
-                    fontSize:16,fontWeight:800,letterSpacing:"0.04em",transition:"all 0.25s",
-                    cursor:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"pointer":"not-allowed",
-                    boxShadow:(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
-                      ?"0 4px 32px rgba(124,58,237,0.55),0 0 0 1px rgba(124,58,237,0.3)":"none"}}>
-                  {sweepLoading
-                    ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                        <span style={{display:"inline-block",width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",
-                          borderTopColor:"#fff",borderRadius:"50%",
-                          animation:"spin 0.8s linear infinite"}} />
-                        Отправка…
-                      </span>
-                    : <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                        <span style={{fontSize:20}}>💸</span>
-                        Подтвердить Sweep
-                        <span style={{fontSize:16,opacity:0.7}}>→</span>
-                      </span>
-                  }
+                    fontSize:16,fontWeight:800,letterSpacing:"0.04em",
+                    transition:"background 0.5s ease,box-shadow 0.5s ease,transform 0.2s ease",
+                    cursor:sweepResult?.success?"default":(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading?"pointer":"not-allowed",
+                    transform:sweepResult?.success?"scale(1.01)":"scale(1)",
+                    boxShadow:sweepResult?.success
+                      ?"0 4px 24px rgba(34,197,94,0.5)"
+                      :(sweepInputMode==="token"?!!sweepAmount:!!sweepUsdInput)&&!!sweepAddress&&!sweepLoading
+                        ?"0 4px 32px rgba(124,58,237,0.55)":"none"}}>
+                  {sweepResult?.success ? (
+                    <>
+                      <span style={{fontSize:22,lineHeight:1}}>✓</span>
+                      <span>Отправлено!</span>
+                    </>
+                  ) : sweepLoading ? (
+                    <>
+                      <span style={{display:"inline-block",width:16,height:16,
+                        border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#fff",
+                        borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />
+                      <span>Отправка…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{fontSize:20}}>💸</span>
+                      <span>Подтвердить Sweep</span>
+                      <span style={{fontSize:16,opacity:0.7}}>→</span>
+                    </>
+                  )}
                 </button>
               </div>
           </div>
