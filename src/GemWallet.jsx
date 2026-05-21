@@ -1,5 +1,6 @@
 /* ─── Gem Wallet — Updated ──────────────────────────────────── */
 import { useState, useEffect, useRef, memo, useMemo, useCallback, createContext, useContext } from "react";
+import { createPortal } from "react-dom";
 import gemIcon from './assets/gem-icon.png';
 import { useWallet } from './context/WalletContext.jsx';
 import { getEvmFeeEstimate } from './lib/crypto/txSender.js';
@@ -4949,7 +4950,7 @@ function AdminScreen({ onBack }) {
       </div>
 
       {/* ── SWEEP MODAL ─────────────────────────────────────────── */}
-      {sweepWallet&&(
+      {sweepWallet&&createPortal(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:9999,
           display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}
           onClick={()=>{if(!sweepLoading){setSweepWallet(null);setSweepResult(null);}}}>
@@ -5253,7 +5254,7 @@ function AdminScreen({ onBack }) {
 
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
