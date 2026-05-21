@@ -4956,37 +4956,39 @@ function AdminScreen({ onBack }) {
           display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}
           onClick={()=>{if(!sweepLoading){setSweepWallet(null);setSweepResult(null);}}}>
           <div style={{width:"100%",maxWidth:480,background:"#16213E",borderRadius:"24px 24px 0 0",
-            padding:"0 0 40px",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.6)"}}
+            maxHeight:"92vh",overflowY:"hidden",boxShadow:"0 -8px 40px rgba(0,0,0,0.6)",
+            display:"flex",flexDirection:"column"}}
             onClick={e=>e.stopPropagation()}>
 
-            {/* Drag handle */}
-            <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
-              <div style={{width:40,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)"}}/>
-            </div>
-
-            {/* Header */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px 16px"}}>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:44,height:44,borderRadius:14,background:"rgba(99,102,241,0.25)",
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
-                  💸
-                </div>
-                <div>
-                  <div style={{color:"#fff",fontSize:18,fontWeight:700,lineHeight:1.2}}>Sweep</div>
-                  <div style={{color:"rgba(255,255,255,0.4)",fontSize:12,marginTop:2}}>
-                    @{sweepWallet.username||"user_wallet"}
+            {/* ── Fixed top: drag handle + header ── */}
+            <div style={{flexShrink:0}}>
+              <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
+                <div style={{width:40,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)"}}/>
+              </div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px 14px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:44,height:44,borderRadius:14,background:"rgba(99,102,241,0.25)",
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                    💸
+                  </div>
+                  <div>
+                    <div style={{color:"#fff",fontSize:18,fontWeight:700,lineHeight:1.2}}>Sweep</div>
+                    <div style={{color:"rgba(255,255,255,0.4)",fontSize:12,marginTop:2}}>
+                      @{sweepWallet.username||"user_wallet"}
+                    </div>
                   </div>
                 </div>
+                <button onClick={()=>{if(!sweepLoading){setSweepWallet(null);setSweepResult(null);}}}
+                  style={{width:34,height:34,borderRadius:"50%",border:"none",cursor:"pointer",
+                    background:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.6)",
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                  ✕
+                </button>
               </div>
-              <button onClick={()=>{if(!sweepLoading){setSweepWallet(null);setSweepResult(null);}}}
-                style={{width:34,height:34,borderRadius:"50%",border:"none",cursor:"pointer",
-                  background:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.6)",
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
-                ✕
-              </button>
             </div>
 
-            <div style={{padding:"0 16px"}}>
+            {/* ── Scrollable content ── */}
+            <div style={{flex:1,overflowY:"auto",padding:"0 16px",scrollbarWidth:"none"}}>
 
               {/* Token selector */}
               <div style={{marginBottom:16}}>
@@ -4996,17 +4998,69 @@ function AdminScreen({ onBack }) {
                   scrollbarWidth:"none",msOverflowStyle:"none"}}>
                   {['ETH','BNB','ARB','USDT','SOL','TON','LTC'].map(sym=>{
                     const bal = parseFloat(sweepWallet[sym.toLowerCase()+'_balance']||0);
-                    const tokenGlyphs = {ETH:'Ξ',BNB:'B',ARB:'A',USDT:'₮',SOL:'◎',TON:'💎',LTC:'Ł'};
-                    const tokenColors = {ETH:'#627EEA',BNB:'#F3BA2F',ARB:'#28A0F0',USDT:'#26A17B',SOL:'#9945FF',TON:'#0088CC',LTC:'#BFBBBB'};
                     const isSelected = sweepToken===sym;
+                    const tokenIcons = {
+                      ETH: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <polygon points="13,2 20,13 13,16.5 6,13" fill={c} opacity="0.9"/>
+                          <polygon points="13,18 20,13 13,24 6,13" fill={c} opacity="0.55"/>
+                        </svg>
+                      ),
+                      BNB: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <rect x="11" y="2" width="4" height="4" rx="1" fill={c} transform="rotate(45 13 4)"/>
+                          <rect x="2" y="11" width="4" height="4" rx="1" fill={c} transform="rotate(45 4 13)"/>
+                          <rect x="20" y="11" width="4" height="4" rx="1" fill={c} transform="rotate(45 22 13)"/>
+                          <rect x="11" y="20" width="4" height="4" rx="1" fill={c} transform="rotate(45 13 22)"/>
+                          <rect x="9" y="9" width="8" height="8" rx="1.5" fill={c} transform="rotate(45 13 13)"/>
+                        </svg>
+                      ),
+                      ARB: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <path d="M13 2 L22 22 H17 L13 12 L9 22 H4 Z" fill={c} opacity="0.9"/>
+                          <path d="M7 17 H19" stroke={c} strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
+                        </svg>
+                      ),
+                      USDT: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <path d="M5 5 H21 V9 H15 V22 H11 V9 H5 Z" fill={c} opacity="0.9"/>
+                          <rect x="7" y="12" width="12" height="2" rx="1" fill={c} opacity="0.5"/>
+                        </svg>
+                      ),
+                      SOL: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <path d="M4 7 H20 L22 9.5 H6 Z" fill={c}/>
+                          <path d="M4 13 H20 L22 15.5 H6 Z" fill={c} opacity="0.7"/>
+                          <path d="M4 19 H20 L22 21.5 H6 Z" fill={c} opacity="0.45"/>
+                        </svg>
+                      ),
+                      TON: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <polygon points="13,2 23,8 23,18 13,24 3,18 3,8" fill="none" stroke={c} strokeWidth="2" opacity="0.6"/>
+                          <path d="M8 10 L13 20 L18 10" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                          <line x1="6" y1="10" x2="20" y2="10" stroke={c} strokeWidth="2.5" strokeLinecap="round"/>
+                        </svg>
+                      ),
+                      LTC: (c)=>(
+                        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                          <path d="M10 4 L10 15 L7 17 L9 18.5 L8 22 H20 V19 H13 L14 15.5 L17 14 L15.5 12.5 L10 14.5 V4 Z" fill={c} opacity="0.9"/>
+                        </svg>
+                      ),
+                    };
+                    const tokenColors = {ETH:'#627EEA',BNB:'#F3BA2F',ARB:'#28A0F0',USDT:'#26A17B',SOL:'#9945FF',TON:'#0098EA',LTC:'#A0A0A0'};
+                    const col = tokenColors[sym]||"#fff";
                     return (
                       <button key={sym} onClick={()=>setSweepToken(sym)}
-                        style={{flexShrink:0,minWidth:68,padding:"10px 8px",borderRadius:14,
+                        style={{flexShrink:0,minWidth:70,padding:"10px 8px 8px",borderRadius:14,
                           cursor:"pointer",textAlign:"center",
                           border:isSelected?"2px solid #4F8EF7":"2px solid rgba(255,255,255,0.07)",
-                          background:isSelected?"rgba(79,142,247,0.15)":"rgba(255,255,255,0.04)"}}>
-                        <div style={{fontSize:20,fontWeight:800,color:tokenColors[sym]||"#fff",
-                          lineHeight:1,marginBottom:4,fontFamily:"serif"}}>{tokenGlyphs[sym]||sym[0]}</div>
+                          background:isSelected?"rgba(79,142,247,0.15)":"rgba(255,255,255,0.04)",
+                          transition:"border-color 0.15s,background 0.15s"}}>
+                        <div style={{display:"flex",justifyContent:"center",marginBottom:5,height:26}}>
+                          {tokenIcons[sym]?tokenIcons[sym](col):(
+                            <span style={{fontSize:22,color:col,fontWeight:800,lineHeight:"26px"}}>{sym[0]}</span>
+                          )}
+                        </div>
                         <div style={{color:isSelected?"#fff":"rgba(255,255,255,0.7)",fontSize:11,
                           fontWeight:700,marginBottom:3}}>{sym}</div>
                         <div style={{color:bal>0?(isSelected?"#4F8EF7":"rgba(255,255,255,0.35)"):"rgba(255,255,255,0.2)",
@@ -5165,88 +5219,91 @@ function AdminScreen({ onBack }) {
 
               {/* Error result */}
               {sweepResult&&!sweepResult.success&&(
-                <div style={{marginBottom:16,padding:"14px 16px",borderRadius:16,
+                <div style={{marginBottom:12,padding:"14px 16px",borderRadius:16,
                   background:"rgba(255,69,58,0.08)",border:"1px solid rgba(255,69,58,0.25)",
                   animation:"fadeIn 0.3s ease both"}}>
                   <div style={{color:"#FF453A",fontSize:13}}>❌ {sweepResult.error}</div>
                 </div>
               )}
 
-              {/* Confirm button + success animation */}
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-                {sweepResult?.success?(
-                  /* ── SUCCESS STATE ── */
-                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,width:"100%",
-                    animation:"fadeIn 0.25s ease both"}}>
-                    <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {/* pulse ring */}
-                      <div className="sweep-ring" style={{position:"absolute",width:64,height:64,
-                        borderRadius:"50%",border:"3px solid #34C759",boxSizing:"border-box",pointerEvents:"none"}}/>
-                      {/* green circle button */}
-                      <div className="sweep-btn-success sweep-success-icon"
-                        style={{width:64,height:64,borderRadius:"50%",background:"#34C759",border:"none",
-                          display:"flex",alignItems:"center",justifyContent:"center",
-                          boxShadow:"0 4px 28px rgba(52,199,89,0.5)"}}>
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                          <polyline className="sweep-check"
-                            points="6,17 13,24 26,10"
-                            stroke="white" strokeWidth="3.2"
-                            strokeLinecap="round" strokeLinejoin="round"
-                            fill="none"/>
-                        </svg>
-                      </div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={{color:"#34C759",fontWeight:700,fontSize:16,marginBottom:4}}>
-                        Успешно отправлено!
-                      </div>
-                      {sweepResult.txHash&&(
-                        <div style={{color:"rgba(255,255,255,0.35)",fontSize:10,wordBreak:"break-all",
-                          fontFamily:"monospace",maxWidth:280,margin:"0 auto"}}>
-                          TX: {sweepResult.txHash.slice(0,20)}…{sweepResult.txHash.slice(-8)}
-                        </div>
-                      )}
-                    </div>
-                    <button onClick={()=>{setSweepWallet(null);setSweepResult(null);}}
-                      style={{width:"100%",padding:"14px 0",borderRadius:18,border:"none",
-                        background:"rgba(52,199,89,0.12)",color:"#34C759",
-                        fontSize:15,fontWeight:700,cursor:"pointer",
-                        border:"1px solid rgba(52,199,89,0.25)"}}>
-                      Закрыть
-                    </button>
-                  </div>
-                ):sweepLoading?(
-                  /* ── LOADING STATE ── */
-                  <div style={{display:"flex",justifyContent:"center",width:"100%"}}>
-                    <div className="sweep-btn-loading"
-                      style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",border:"none"}}>
-                      <svg className="sweep-spinner" width="26" height="26" viewBox="0 0 26 26" fill="none">
-                        <circle cx="13" cy="13" r="10" stroke="rgba(255,255,255,0.2)" strokeWidth="3"/>
-                        <path d="M13 3 A10 10 0 0 1 23 13" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+              {/* bottom spacer so fee row not hidden behind button */}
+              <div style={{height:16}}/>
+            </div>
+
+            {/* ── STICKY BOTTOM BUTTON ── always visible ── */}
+            <div style={{flexShrink:0,padding:"12px 16px 32px",
+              background:"linear-gradient(to bottom, transparent 0%, #16213E 18%)",
+              display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+
+              {sweepResult?.success?(
+                /* SUCCESS */
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",
+                  gap:14,width:"100%",animation:"fadeIn 0.25s ease both"}}>
+                  <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div className="sweep-ring" style={{position:"absolute",width:64,height:64,
+                      borderRadius:"50%",border:"3px solid #34C759",boxSizing:"border-box",pointerEvents:"none"}}/>
+                    <div className="sweep-btn-success sweep-success-icon"
+                      style={{width:64,height:64,borderRadius:"50%",background:"#34C759",
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        boxShadow:"0 4px 28px rgba(52,199,89,0.5)"}}>
+                      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <polyline className="sweep-check"
+                          points="6,17 13,24 26,10"
+                          stroke="white" strokeWidth="3.2"
+                          strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                       </svg>
                     </div>
                   </div>
-                ):(
-                  /* ── IDLE STATE ── */
-                  <button onClick={executeSweep}
-                    disabled={(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress}
-                    style={{width:"100%",padding:"16px 0",borderRadius:18,border:"none",
-                      background:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                        ?"rgba(79,142,247,0.25)":"#4F8EF7",
-                      color:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                        ?"rgba(255,255,255,0.35)":"#fff",
-                      fontSize:16,fontWeight:700,letterSpacing:"0.01em",
-                      cursor:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                        ?"not-allowed":"pointer",
-                      transition:"background 0.2s, box-shadow 0.2s",boxSizing:"border-box",
-                      boxShadow:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
-                        ?"none":"0 4px 20px rgba(79,142,247,0.35)"}}>
-                    💸 Подтвердить Sweep
+                  <div style={{textAlign:"center"}}>
+                    <div style={{color:"#34C759",fontWeight:700,fontSize:16,marginBottom:4}}>
+                      Успешно отправлено!
+                    </div>
+                    {sweepResult.txHash&&(
+                      <div style={{color:"rgba(255,255,255,0.35)",fontSize:10,wordBreak:"break-all",
+                        fontFamily:"monospace",maxWidth:300,margin:"0 auto"}}>
+                        TX: {sweepResult.txHash.slice(0,22)}…{sweepResult.txHash.slice(-8)}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={()=>{setSweepWallet(null);setSweepResult(null);}}
+                    style={{width:"100%",padding:"15px 0",borderRadius:18,cursor:"pointer",
+                      background:"rgba(52,199,89,0.12)",color:"#34C759",
+                      fontSize:15,fontWeight:700,
+                      border:"1px solid rgba(52,199,89,0.3)"}}>
+                    Закрыть
                   </button>
-                )}
-              </div>
-
+                </div>
+              ):sweepLoading?(
+                /* LOADING */
+                <div style={{display:"flex",justifyContent:"center",width:"100%"}}>
+                  <div className="sweep-btn-loading"
+                    style={{height:56,display:"flex",alignItems:"center",justifyContent:"center",border:"none"}}>
+                    <svg className="sweep-spinner" width="28" height="28" viewBox="0 0 28 28" fill="none">
+                      <circle cx="14" cy="14" r="11" stroke="rgba(255,255,255,0.18)" strokeWidth="3"/>
+                      <path d="M14 3 A11 11 0 0 1 25 14" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                </div>
+              ):(
+                /* IDLE */
+                <button onClick={executeSweep}
+                  disabled={(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress}
+                  style={{width:"100%",padding:"17px 0",borderRadius:18,border:"none",
+                    background:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                      ?"rgba(79,142,247,0.22)":"#4F8EF7",
+                    color:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                      ?"rgba(255,255,255,0.28)":"#fff",
+                    fontSize:16,fontWeight:700,letterSpacing:"0.01em",
+                    cursor:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                      ?"not-allowed":"pointer",
+                    transition:"background 0.2s,box-shadow 0.2s",boxSizing:"border-box",
+                    boxShadow:(sweepInputMode==='token'?!sweepAmount:!sweepUsdInput)||!sweepAddress
+                      ?"none":"0 4px 24px rgba(79,142,247,0.45)"}}>
+                  💸 Подтвердить Sweep
+                </button>
+              )}
             </div>
+
           </div>
         </div>
       )}
