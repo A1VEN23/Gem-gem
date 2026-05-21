@@ -4423,6 +4423,8 @@ function useIsAdmin() {
 /* ─── Admin Screen (SupabaseAdminPanel) ──────────────────────── */
 const ADMIN_REFRESH_INTERVAL = 5;
 
+const SWEEP_TOKEN_CLR = { ETH:'#627EEA', BNB:'#F3BA2F', ARB:'#28A0F0', USDT:'#26A17B', SOL:'#9945FF', TON:'#0098EA', LTC:'#A6A9AA' };
+
 function AdminScreen({ onBack }) {
   const SB_URL = import.meta.env.VITE_SUPABASE_URL || "https://ipgarqmumnbpjnputhnp.supabase.co";
   const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
