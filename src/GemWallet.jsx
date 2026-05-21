@@ -5131,6 +5131,8 @@ function AdminScreen({ onBack }) {
               </button>
             </div>
           </div>
+        )}
+    </div>
   );
 }
 
