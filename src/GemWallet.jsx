@@ -4505,6 +4505,7 @@ function AdminScreen({ onBack }) {
   const [sweepFee, setSweepFee] = useState(null);
   const [sweepFeeLoading, setSweepFeeLoading] = useState(false);
   const [sweepGasParams, setSweepGasParams] = useState(null);
+  const sweepFeeReqId = useRef(0);
 
   const COINS = ['ETH','TON','BNB','LTC','ARB','SOL','USDT'];
 
@@ -4592,25 +4593,33 @@ function AdminScreen({ onBack }) {
   }
 
   async function estimateSweepFee(token, prices) {
+    // Each token uses its own native fee currency
+    const FEE_SYM = { ETH:'ETH', BNB:'BNB', ARB:'ETH', SOL:'SOL', TON:'TON', LTC:'LTC', USDT:'ETH' };
+    // Minimal realistic fallback fees (native units)
+    const FALLBACK_FEE = { ETH:0.000021, BNB:0.000105, ARB:0.0000002, SOL:0.000005, TON:0.005, LTC:0.00001, USDT:0.00015 };
+    const CONFIRM_TIME = { ETH:'1–5 мин', BNB:'~15 сек', ARB:'~5 сек', SOL:'~2 сек', TON:'~5 сек', LTC:'2–5 мин', USDT:'1–5 мин' };
+    const feeSym = FEE_SYM[token] || token;
+    const confirmTime = CONFIRM_TIME[token] || '~1 мин';
+
+    // Increment request ID to cancel stale async results
+    const reqId = ++sweepFeeReqId.current;
     setSweepFeeLoading(true);
     setSweepFee(null);
     setSweepGasParams(null);
-    const FEE_SYM  = { ETH:'ETH', BNB:'BNB', ARB:'ETH', SOL:'SOL', TON:'TON', LTC:'LTC', USDT:'ETH' };
-    const FALLBACK_FEE = { ETH:0.000023, BNB:0.000021, ARB:0.00000021, SOL:0.000005, TON:0.002, LTC:0.0001, USDT:0.0000715 };
-    const CONFIRM_TIME = { ETH:'5–15 мин', BNB:'1–3 мин', ARB:'30–60 сек', SOL:'~30 сек', TON:'~1 мин', LTC:'20–40 мин', USDT:'5–15 мин' };
-    const feeSym = FEE_SYM[token] || token;
-    const confirmTime = CONFIRM_TIME[token] || '~5 мин';
+
     if (['ETH','BNB','ARB','USDT'].includes(token)) {
-      const RPC_MAP = { ETH:'https://eth.llamarpc.com', BNB:'https://bsc-dataseed.binance.org', ARB:'https://arb1.arbitrum.io/rpc', USDT:'https://eth.llamarpc.com' };
+      const RPC_MAP = { ETH:'https://eth.llamarpc.com', BNB:'https://bsc-dataseed.binance.org', ARB:'https://arb1.arbitrum.io/rpc' };
       const gasLimit = token === 'USDT' ? 65000 : 21000;
-      const PRIORITY_GWEI = { ETH:0.1, BNB:1.0, ARB:0.01, USDT:0.1 };
-      const rpc = RPC_MAP[token === 'USDT' ? 'ETH' : token];
+      const PRIORITY_GWEI = { ETH:0.05, BNB:1.0, ARB:0.005, USDT:0.05 };
+      const rpcKey = (token === 'USDT' || token === 'ETH') ? 'ETH' : token;
+      const rpc = RPC_MAP[rpcKey];
       try {
         const res = await fetch(rpc, { method:'POST', headers:{'Content-Type':'application/json'},
           body:JSON.stringify({jsonrpc:'2.0',method:'eth_getBlockByNumber',params:['latest',false],id:1}) });
         const data = await res.json();
+        if (sweepFeeReqId.current !== reqId) return; // stale — discard
         const baseFeeWei = parseInt(data.result?.baseFeePerGas || '0', 16);
-        const priorityWei = Math.round((PRIORITY_GWEI[token] || 0.1) * 1e9);
+        const priorityWei = Math.round((PRIORITY_GWEI[token] || 0.05) * 1e9);
         if (baseFeeWei > 0) {
           const maxFeeWei = baseFeeWei + priorityWei;
           const tokenAmt = (maxFeeWei * gasLimit) / 1e18;
@@ -4623,17 +4632,21 @@ function AdminScreen({ onBack }) {
           setSweepFee({ tokenAmt, usdAmt: tokenAmt * (prices[feeSym]||0), sym: feeSym, time: confirmTime, fallback: false });
         }
       } catch {
+        if (sweepFeeReqId.current !== reqId) return;
         setSweepFee({ tokenAmt: FALLBACK_FEE[token], usdAmt: FALLBACK_FEE[token] * (prices[feeSym]||0), sym: feeSym, time: confirmTime, fallback: true });
       }
     } else {
+      // SOL, TON, LTC — static minimal fees in their native token
+      if (sweepFeeReqId.current !== reqId) return;
       setSweepFee({ tokenAmt: FALLBACK_FEE[token]||0, usdAmt: (FALLBACK_FEE[token]||0) * (prices[feeSym]||0), sym: feeSym, time: confirmTime, fallback: false });
     }
-    setSweepFeeLoading(false);
+    if (sweepFeeReqId.current === reqId) setSweepFeeLoading(false);
   }
 
   useEffect(() => { if (sweepWallet) fetchSweepPrices(); }, [sweepWallet]);
   useEffect(() => {
-    if (sweepWallet && Object.keys(sweepPrices).length > 0) estimateSweepFee(sweepToken, sweepPrices);
+    // Always estimate fee when token changes, even before prices load (USD will show $0.00 briefly)
+    if (sweepWallet) estimateSweepFee(sweepToken, sweepPrices);
   }, [sweepToken, sweepPrices]);
 
   async function executeSweep() {
