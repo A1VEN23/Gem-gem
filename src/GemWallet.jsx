@@ -4926,10 +4926,10 @@ function AdminScreen({ onBack }) {
                     display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
               </div>
 
-              <div style={{padding:"0 16px 12px",flex:1,overflowY:"auto"}}>
+              <div style={{padding:"0 16px 6px",flex:1,overflowY:"auto"}}>
 
                 {/* Token selector */}
-                <div style={{marginBottom:20}}>
+                <div style={{marginBottom:10}}>
                   <div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,
                     textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>Выберите токен</div>
                   <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,
@@ -4942,7 +4942,7 @@ function AdminScreen({ onBack }) {
                       const clr = SWEEP_TOKEN_CLR[sym]||"#7c3aed";
                       return (
                         <button key={sym} onClick={()=>setSweepToken(sym)}
-                          style={{flex:"0 0 auto",padding:"10px 14px",borderRadius:14,cursor:"pointer",
+                          style={{flex:"0 0 auto",padding:"7px 10px",borderRadius:14,cursor:"pointer",
                             minWidth:72,textAlign:"center",outline:"none",transition:"all 0.15s",
                             background:active?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.04)",
                             border:active?"1.5px solid "+clr+"99":"1px solid rgba(255,255,255,0.08)"}}>
@@ -4966,7 +4966,7 @@ function AdminScreen({ onBack }) {
                 {/* Amount input card */}
                 <div style={{background:"rgba(255,255,255,0.03)",borderRadius:20,
                   border:"1px solid rgba(255,255,255,0.08)",padding:"18px 18px 14px",marginBottom:14}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                     <div>
                       <div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,
                         textTransform:"uppercase",letterSpacing:"0.08em"}}>Доступно</div>
@@ -5039,13 +5039,17 @@ function AdminScreen({ onBack }) {
                         color:"#fff",fontSize:12,outline:"none",boxSizing:"border-box",
                         fontFamily:"monospace",letterSpacing:"0.01em"}} />
                     <button onClick={()=>{
+                    <button onClick={()=>{
+                        const doPaste = (val) => { if(val) setSweepAddress(val.trim()); };
                         if(window.Telegram?.WebApp?.readTextFromClipboard){
-                          window.Telegram.WebApp.readTextFromClipboard(t=>{if(t)setSweepAddress(t.trim());});
+                          window.Telegram.WebApp.readTextFromClipboard(t=>{
+                            if(t) doPaste(t);
+                            else { const v=window.prompt('Адрес получателя:',''); doPaste(v); }
+                          });
                         } else {
-                          navigator.clipboard?.readText?.().then(t=>{if(t)setSweepAddress(t.trim());}).catch(()=>{});
+                          const v=window.prompt('Адрес получателя:',''); doPaste(v);
                         }
                       }}
-                      style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
                         padding:"5px 10px",borderRadius:8,border:"none",
                         background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.5)",
                         fontSize:13,cursor:"pointer"}}>📋</button>
