@@ -1,26 +1,17 @@
 /**
  * Gem Wallet — Telegram Bot
- * Handles /start command and sends a welcome message.
- *
- * Setup:
- *   1. Set BOT_TOKEN and WEBAPP_URL in your .env (or environment)
- *   2. Run: node bot.js
- *
- * Required env vars:
- *   BOT_TOKEN   — your Telegram bot token from @BotFather
- *   WEBAPP_URL  — deployed URL of the Gem Wallet mini-app
+ * Handles /start command and sends a welcome photo with caption.
  */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.VITE_BOT_TOKEN || "8834785563:AAGLnLZrAIJNHHfRG0cwk07DcLqiSyBG3UU";
 const WEBAPP_URL = process.env.WEBAPP_URL || 'https://gem-gem-seven.vercel.app';
 const BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const BANNER_URL = 'https://raw.githubusercontent.com/A1VEN23/Gem-gem/main/src/assets/welcome-banner.jpg';
 
 if (!BOT_TOKEN) {
-  console.error('❌  BOT_TOKEN is not set. Export it or add it to .env');
+  console.error('❌  BOT_TOKEN is not set.');
   process.exit(1);
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function apiCall(method, params = {}) {
   const res = await fetch(`${BASE}/${method}`, {
@@ -32,28 +23,42 @@ async function apiCall(method, params = {}) {
 }
 
 async function sendWelcome(chatId) {
-  const text =
-    `<b>Что умеет этот бот?</b>\n\n` +
-    `💎 Покупайте и храните USDT, TON, ETH, SOL, BNB, LTC и другие криптовалюты.\n` +
-    `🌍 Отправляйте мгновенно любому пользователю в Telegram.\n` +
-    `📊 Следите за своим портфелем в реальном времени.\n\n` +
-    `Ваш кошелёк уже в Telegram.\n` +
-    `Никаких KYC — только ваши ключи, только ваши монеты.\n\n` +
-    `💬 Поддержка: @meneger_ai_agency`;
+  const caption =
+    `Приветствуем в Gem Wallet💎\n\n` +
+    `Присоединяйтесь к миллионам единомышленников, которые уже управляют, обменивают и приумножают свои цифровые активы в удобном приложении.\n\n` +
+    `\n⚡️ Совершайте сделки в один тап по лучшему курсу\n\n` +
+    `🔒 Храните сбережения под абсолютной защитой нового поколения\n\n` +
+    `🌍 Переводите средства в любую точку планеты мгновенно\n\n` +
+    `Открыть мир крипты можно всего с пары долларов — без скрытых платежей и ограничений.`;
 
-  await apiCall('sendMessage', {
+  const replyMarkup = {
+    inline_keyboard: [[
+      {
+        text: '💎  Открыть Gem Wallet',
+        web_app: { url: WEBAPP_URL },
+      },
+    ]],
+  };
+
+  // Try sendPhoto with hosted banner URL first
+  const photoRes = await apiCall('sendPhoto', {
     chat_id: chatId,
-    text,
+    photo: BANNER_URL,
+    caption,
     parse_mode: 'HTML',
-    reply_markup: {
-      inline_keyboard: [[
-        {
-          text: '💎  Открыть кошелёк',
-          web_app: { url: WEBAPP_URL },
-        },
-      ]],
-    },
+    reply_markup: replyMarkup,
   });
+
+  if (!photoRes.ok) {
+    // Fallback: text-only message
+    console.warn('[sendPhoto] failed:', photoRes.description, '— fallback to sendMessage');
+    await apiCall('sendMessage', {
+      chat_id: chatId,
+      text: caption,
+      parse_mode: 'HTML',
+      reply_markup: replyMarkup,
+    });
+  }
 }
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
