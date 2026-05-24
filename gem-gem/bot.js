@@ -5,7 +5,7 @@
  */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.VITE_BOT_TOKEN || "8834785563:AAGLnLZrAIJNHHfRG0cwk07DcLqiSyBG3UU";
-const WEBAPP_URL = process.env.WEBAPP_URL || 'https://gem-gem-seven.vercel.app';
+const WEBAPP_URL = process.env.WEBAPP_URL || 'https://1396e4b3-a553-4ca2-b218-135ab89415a1-00-3rb407o4nb7a2.picard.replit.dev';
 const BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const BANNER_URL = 'https://raw.githubusercontent.com/A1VEN23/Gem-gem/main/src/assets/welcome-banner.jpg';
 
