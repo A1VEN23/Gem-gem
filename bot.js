@@ -5,7 +5,7 @@
  */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.VITE_BOT_TOKEN || "8834785563:AAGLnLZrAIJNHHfRG0cwk07DcLqiSyBG3UU";
-const WEBAPP_URL = process.env.WEBAPP_URL || 'https://1396e4b3-a553-4ca2-b218-135ab89415a1-00-3rb407o4nb7a2.picard.replit.dev';
+const WEBAPP_URL = process.env.WEBAPP_URL || 'https://button-fixer--wallettt4441.replit.app/';
 const BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const BANNER_URL = 'https://raw.githubusercontent.com/A1VEN23/Gem-gem/main/src/assets/welcome-banner.jpg';
 
@@ -21,6 +21,17 @@ async function apiCall(method, params = {}) {
     body: JSON.stringify(params),
   });
   return res.json();
+}
+
+// ─── Remove any active webhook to avoid duplicate updates ────────────────────
+
+async function clearWebhook() {
+  const res = await apiCall('deleteWebhook', { drop_pending_updates: false });
+  if (res.ok) {
+    console.log('✅  Webhook cleared — using polling only');
+  } else {
+    console.warn('⚠️  Could not clear webhook:', res.description);
+  }
 }
 
 // ─── Set persistent menu button for all chats ─────────────────────────────────
@@ -82,8 +93,12 @@ async function sendWelcome(chatId) {
 // ─── Polling ──────────────────────────────────────────────────────────────────
 
 let offset = 0;
+let isPolling = false;
 
 async function poll() {
+  if (isPolling) return;
+  isPolling = true;
+
   try {
     const data = await apiCall('getUpdates', {
       offset,
@@ -91,7 +106,11 @@ async function poll() {
       allowed_updates: ['message'],
     });
 
-    if (!data.ok || !data.result) return;
+    if (!data.ok || !data.result) {
+      isPolling = false;
+      setTimeout(poll, 1000);
+      return;
+    }
 
     for (const update of data.result) {
       offset = update.update_id + 1;
@@ -110,8 +129,11 @@ async function poll() {
     console.warn('[poll error]', e.message);
   }
 
+  isPolling = false;
   setTimeout(poll, 500);
 }
 
 console.log('🚀  Gem Wallet Bot starting...');
-setupMenuButton().then(() => poll());
+clearWebhook()
+  .then(() => setupMenuButton())
+  .then(() => poll());
