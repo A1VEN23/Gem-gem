@@ -1,6 +1,7 @@
 /**
  * Gem Wallet — Telegram Bot
  * Handles /start command and sends a welcome photo with caption.
+ * Sets a persistent menu button "💎 Кошелёк" that opens the web app.
  */
 
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.VITE_BOT_TOKEN || "8834785563:AAGLnLZrAIJNHHfRG0cwk07DcLqiSyBG3UU";
@@ -22,11 +23,30 @@ async function apiCall(method, params = {}) {
   return res.json();
 }
 
+// ─── Set persistent menu button for all chats ─────────────────────────────────
+
+async function setupMenuButton() {
+  const res = await apiCall('setChatMenuButton', {
+    menu_button: {
+      type: 'web_app',
+      text: '💎 Кошелёк',
+      web_app: { url: WEBAPP_URL },
+    },
+  });
+  if (res.ok) {
+    console.log('✅  Menu button set: 💎 Кошелёк');
+  } else {
+    console.warn('⚠️  Could not set menu button:', res.description);
+  }
+}
+
+// ─── Welcome message ──────────────────────────────────────────────────────────
+
 async function sendWelcome(chatId) {
   const caption =
     `Приветствуем в Gem Wallet💎\n\n` +
     `Присоединяйтесь к миллионам единомышленников, которые уже управляют, обменивают и приумножают свои цифровые активы в удобном приложении.\n\n` +
-    `\n⚡️ Совершайте сделки в один тап по лучшему курсу\n\n` +
+    `⚡️ Совершайте сделки в один тап по лучшему курсу\n\n` +
     `🔒 Храните сбережения под абсолютной защитой нового поколения\n\n` +
     `🌍 Переводите средства в любую точку планеты мгновенно\n\n` +
     `Открыть мир крипты можно всего с пары долларов — без скрытых платежей и ограничений.`;
@@ -40,7 +60,6 @@ async function sendWelcome(chatId) {
     ]],
   };
 
-  // Try sendPhoto with hosted banner URL first
   const photoRes = await apiCall('sendPhoto', {
     chat_id: chatId,
     photo: BANNER_URL,
@@ -50,7 +69,6 @@ async function sendWelcome(chatId) {
   });
 
   if (!photoRes.ok) {
-    // Fallback: text-only message
     console.warn('[sendPhoto] failed:', photoRes.description, '— fallback to sendMessage');
     await apiCall('sendMessage', {
       chat_id: chatId,
@@ -95,5 +113,5 @@ async function poll() {
   setTimeout(poll, 500);
 }
 
-console.log('🚀  Gem Wallet Bot started — polling for updates...');
-poll();
+console.log('🚀  Gem Wallet Bot starting...');
+setupMenuButton().then(() => poll());
